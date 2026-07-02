@@ -1,5 +1,5 @@
 type SectionHeaderProps = {
-  eyebrow: string;
+  eyebrow?: string;
   title: string;
   description: string;
   align?: "left" | "center";
@@ -19,13 +19,15 @@ export function SectionHeader({
           : "max-w-3xl text-left"
       }
     >
-      <p className="text-xs font-semibold uppercase tracking-[0.28em] text-teal-700">
-        {eyebrow}
-      </p>
-      <h2 className="mt-4 text-3xl font-semibold text-zinc-950 sm:text-4xl">
+      {eyebrow ? (
+        <p className="inline-flex items-center rounded-full border border-[#d8c6af] bg-[#fff9f2] px-3 py-1 text-[0.68rem] font-semibold uppercase tracking-[0.24em] text-[#9a6b3d]">
+          {eyebrow}
+        </p>
+      ) : null}
+      <h2 className="mt-3.5 font-serif text-[1.75rem] font-semibold leading-tight text-zinc-950 sm:text-4xl lg:text-[2.8rem]">
         {title}
       </h2>
-      <p className="mt-4 text-base leading-8 text-zinc-600 sm:text-lg">
+      <p className="mt-2.5 text-[0.95rem] leading-7 text-zinc-600 sm:text-lg sm:leading-8">
         {description}
       </p>
     </div>

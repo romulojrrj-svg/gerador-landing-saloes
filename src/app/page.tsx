@@ -9,22 +9,28 @@ import {
 
 const workflow = [
   {
-    title: "Capturar a identidade do salão",
+    title: "Cadastrar salão",
     description:
-      "Reunir posicionamento, serviços, atmosfera, provas sociais e preferências de agendamento em um cadastro elegante.",
+      "Reúna nome, posicionamento, serviços, idioma, links e fontes visuais em um cadastro guiado.",
     icon: BadgeCheck,
   },
   {
-    title: "Gerar uma estrutura premium",
+    title: "Gerar prévia",
     description:
-      "Montar uma landing page focada em conversão com seções reutilizáveis e blocos prontos para salões.",
+      "Visualize uma landing premium com seções comerciais, prova social e chamada de agendamento.",
     icon: LayoutTemplate,
   },
   {
-    title: "Ajustar a direção visual",
+    title: "Revisar conteúdo",
     description:
-      "Manter o layout refinado, editorial e adaptável para marcas de beleza em mercados internacionais.",
+      "Ajuste textos, imagens e diferenciais antes de enviar a página para o cliente final.",
     icon: Palette,
+  },
+  {
+    title: "Publicar link",
+    description:
+      "Prepare a versão final para compartilhar a landing com tráfego pago, Instagram ou Google.",
+    icon: Sparkles,
   },
 ];
 
@@ -42,14 +48,20 @@ export default function Home() {
         </Link>
         <div className="hidden items-center gap-2 sm:flex">
           <Link
-            href="/salons/maison-lumiere/preview"
-            className="rounded-full px-4 py-2 text-sm font-semibold text-zinc-700 transition hover:bg-white"
+            href="/salons"
+            className="btn btn-secondary min-h-10 px-4 py-2"
           >
-            Prévia
+            Salões salvos
+          </Link>
+          <Link
+            href="/salons/import"
+            className="btn btn-secondary min-h-10 px-4 py-2"
+          >
+            Importar planilha
           </Link>
           <Link
             href="/salons/new"
-            className="inline-flex items-center gap-2 rounded-full bg-zinc-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-teal-800"
+            className="btn btn-primary min-h-10 px-4 py-2"
           >
             Novo salão
             <ArrowRight className="h-4 w-4" />
@@ -67,24 +79,30 @@ export default function Home() {
             Gerador de Landing Pages para Salões
           </h1>
           <p className="mt-6 max-w-2xl text-lg leading-8 text-zinc-600">
-            Um painel focado em transformar perfis de salões em prévias de
-            landing pages elegantes, persuasivas e com estética premium para o
+            Um painel operacional para cadastrar salões, gerar prévias,
+            revisar conteúdo e preparar links de landing pages premium para o
             mercado de beleza.
           </p>
 
           <div className="mt-9 flex flex-col gap-3 sm:flex-row">
             <Link
               href="/salons/new"
-              className="inline-flex items-center justify-center gap-2 rounded-full bg-zinc-950 px-6 py-3 text-sm font-semibold text-white transition hover:bg-teal-800"
+              className="btn btn-primary px-6 py-3"
             >
               Criar perfil do salão
               <ArrowRight className="h-4 w-4" />
             </Link>
             <Link
-              href="/salons/maison-lumiere/preview"
-              className="inline-flex items-center justify-center rounded-full border border-zinc-300 bg-white/70 px-6 py-3 text-sm font-semibold text-zinc-950 transition hover:border-rose-200 hover:bg-rose-50"
+              href="/salons/import"
+              className="btn btn-secondary px-6 py-3"
             >
-              Ver prévia de exemplo
+              Importar planilha
+            </Link>
+            <Link
+              href="/salons"
+              className="btn btn-secondary px-6 py-3"
+            >
+              Ver salões salvos
             </Link>
           </div>
         </div>
@@ -98,23 +116,23 @@ export default function Home() {
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <p className="text-xs font-semibold uppercase tracking-[0.22em] text-teal-700">
-                      Salão de exemplo
+                      Fluxo operacional
                     </p>
                     <h2 className="mt-3 text-3xl font-semibold text-zinc-950">
-                      Maison Lumiere Atelier
+                      Da ficha do salão ao link pronto
                     </h2>
                     <p className="mt-3 text-sm leading-7 text-zinc-600">
-                      Luxury hair artistry, skin rituals, and luminous styling
-                      in Mayfair.
+                      Organize cadastro, fontes visuais, prévia e revisão em
+                      uma sequência simples para vender melhor o salão.
                     </p>
                   </div>
                   <span className="rounded-full bg-rose-100 px-3 py-1 text-xs font-semibold text-zinc-900">
-                    Premium
+                    Preparado
                   </span>
                 </div>
 
                 <div className="mt-7 grid gap-3">
-                  {workflow.map((item) => {
+                  {workflow.map((item, index) => {
                     const Icon = item.icon;
 
                     return (
@@ -126,9 +144,14 @@ export default function Home() {
                           <Icon className="h-5 w-5" />
                         </span>
                         <div>
-                          <h3 className="font-semibold text-zinc-950">
-                            {item.title}
-                          </h3>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-bold uppercase tracking-[0.14em] text-teal-700 ring-1 ring-zinc-200">
+                              Etapa {index + 1}
+                            </span>
+                            <h3 className="font-semibold text-zinc-950">
+                              {item.title}
+                            </h3>
+                          </div>
                           <p className="mt-1 text-sm leading-6 text-zinc-600">
                             {item.description}
                           </p>

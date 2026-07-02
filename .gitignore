@@ -23,3 +23,14 @@ pnpm-debug.log*
 
 # typescript
 *.tsbuildinfo
+
+# Local development data
+.local-data/
+.local-browser-profile/
+.next/
+node_modules/
+*.log
+.codex-dev*.log
+devserver.log
+temp-upload-image.*
+tsconfig.tsbuildinfo
