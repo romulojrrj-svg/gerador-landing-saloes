@@ -98,7 +98,7 @@ export function mapSalonToSupabaseRow(salon: Salon): SupabaseSalonWrite {
     ...(isUuid(completeSalon.id) ? { id: completeSalon.id } : {}),
     slug: completeSalon.slug,
     name: completeSalon.name,
-    status: completeSalon.status,
+    status: normalizeStatusForWrite(completeSalon.status),
     commercial_status: completeSalon.commercialStatus,
     language: completeSalon.language,
     country: emptyToNull(completeSalon.country),
@@ -256,8 +256,28 @@ function buildLocation(city: string | null, country: string | null) {
 }
 
 function normalizeStatus(value: string | null): Salon["status"] {
-  if (value === "draft" || value === "preview" || value === "published") {
-    return value;
+  const normalizedValue = value?.trim();
+
+  if (
+    normalizedValue === "draft" ||
+    normalizedValue === "preview" ||
+    normalizedValue === "published"
+  ) {
+    return normalizedValue;
+  }
+
+  return "preview";
+}
+
+function normalizeStatusForWrite(value: string | null | undefined): Salon["status"] {
+  const normalizedValue = value?.trim();
+
+  if (
+    normalizedValue === "draft" ||
+    normalizedValue === "preview" ||
+    normalizedValue === "published"
+  ) {
+    return normalizedValue;
   }
 
   return "preview";

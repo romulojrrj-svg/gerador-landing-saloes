@@ -345,6 +345,40 @@ export function moveImageWithinDestination(
   });
 }
 
+export function reorderImageInDestination(
+  plan: SalonLayoutImagePlan | undefined,
+  imageId: string,
+  destination: Extract<SalonImagePlanDestination, "top" | "gallery" | "space">,
+  targetIndex: number,
+  options: NormalizeSalonLayoutImagePlanOptions = {},
+) {
+  const normalizedPlan =
+    normalizeSalonLayoutImagePlan(plan, options) ?? createEmptySalonLayoutImagePlan();
+  const nextPlan = {
+    ...normalizedPlan,
+    topImageIds:
+      destination === "top"
+        ? reorderPlanIds(normalizedPlan.topImageIds ?? [], imageId, targetIndex)
+        : normalizedPlan.topImageIds ?? [],
+    galleryImageIds:
+      destination === "gallery"
+        ? reorderPlanIds(normalizedPlan.galleryImageIds ?? [], imageId, targetIndex)
+        : normalizedPlan.galleryImageIds ?? [],
+    spaceImageIds:
+      destination === "space"
+        ? reorderPlanIds(normalizedPlan.spaceImageIds ?? [], imageId, targetIndex)
+        : normalizedPlan.spaceImageIds ?? [],
+    experienceImageIds:
+      destination === "space"
+        ? reorderPlanIds(normalizedPlan.experienceImageIds ?? [], imageId, targetIndex)
+        : normalizedPlan.experienceImageIds ?? [],
+  };
+
+  return touchLayoutImagePlan(
+    normalizeSalonLayoutImagePlan(nextPlan, options) ?? normalizedPlan,
+  );
+}
+
 export function updateLayoutPlanSpaceSettings(
   plan: SalonLayoutImagePlan | undefined,
   updates: Partial<
@@ -520,6 +554,25 @@ function movePlanIdInList(ids: string[], imageId: string, direction: -1 | 1) {
 
   const [movedId] = nextIds.splice(index, 1);
   nextIds.splice(nextIndex, 0, movedId);
+  return nextIds;
+}
+
+function reorderPlanIds(ids: string[], imageId: string, targetIndex: number) {
+  const nextIds = [...ids];
+  const currentIndex = nextIds.findIndex((currentId) =>
+    imageIdMatchesPlanId(imageId, currentId),
+  );
+
+  if (currentIndex === -1) {
+    return nextIds;
+  }
+
+  const [movedId] = nextIds.splice(currentIndex, 1);
+  const boundedTargetIndex = Math.max(0, Math.min(targetIndex, nextIds.length));
+  const insertionIndex =
+    currentIndex < boundedTargetIndex ? boundedTargetIndex - 1 : boundedTargetIndex;
+
+  nextIds.splice(insertionIndex, 0, movedId);
   return nextIds;
 }
 

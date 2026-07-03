@@ -634,7 +634,7 @@ function buildCompleteSalon(partialSalon: Partial<Salon>): Salon {
       whatsapp,
       phone,
     },
-    status: partialSalon.status ?? "draft",
+    status: normalizeSalonStatus(partialSalon.status),
     commercialStatus,
     createdAt: partialSalon.createdAt ?? now,
     updatedAt: partialSalon.updatedAt ?? now,
@@ -767,7 +767,7 @@ function dataToPartialSalon(data: SalonFormInput): Partial<Salon> {
     lastAppliedAt: data.lastAppliedAt,
     sourceMode: "manual" satisfies SalonSourceMode,
     generationStatus: "needs_review",
-    status: data.status ?? "preview",
+    status: normalizeSalonStatus(data.status),
     headline: data.generatedCopy?.headline ?? data.name,
     subheadline: data.generatedCopy?.subheadline ?? data.positioningLine,
     aboutText: data.generatedCopy?.aboutText ?? data.description,
@@ -1187,10 +1187,24 @@ function getLanguage(formData: FormData): SalonLanguage {
 }
 
 function getStatus(formData: FormData): SalonStatus {
-  const status = String(formData.get("status") ?? "draft");
+  const status = String(formData.get("status") ?? "draft").trim();
 
   if (status === "draft" || status === "preview" || status === "published") {
     return status;
+  }
+
+  return "draft";
+}
+
+function normalizeSalonStatus(status: string | null | undefined): SalonStatus {
+  const normalizedStatus = status?.trim();
+
+  if (
+    normalizedStatus === "draft" ||
+    normalizedStatus === "preview" ||
+    normalizedStatus === "published"
+  ) {
+    return normalizedStatus;
   }
 
   return "draft";

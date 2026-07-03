@@ -963,11 +963,16 @@ function resolvePlanImages(salon: Salon, imageIds: string[]) {
     .map((imageId) => resolveImageFromPlanId(salon, imageId))
     .filter((image): image is SalonGalleryImage => Boolean(image))
     .filter((image) => {
-      if (seen.has(image.id)) {
+      const identityKeys = getImageIdentityKeys(image);
+
+      if (identityKeys.some((key) => seen.has(key))) {
         return false;
       }
 
-      seen.add(image.id);
+      for (const key of identityKeys) {
+        seen.add(key);
+      }
+
       return true;
     });
 }
@@ -978,6 +983,20 @@ function getNormalizedPublicImagePlan(salon: Salon) {
       .filter((image) => image.isReal && image.selectedForLanding)
       .map((image) => image.id),
   });
+}
+
+function hasExplicitPublicImagePlan(salon: Salon) {
+  const plan = getNormalizedPublicImagePlan(salon);
+
+  return Boolean(
+    plan &&
+      (plan.logoImageId ||
+        plan.topImageIds?.length ||
+        plan.galleryImageIds?.length ||
+        plan.spaceImageIds?.length ||
+        plan.ignoredImageIds?.length ||
+        plan.spaceEnabled),
+  );
 }
 
 function getTopImageIds(salon: Salon) {
@@ -1018,6 +1037,30 @@ function planIdsIncludeImage(imageIds: Iterable<string>, image: SalonGalleryImag
   return false;
 }
 
+function getImageIdentityKeys(image: SalonGalleryImage) {
+  return Array.from(
+    new Set([image.id, image.src, image.url].filter(Boolean) as string[]),
+  );
+}
+
+function dedupePublicImages(images: SalonGalleryImage[]) {
+  const seen = new Set<string>();
+
+  return images.filter((image) => {
+    const keys = getImageIdentityKeys(image);
+
+    if (keys.some((key) => seen.has(key))) {
+      return false;
+    }
+
+    for (const key of keys) {
+      seen.add(key);
+    }
+
+    return true;
+  });
+}
+
 export function getPublicHeroImage(salon: Salon) {
   const topImageIds = getTopImageIds(salon);
   const plannedHero = topImageIds.length === 1
@@ -1026,6 +1069,10 @@ export function getPublicHeroImage(salon: Salon) {
 
   if (plannedHero?.src) {
     return plannedHero.src;
+  }
+
+  if (hasExplicitPublicImagePlan(salon)) {
+    return "";
   }
 
   const landingImages = getRealGalleryImages(salon);
@@ -1058,6 +1105,10 @@ export function getPublicHeroMosaicImages(salon: Salon) {
     return plannedImages.slice(0, 3);
   }
 
+  if (hasExplicitPublicImagePlan(salon)) {
+    return [];
+  }
+
   const fallbackImages = getRealLandingImages(salon)
     .filter((image) => image.type !== "hero")
     .slice(0, 3);
@@ -1075,6 +1126,10 @@ export function getPublicLogoImage(salon: Salon) {
     return plannedLogo;
   }
 
+  if (hasExplicitPublicImagePlan(salon)) {
+    return undefined;
+  }
+
   return salon.gallery.find(
     (image) =>
       image.isReal &&
@@ -1084,10 +1139,14 @@ export function getPublicLogoImage(salon: Salon) {
 }
 
 export function getPublicSupportingImage(salon: Salon) {
-  const plannedExperience = getPublicExperienceImages(salon)[0];
+  const plannedExperience = getPublicSpaceImages(salon)[0];
 
   if (plannedExperience) {
     return plannedExperience;
+  }
+
+  if (hasExplicitPublicImagePlan(salon)) {
+    return undefined;
   }
 
   return getRealGalleryImages(salon).find(
@@ -1100,6 +1159,7 @@ export function getPublicGalleryImages(salon: Salon) {
   const ignoredIds = getIgnoredImageIds(salon);
   const topIds = new Set(getTopImageIds(salon));
   const spaceIds = new Set(getSpaceImageIds(salon));
+  const logoImageId = normalizedPlan?.logoImageId;
   const plannedGallery = resolvePlanImages(
     salon,
     normalizedPlan?.galleryImageIds ?? [],
@@ -1108,10 +1168,11 @@ export function getPublicGalleryImages(salon: Salon) {
       !planIdsIncludeImage(ignoredIds, image) &&
       !planIdsIncludeImage(topIds, image) &&
       !planIdsIncludeImage(spaceIds, image) &&
+      !(logoImageId && imageMatchesPlanId(image.id, logoImageId)) &&
       image.type !== "logo",
   );
 
-  if (plannedGallery.length) {
+  if (hasExplicitPublicImagePlan(salon)) {
     return plannedGallery;
   }
 
@@ -1120,33 +1181,43 @@ export function getPublicGalleryImages(salon: Salon) {
       image.type !== "logo" &&
       !planIdsIncludeImage(ignoredIds, image) &&
       !planIdsIncludeImage(topIds, image) &&
-      !planIdsIncludeImage(spaceIds, image),
+      !planIdsIncludeImage(spaceIds, image) &&
+      !(logoImageId && imageMatchesPlanId(image.id, logoImageId)),
   );
 }
 
 export function getPublicExperienceImages(salon: Salon) {
-  const plannedImages = getPublicSpaceImages(salon);
-
-  if (plannedImages.length) {
-    return plannedImages;
-  }
-
-  return getRealLandingImages(salon)
-    .filter((image) => image.type === "interior" || image.type === "gallery")
-    .slice(0, 3);
+  return getPublicSpaceImages(salon);
 }
 
 export function getPublicSpaceImages(salon: Salon) {
   const normalizedPlan = getNormalizedPublicImagePlan(salon);
+  const hasExplicitPlan = hasExplicitPublicImagePlan(salon);
 
   if (!normalizedPlan?.spaceEnabled) {
-    return [];
+    if (hasExplicitPlan) {
+      return [];
+    }
+
+    return dedupePublicImages(
+      getRealLandingImages(salon)
+        .filter((image) => image.type === "interior" || image.type === "gallery")
+        .slice(0, 3),
+    );
   }
 
   const ignoredIds = getIgnoredImageIds(salon);
+  const topIds = new Set(getTopImageIds(salon));
+  const logoImageId = normalizedPlan.logoImageId;
 
-  return resolvePlanImages(salon, normalizedPlan.spaceImageIds ?? []).filter(
-    (image) => image.type !== "logo" && !planIdsIncludeImage(ignoredIds, image),
+  return dedupePublicImages(
+    resolvePlanImages(salon, normalizedPlan.spaceImageIds ?? []).filter(
+      (image) =>
+        image.type !== "logo" &&
+        !planIdsIncludeImage(ignoredIds, image) &&
+        !planIdsIncludeImage(topIds, image) &&
+        !(logoImageId && imageMatchesPlanId(image.id, logoImageId)),
+    ),
   );
 }
 

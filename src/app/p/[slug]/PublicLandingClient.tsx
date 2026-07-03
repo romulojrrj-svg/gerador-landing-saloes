@@ -35,13 +35,25 @@ import type { Salon } from "@/types/salon";
 
 type PublicLandingClientProps = {
   slug: string;
+  initialSalon?: Salon | null;
+  skipClientLoad?: boolean;
 };
 
-export function PublicLandingClient({ slug }: PublicLandingClientProps) {
-  const [salon, setSalon] = useState<Salon | null>(null);
-  const [hasCheckedStorage, setHasCheckedStorage] = useState(false);
+export function PublicLandingClient({
+  slug,
+  initialSalon = null,
+  skipClientLoad = false,
+}: PublicLandingClientProps) {
+  const [salon, setSalon] = useState<Salon | null>(initialSalon);
+  const [hasCheckedStorage, setHasCheckedStorage] = useState(
+    Boolean(initialSalon) || skipClientLoad,
+  );
 
   useEffect(() => {
+    if (initialSalon || skipClientLoad) {
+      return;
+    }
+
     let isActive = true;
 
     async function loadSalon() {
@@ -65,7 +77,7 @@ export function PublicLandingClient({ slug }: PublicLandingClientProps) {
       isActive = false;
       unsubscribe();
     };
-  }, [slug]);
+  }, [initialSalon, skipClientLoad, slug]);
 
   if (!hasCheckedStorage) {
     return <PublicLoading />;

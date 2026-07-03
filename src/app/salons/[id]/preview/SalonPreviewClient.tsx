@@ -20,6 +20,7 @@ import {
   translateStatLabel,
   type LandingCopy,
 } from "@/lib/landing-copy";
+import { getPublicGalleryImages } from "@/lib/public-landing";
 import {
   getSalonBySlug,
   getSalonRepositoryStatus,
@@ -291,7 +292,7 @@ export function SalonPreviewClient({
         salon={salon}
       />
       <Gallery
-        images={salon.gallery}
+        images={getPublicGalleryImages(salon)}
         salonName={salon.name}
         location={salon.location}
         language={salon.language}

@@ -55,6 +55,7 @@ import {
   moveImageToDestination,
   moveImageWithinDestination,
   normalizeSalonLayoutImagePlan,
+  reorderImageInDestination,
   removeImageFromLayoutPlan,
   type SalonImagePlanDestination,
   updateLayoutPlanSpaceSettings,
@@ -304,8 +305,8 @@ const IMAGE_SECTION_ORDER: ImageDestination[] = [
   "bank",
   "logo",
   "top",
-  "gallery",
   "space",
+  "gallery",
   "ignore",
 ];
 
@@ -1435,6 +1436,10 @@ function RealImagesSection({
     undefined,
   );
   const [draggedImageId, setDraggedImageId] = useState<string | null>(null);
+  const [dragOverDestination, setDragOverDestination] = useState<ImageDestination | null>(
+    null,
+  );
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
   const effectiveLayoutImagePlan = useMemo(
     () => buildEffectiveLayoutImagePlan(images, layoutImagePlan),
     [images, layoutImagePlan],
@@ -1491,25 +1496,6 @@ function RealImagesSection({
     setMessage("Imagem adicionada. Salve as alteracoes para gravar.");
   }
 
-  function updateImage(id: string, updates: Partial<SalonGalleryImage>) {
-    onChange((current) =>
-      normalizeHeroImages(
-        current.map((image) =>
-          image.id === id
-            ? {
-                ...image,
-                ...updates,
-                selectedForLanding:
-                  updates.type === "hero"
-                    ? true
-                    : updates.selectedForLanding ?? image.selectedForLanding,
-              }
-            : image,
-        ),
-      ),
-    );
-  }
-
   function removeImage(id: string) {
     const nextImages = images.filter((image) => image.id !== id);
     const nextPlan = removeImageFromLayoutPlan(
@@ -1522,6 +1508,15 @@ function RealImagesSection({
 
     onChange(nextImages);
     onLayoutPlanChange(nextPlan);
+  }
+
+  function commitImagePlan(
+    nextPlan: SalonLayoutImagePlan | undefined,
+    nextMessage: string,
+  ) {
+    onLayoutPlanChange(nextPlan);
+    onChange((current) => syncImagesWithPlan(current, nextPlan));
+    setMessage(nextMessage);
   }
 
   function setImageDestination(id: string, destination: ImageDestination) {
@@ -1539,14 +1534,13 @@ function RealImagesSection({
       return;
     }
 
-    onLayoutPlanChange(result.plan);
-    onChange((current) => syncImagesWithPlan(current, result.plan));
-    setMessage(
+    commitImagePlan(
+      result.plan,
       result.replacedLogoImageId
         ? "Nova logo definida. A logo anterior foi movida para Ignorar."
         : destination === "bank"
           ? "Imagem enviada para o banco de fotos. Salve as alteracoes para gravar."
-          : "Destino da imagem atualizado. Salve as alteracoes para gravar.",
+        : "Destino da imagem atualizado. Salve as alteracoes para gravar.",
     );
   }
 
@@ -1555,8 +1549,63 @@ function RealImagesSection({
     imageId: string,
   ) {
     setDraggedImageId(imageId);
+    setDragOverDestination(null);
+    setDragOverIndex(null);
     event.dataTransfer.effectAllowed = "move";
     event.dataTransfer.setData("text/plain", imageId);
+  }
+
+  function clearDragState() {
+    setDraggedImageId(null);
+    setDragOverDestination(null);
+    setDragOverIndex(null);
+  }
+
+  function applyDraggedImage(
+    imageId: string,
+    destination: ImageDestination,
+    targetIndex?: number,
+  ) {
+    const result = moveImageToDestination(
+      effectiveLayoutImagePlan,
+      imageId,
+      destination,
+      {
+        availableImageIds: images.map((image) => image.id),
+      },
+    );
+
+    if (result.blockedReason) {
+      setMessage(result.blockedReason);
+      return false;
+    }
+
+    let nextPlan = result.plan;
+
+    if (
+      typeof targetIndex === "number" &&
+      (destination === "top" || destination === "gallery" || destination === "space")
+    ) {
+      nextPlan = reorderImageInDestination(
+        nextPlan,
+        imageId,
+        destination,
+        targetIndex,
+        {
+          availableImageIds: images.map((image) => image.id),
+        },
+      );
+    }
+
+    commitImagePlan(
+      nextPlan,
+      result.replacedLogoImageId
+        ? "Nova logo definida. A logo anterior foi movida para Ignorar."
+        : destination === "bank"
+          ? "Imagem enviada para o banco de fotos. Salve as alteracoes para gravar."
+          : "Destino da imagem atualizado. Salve as alteracoes para gravar.",
+    );
+    return true;
   }
 
   function handleDropOnDestination(
@@ -1564,19 +1613,60 @@ function RealImagesSection({
     destination: ImageDestination,
   ) {
     event.preventDefault();
+    event.stopPropagation();
     const imageId = event.dataTransfer.getData("text/plain") || draggedImageId;
 
     if (!imageId) {
       return;
     }
 
-    setImageDestination(imageId, destination);
-    setDraggedImageId(null);
+    const targetIndex =
+      destination === "top" || destination === "gallery" || destination === "space"
+        ? imagesByDestination[destination].length
+        : undefined;
+
+    applyDraggedImage(imageId, destination, targetIndex);
+    clearDragState();
   }
 
   function handleDragOverDestination(event: DragEvent<HTMLElement>) {
     event.preventDefault();
     event.dataTransfer.dropEffect = "move";
+  }
+
+  function handleDragEnterDestination(destination: ImageDestination) {
+    setDragOverDestination(destination);
+    setDragOverIndex(null);
+  }
+
+  function handleDropOnImageCard(
+    event: DragEvent<HTMLElement>,
+    destination: ImageDestination,
+    targetIndex: number,
+    targetImageId: string,
+  ) {
+    event.preventDefault();
+    event.stopPropagation();
+
+    const imageId = event.dataTransfer.getData("text/plain") || draggedImageId;
+
+    if (!imageId || imageId === targetImageId) {
+      clearDragState();
+      return;
+    }
+
+    applyDraggedImage(imageId, destination, targetIndex);
+    clearDragState();
+  }
+
+  function handleDragEnterImageCard(
+    event: DragEvent<HTMLElement>,
+    destination: ImageDestination,
+    targetIndex: number,
+  ) {
+    event.preventDefault();
+    setDragOverDestination(destination);
+    setDragOverIndex(targetIndex);
   }
 
   function moveImageInPlan(id: string, direction: -1 | 1) {
@@ -2174,9 +2264,9 @@ function RealImagesSection({
   const hasSelectedCandidates = candidates.some(
     (candidate) => candidate.status === "selected" || candidate.status === "applied",
   ) || Boolean(effectiveLayoutImagePlan);
-  const imagesByDestination = useMemo(
-    () => groupImagesByDestination(images, effectiveLayoutImagePlan),
-    [images, effectiveLayoutImagePlan],
+  const imagesByDestination = groupImagesByDestination(
+    images,
+    effectiveLayoutImagePlan,
   );
 
   return (
@@ -2816,8 +2906,9 @@ function RealImagesSection({
               Organizador de fotos da landing
             </p>
             <p className="mt-1 text-xs leading-5 text-zinc-500">
-              Arraste uma foto para uma area ou use os botoes do card. A foto
-              sai do grupo antigo e entra no novo destino imediatamente.
+              Arraste uma foto para outro bloco ou reordene dentro do proprio
+              bloco. O destino real muda na hora e a landing usa exatamente
+              esse plano quando voce salvar.
             </p>
           </div>
           <span className="rounded-full bg-zinc-100 px-3 py-1 text-xs font-semibold text-zinc-600">
@@ -2858,192 +2949,187 @@ function RealImagesSection({
         ) : null}
 
         {images.length ? (
-          <div className="mt-4 grid gap-4 xl:grid-cols-3">
+          <div className="mt-6 space-y-5">
             {IMAGE_SECTION_ORDER.map((destination) => {
               const sectionImages = imagesByDestination[destination];
+              const isDropTarget =
+                dragOverDestination === destination && dragOverIndex === null;
 
               return (
-                <div
+                <section
                   key={destination}
                   data-image-destination={destination}
                   onDragOver={handleDragOverDestination}
+                  onDragEnter={() => handleDragEnterDestination(destination)}
                   onDrop={(event) => handleDropOnDestination(event, destination)}
-                  className={`min-h-[14rem] rounded-[1.5rem] border border-dashed p-4 transition ${
-                    draggedImageId
-                      ? "border-teal-400 bg-teal-50/50"
+                  className={`rounded-[1.75rem] border p-5 transition ${
+                    isDropTarget
+                      ? "border-teal-400 bg-teal-50/80 shadow-lg shadow-teal-100"
                       : "border-zinc-200 bg-zinc-50"
                   }`}
                 >
-                  <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+                  <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
                     <div>
-                      <p className="text-sm font-semibold text-zinc-950">
+                      <p className="text-base font-semibold text-zinc-950">
                         {getDestinationSectionTitle(destination)}
                       </p>
                       <p className="mt-1 text-xs leading-5 text-zinc-500">
                         {getDestinationSectionDescription(destination)}
                       </p>
                     </div>
-                    <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-zinc-700 ring-1 ring-zinc-200">
-                      {destination === "top"
-                        ? `${sectionImages.length}/3`
-                        : `${sectionImages.length}`}
-                    </span>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-zinc-700 ring-1 ring-zinc-200">
+                        {destination === "top"
+                          ? `${sectionImages.length}/3`
+                          : destination === "logo"
+                            ? `${sectionImages.length}/1`
+                            : `${sectionImages.length}`}
+                      </span>
+                      {destination === "space" ? (
+                        <span
+                          className={`rounded-full px-3 py-1 text-xs font-semibold ring-1 ${
+                            effectiveLayoutImagePlan?.spaceEnabled
+                              ? "bg-amber-50 text-amber-900 ring-amber-200"
+                              : "bg-zinc-100 text-zinc-600 ring-zinc-200"
+                          }`}
+                        >
+                          {effectiveLayoutImagePlan?.spaceEnabled
+                            ? "Secao ativa"
+                            : "Secao inativa"}
+                        </span>
+                      ) : null}
+                    </div>
                   </div>
 
                   {sectionImages.length ? (
-                  <div className="grid gap-3">
-                    {sectionImages.map((image) => (
-                      <article
-                        key={image.id}
-                        data-image-id={image.id}
-                        draggable
-                        onDragStart={(event) =>
-                          handleImageDragStart(event, image.id)
-                        }
-                        onDragEnd={() => setDraggedImageId(null)}
-                        className="grid cursor-grab gap-3 rounded-[1.25rem] border border-zinc-200 bg-white p-3 shadow-sm active:cursor-grabbing sm:grid-cols-[7.5rem_1fr]"
-                      >
-                        <div className="relative aspect-square overflow-hidden rounded-2xl bg-zinc-200">
-                          <Image
-                            src={image.src}
-                            alt={image.alt}
-                            fill
-                            sizes="8rem"
-                            className="object-cover"
-                          />
-                        </div>
-                        <div className="grid gap-3">
-                          {(() => {
-                            const destinationValue = getImageDestination(
-                              image,
-                              effectiveLayoutImagePlan,
-                            );
-                            const canOrder =
-                              destinationValue === "top" ||
-                              destinationValue === "gallery" ||
-                              destinationValue === "space";
+                    <div className="grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6">
+                      {sectionImages.map((image, index) => {
+                        const destinationValue = getImageDestination(
+                          image,
+                          effectiveLayoutImagePlan,
+                        );
+                        const canOrder =
+                          destinationValue === "top" ||
+                          destinationValue === "gallery" ||
+                          destinationValue === "space";
+                        const isCardDropTarget =
+                          dragOverDestination === destination &&
+                          dragOverIndex === index;
 
-                            return (
-                              <div className="flex flex-wrap items-center gap-2">
-                                <span className="rounded-full bg-zinc-100 px-3 py-1 text-xs font-semibold text-zinc-700 ring-1 ring-zinc-200">
-                                  {getDestinationLabel(destinationValue)}
-                                </span>
-                                {canOrder ? (
-                                  <>
+                        return (
+                          <article
+                            key={image.id}
+                            data-image-id={image.id}
+                            draggable
+                            onDragStart={(event) =>
+                              handleImageDragStart(event, image.id)
+                            }
+                            onDragEnd={clearDragState}
+                            onDragOver={handleDragOverDestination}
+                            onDragEnter={(event) =>
+                              handleDragEnterImageCard(event, destination, index)
+                            }
+                            onDrop={(event) =>
+                              handleDropOnImageCard(
+                                event,
+                                destination,
+                                index,
+                                image.id,
+                              )
+                            }
+                            className={`group rounded-[1.35rem] border bg-white p-3 shadow-sm transition ${
+                              isCardDropTarget
+                                ? "border-teal-400 shadow-lg shadow-teal-100"
+                                : "border-zinc-200"
+                            }`}
+                          >
+                            <div className="relative aspect-[4/5] overflow-hidden rounded-[1.1rem] bg-zinc-200">
+                              <Image
+                                src={image.src}
+                                alt={image.alt}
+                                fill
+                                sizes="(max-width: 1024px) 45vw, 18rem"
+                                className="object-cover transition duration-200 group-hover:scale-[1.02]"
+                              />
+                              <div className="absolute inset-x-0 top-0 flex items-start justify-between gap-2 p-2">
+                                <div className="flex flex-wrap gap-1.5">
+                                  <span className="rounded-full bg-white/92 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-700 shadow-sm ring-1 ring-black/5 backdrop-blur">
+                                    {getImageSourceLabel(image.source)}
+                                  </span>
+                                </div>
+                                <details className="relative">
+                                  <summary className="flex h-8 w-8 cursor-pointer list-none items-center justify-center rounded-full bg-white/92 text-sm font-bold text-zinc-700 shadow-sm ring-1 ring-black/5 backdrop-blur transition hover:bg-white">
+                                    ...
+                                  </summary>
+                                  <div className="absolute right-0 z-20 mt-2 grid min-w-[11rem] gap-1 rounded-2xl border border-zinc-200 bg-white p-2 shadow-xl shadow-zinc-950/10">
+                                    {imageDestinationOptions
+                                      .filter((option) => option.value !== destinationValue)
+                                      .map((option) => (
+                                        <button
+                                          key={option.value}
+                                          type="button"
+                                          data-image-action={option.value}
+                                          onClick={() =>
+                                            setImageDestination(image.id, option.value)
+                                          }
+                                          className="rounded-xl px-3 py-2 text-left text-xs font-semibold text-zinc-700 transition hover:bg-zinc-100"
+                                        >
+                                          {option.label}
+                                        </button>
+                                      ))}
                                     <button
                                       type="button"
-                                      onClick={() => moveImageInPlan(image.id, -1)}
-                                      className="btn btn-secondary min-h-8 px-2.5 py-1.5 text-xs"
-                                      aria-label="Mover imagem para cima"
+                                      onClick={() => removeImage(image.id)}
+                                      className="rounded-xl px-3 py-2 text-left text-xs font-semibold text-rose-700 transition hover:bg-rose-50"
                                     >
-                                      <ArrowUp className="h-3.5 w-3.5" />
+                                      Remover do salao
                                     </button>
-                                    <button
-                                      type="button"
-                                      onClick={() => moveImageInPlan(image.id, 1)}
-                                      className="btn btn-secondary min-h-8 px-2.5 py-1.5 text-xs"
-                                      aria-label="Mover imagem para baixo"
-                                    >
-                                      <ArrowDown className="h-3.5 w-3.5" />
-                                    </button>
-                                  </>
-                                ) : null}
+                                  </div>
+                                </details>
                               </div>
-                            );
-                          })()}
-                          <TextInput
-                            label="Descricao"
-                            value={image.alt}
-                            onChange={(value) => updateImage(image.id, { alt: value })}
-                          />
-                          <div className="flex flex-wrap gap-2 text-[11px] font-semibold text-zinc-500">
-                            <span className="rounded-full bg-zinc-100 px-2.5 py-1">
-                              Origem: {getImageSourceLabel(image.source)}
-                            </span>
-                            <span className="rounded-full bg-zinc-100 px-2.5 py-1">
-                              Arraste para mover
-                            </span>
-                          </div>
-                          <div className="flex flex-wrap gap-2">
-                            {destination !== "bank" ? (
-                              <button
-                                type="button"
-                                data-image-action="bank"
-                                onClick={() => setImageDestination(image.id, "bank")}
-                                className="btn btn-secondary min-h-9 px-3 py-2 text-xs"
-                              >
-                                Banco
-                              </button>
+                              <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/55 via-black/10 to-transparent p-2.5">
+                                <div className="flex items-center justify-between gap-2">
+                                  <span className="rounded-full bg-white/90 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-800 backdrop-blur">
+                                    {getDestinationLabel(destinationValue)}
+                                  </span>
+                                  {canOrder ? (
+                                    <span className="rounded-full bg-white/90 px-2.5 py-1 text-[10px] font-semibold text-zinc-700 backdrop-blur">
+                                      Posicao {index + 1}
+                                    </span>
+                                  ) : null}
+                                </div>
+                              </div>
+                            </div>
+                            {canOrder ? (
+                              <div className="mt-3 flex items-center justify-end gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => moveImageInPlan(image.id, -1)}
+                                  className="btn btn-secondary min-h-8 px-2.5 py-1.5 text-xs"
+                                  aria-label="Mover imagem para cima"
+                                >
+                                  <ArrowUp className="h-3.5 w-3.5" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => moveImageInPlan(image.id, 1)}
+                                  className="btn btn-secondary min-h-8 px-2.5 py-1.5 text-xs"
+                                  aria-label="Mover imagem para baixo"
+                                >
+                                  <ArrowDown className="h-3.5 w-3.5" />
+                                </button>
+                              </div>
                             ) : null}
-                            {destination !== "logo" ? (
-                              <button
-                                type="button"
-                                data-image-action="logo"
-                                onClick={() => setImageDestination(image.id, "logo")}
-                                className="btn btn-secondary min-h-9 px-3 py-2 text-xs"
-                              >
-                                Logo
-                              </button>
-                            ) : null}
-                            {destination !== "top" ? (
-                              <button
-                                type="button"
-                                data-image-action="top"
-                                onClick={() => setImageDestination(image.id, "top")}
-                                className="btn btn-secondary min-h-9 px-3 py-2 text-xs"
-                              >
-                                Destaque
-                              </button>
-                            ) : null}
-                            {destination !== "gallery" ? (
-                              <button
-                                type="button"
-                                data-image-action="gallery"
-                                onClick={() => setImageDestination(image.id, "gallery")}
-                                className="btn btn-secondary min-h-9 px-3 py-2 text-xs"
-                              >
-                                Galeria
-                              </button>
-                            ) : null}
-                            {destination !== "space" ? (
-                              <button
-                                type="button"
-                                data-image-action="space"
-                                onClick={() => setImageDestination(image.id, "space")}
-                                className="btn btn-secondary min-h-9 px-3 py-2 text-xs"
-                              >
-                                Nosso Espaco
-                              </button>
-                            ) : null}
-                            {destination !== "ignore" ? (
-                              <button
-                                type="button"
-                                data-image-action="ignore"
-                                onClick={() => setImageDestination(image.id, "ignore")}
-                                className="btn btn-secondary min-h-9 px-3 py-2 text-xs"
-                              >
-                                Ignorar
-                              </button>
-                            ) : null}
-                            <button
-                              type="button"
-                              onClick={() => removeImage(image.id)}
-                              className="btn min-h-9 border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-950 hover:bg-rose-100"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                              Remover
-                            </button>
-                          </div>
-                        </div>
-                      </article>
-                    ))}
-                  </div>
+                          </article>
+                        );
+                      })}
+                    </div>
                   ) : (
-                    <div className="flex min-h-[8rem] items-center justify-center rounded-2xl border border-dashed border-zinc-300 bg-white/70 px-4 py-6 text-center text-xs font-semibold leading-5 text-zinc-500">
+                    <div className="flex min-h-[10rem] items-center justify-center rounded-[1.35rem] border border-dashed border-zinc-300 bg-white/80 px-6 py-8 text-center text-sm font-medium leading-6 text-zinc-500">
                       Arraste uma foto para {getDestinationSectionTitle(destination)}.
                     </div>
                   )}
-                </div>
+                </section>
               );
             })}
           </div>
@@ -3615,16 +3701,16 @@ function buildEffectiveLayoutImagePlan(
     availableImageIds,
   });
 
-  const topImageIds = [...(normalizedPlan?.topImageIds ?? [])];
-  const galleryImageIds = [...(normalizedPlan?.galleryImageIds ?? [])];
-  const spaceImageIds = [...(normalizedPlan?.spaceImageIds ?? [])];
-  const ignoredImageIds = [...(normalizedPlan?.ignoredImageIds ?? [])];
+  if (normalizedPlan) {
+    return normalizedPlan;
+  }
+
+  const topImageIds: string[] = [];
+  const galleryImageIds: string[] = [];
+  const spaceImageIds: string[] = [];
+  const ignoredImageIds: string[] = [];
 
   for (const image of images) {
-    if (getImageDestinationFromPlan(image.id, normalizedPlan)) {
-      continue;
-    }
-
     if (!image.selectedForLanding) {
       continue;
     }
@@ -3649,28 +3735,20 @@ function buildEffectiveLayoutImagePlan(
   }
 
   const fallbackLogo =
-    normalizedPlan?.logoImageId ??
     images.find((image) => image.selectedForLanding && image.type === "logo")?.id ??
     null;
 
   return normalizeSalonLayoutImagePlan(
     {
-      ...(normalizedPlan ?? {
-        mode: "local_auto" as const,
-        logoImageId: null,
-        topImageIds: [],
-        heroImageId: null,
-        heroMosaicImageIds: [],
-        galleryImageIds: [],
-        spaceEnabled: false,
-        spaceTitle: "Nosso Espaco",
-        spaceDescription: "Conheca um pouco do ambiente e dos detalhes do salao.",
-        spaceImageIds: [],
-        experienceImageIds: [],
-        resultImageIds: [],
-        ignoredImageIds: [],
-        warnings: [],
-      }),
+      mode: "local_auto" as const,
+      heroImageId: null,
+      heroMosaicImageIds: [],
+      spaceEnabled: false,
+      spaceTitle: "Nosso Espaco",
+      spaceDescription: "Conheca um pouco do ambiente e dos detalhes do salao.",
+      experienceImageIds: [],
+      resultImageIds: [],
+      warnings: [],
       logoImageId: fallbackLogo,
       topImageIds,
       galleryImageIds,
