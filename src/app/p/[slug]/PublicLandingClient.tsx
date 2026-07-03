@@ -12,7 +12,6 @@ import {
   MapPinned,
   MessageCircle,
   Phone,
-  Sparkles,
 } from "lucide-react";
 import { Gallery, Hero, Services, Testimonials } from "@/components/landing";
 import { detectBrowserLanguage, getLandingCopy } from "@/lib/landing-copy";
@@ -25,6 +24,7 @@ import {
   getPublicGalleryImages,
   getPublicLogoImage,
   getPublicSpaceImages,
+  getPublicSpaceSectionCopy,
   getPublicText,
 } from "@/lib/public-landing";
 import {
@@ -121,10 +121,11 @@ function PublicSpaceSection({ salon }: { salon: Salon }) {
     return null;
   }
 
-  const title = salon.layoutImagePlan?.spaceTitle || "Nosso Espaço";
-  const description =
-    salon.layoutImagePlan?.spaceDescription ||
-    "Conheça o ambiente, os detalhes e a atmosfera do salão.";
+  const { title, description } = getPublicSpaceSectionCopy(
+    salon.language,
+    salon.layoutImagePlan?.spaceTitle,
+    salon.layoutImagePlan?.spaceDescription,
+  );
 
   return (
     <section className="px-4 py-8 sm:px-8 sm:py-12 lg:px-10">
@@ -428,21 +429,33 @@ function DetailPill({
 }
 
 function PublicLoading() {
-  const copy = getLandingCopy(detectBrowserLanguage());
-
   return (
-    <main className="min-h-screen bg-white">
-      <section className="flex min-h-screen items-center justify-center px-6">
-        <div className="max-w-md text-center">
-          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-teal-50 text-teal-800">
-            <Sparkles className="h-6 w-6" />
+    <main className="min-h-screen bg-[#fcfaf7]">
+      <div className="mx-auto flex min-h-screen max-w-6xl flex-col gap-6 px-4 py-8 sm:px-8 lg:px-10">
+        <div className="h-14 animate-pulse rounded-[1.2rem] border border-[#eadfce] bg-white/80" />
+
+        <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
+          <div className="rounded-[2rem] border border-[#eadfce] bg-white/90 p-6 shadow-sm">
+            <div className="h-6 w-28 animate-pulse rounded-full bg-zinc-200" />
+            <div className="mt-5 h-10 w-3/4 animate-pulse rounded-full bg-zinc-200" />
+            <div className="mt-3 h-4 w-full animate-pulse rounded-full bg-zinc-100" />
+            <div className="mt-2 h-4 w-5/6 animate-pulse rounded-full bg-zinc-100" />
+            <div className="mt-6 h-12 w-40 animate-pulse rounded-full bg-[#f2e8da]" />
           </div>
-          <h1 className="mt-6 font-serif text-3xl font-semibold text-zinc-950">
-            {copy.loadingTitle}
-          </h1>
-          <p className="mt-3 text-sm leading-6 text-zinc-500">{copy.loadingText}</p>
+
+          <div className="rounded-[2rem] border border-[#eadfce] bg-white/90 p-6 shadow-sm">
+            <div className="h-5 w-24 animate-pulse rounded-full bg-zinc-200" />
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              {Array.from({ length: 4 }).map((_, index) => (
+                <div
+                  key={index}
+                  className="h-24 animate-pulse rounded-[1.1rem] border border-[#f0e6d8] bg-[#faf6ef]"
+                />
+              ))}
+            </div>
+          </div>
         </div>
-      </section>
+      </div>
     </main>
   );
 }

@@ -94,6 +94,8 @@ type PublicText = {
   ctaText: string;
   ctaLabel: string;
   noContactText: string;
+  spaceTitle: string;
+  spaceDescription: string;
   genericServiceDescription: string;
   serviceCatalog: Record<PublicServiceKey, PublicService>;
   serviceSummaryLabels: Record<PublicServiceKey, string>;
@@ -167,6 +169,8 @@ const publicText: Record<SalonLanguage, PublicText> = {
       "Fale com o salão e escolha o melhor horário para o seu atendimento.",
     ctaLabel: "Agendar agora",
     noContactText: "Entre em contato pelo canal informado pelo salão.",
+    spaceTitle: "Nosso Espaço",
+    spaceDescription: "Conheça um pouco do ambiente e dos detalhes do salão.",
     genericServiceDescription:
       "Atendimento personalizado, com cuidado nos detalhes e foco no resultado desejado.",
     serviceCatalog: {
@@ -309,6 +313,8 @@ const publicText: Record<SalonLanguage, PublicText> = {
     ctaText: "Contact the salon and choose the best time for your visit.",
     ctaLabel: "Book now",
     noContactText: "Contact the salon through the channel they provide.",
+    spaceTitle: "Our Space",
+    spaceDescription: "Take a look at the salon environment and details.",
     genericServiceDescription:
       "Personalized service with attention to detail and focus on the desired result.",
     serviceCatalog: {
@@ -451,6 +457,8 @@ const publicText: Record<SalonLanguage, PublicText> = {
     ctaText: "Habla con el salón y elige el mejor horario para tu atención.",
     ctaLabel: "Reservar ahora",
     noContactText: "Contacta el salón por el canal informado.",
+    spaceTitle: "Nuestro Espacio",
+    spaceDescription: "Mira un poco el ambiente y los detalles del salón.",
     genericServiceDescription:
       "Atención personalizada, con cuidado en los detalles y foco en el resultado deseado.",
     serviceCatalog: {} as Record<PublicServiceKey, PublicService>,
@@ -459,6 +467,11 @@ const publicText: Record<SalonLanguage, PublicText> = {
   fr: {} as PublicText,
   no: {} as PublicText,
 };
+
+Object.assign(publicText.fr, {
+  spaceTitle: "Our Space",
+  spaceDescription: "Take a look at the salon environment and details.",
+});
 
 publicText.es.serviceCatalog = publicText["pt-BR"].serviceCatalog;
 publicText.es.serviceSummaryLabels = publicText["pt-BR"].serviceSummaryLabels;
@@ -689,6 +702,59 @@ Object.assign(publicText.no, {
 
 export function getPublicText(language: SalonLanguage) {
   return publicText[language] ?? publicText.en;
+}
+
+const legacySpaceTitleValues = ["nosso espaco", "nosso espaço"];
+const legacySpaceDescriptionValues = [
+  "conheca o ambiente, os detalhes e a atmosfera do salao.",
+  "conheça o ambiente, os detalhes e a atmosfera do salão.",
+  "conheca um pouco do ambiente e dos detalhes do salao.",
+  "conheça um pouco do ambiente e dos detalhes do salão.",
+];
+
+function normalizeLocalTextValue(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+}
+
+function resolveLocalizedSpaceText(
+  savedValue: string | undefined,
+  fallbackText: string,
+  legacyValues: string[],
+) {
+  const trimmedValue = clean(savedValue);
+
+  if (!trimmedValue) {
+    return fallbackText;
+  }
+
+  const normalizedValue = normalizeLocalTextValue(trimmedValue);
+
+  if (legacyValues.some((value) => normalizedValue === normalizeLocalTextValue(value))) {
+    return fallbackText;
+  }
+
+  return trimmedValue;
+}
+
+export function getPublicSpaceSectionCopy(
+  language: SalonLanguage,
+  title?: string,
+  description?: string,
+) {
+  const copy = getPublicText(language);
+
+  return {
+    title: resolveLocalizedSpaceText(title, copy.spaceTitle, legacySpaceTitleValues),
+    description: resolveLocalizedSpaceText(
+      description,
+      copy.spaceDescription,
+      legacySpaceDescriptionValues,
+    ),
+  };
 }
 
 export function getPublicHeroEyebrow(salon: Salon) {
