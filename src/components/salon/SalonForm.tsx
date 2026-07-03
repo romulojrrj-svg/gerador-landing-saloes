@@ -28,6 +28,7 @@ import {
 import {
   type ChangeEvent,
   type Dispatch,
+  type DragEvent,
   type FormEvent,
   type SetStateAction,
   useMemo,
@@ -40,7 +41,6 @@ import {
   selectedServicesToSalonServices,
 } from "@/lib/salon-storage";
 import {
-  mapSuggestedUseToImageType,
   mergeImageCandidates,
 } from "@/lib/image-curation";
 import {
@@ -50,6 +50,15 @@ import {
   createLocalImagePlan,
   validateChatGptCurationJson,
 } from "@/lib/image-intelligence";
+import {
+  getImageDestinationFromPlan,
+  moveImageToDestination,
+  moveImageWithinDestination,
+  normalizeSalonLayoutImagePlan,
+  removeImageFromLayoutPlan,
+  type SalonImagePlanDestination,
+  updateLayoutPlanSpaceSettings,
+} from "@/lib/salon-image-plan";
 import {
   getAbsoluteAppUrl,
   getApproachMessage,
@@ -89,7 +98,7 @@ type SalonFormProps = {
   onSubmit: (input: SalonFormInput) => void;
 };
 
-type ImageDestination = "logo" | "top" | "gallery" | "space" | "ignore";
+type ImageDestination = SalonImagePlanDestination;
 
 const serviceOptions = [
   "Cabelo",
@@ -282,7 +291,8 @@ const imageTypeOptions: Array<{ value: SalonImageType; label: string }> = [
   { value: "interior", label: "Nosso Espaço" },
 ];
 
-const candidateSuggestedUseOptions = [
+const imageDestinationOptions: Array<{ value: ImageDestination; label: string }> = [
+  { value: "bank", label: "Banco de fotos" },
   { value: "logo", label: "Logo" },
   { value: "top", label: "Destaque inicial" },
   { value: "gallery", label: "Galeria" },
@@ -290,12 +300,13 @@ const candidateSuggestedUseOptions = [
   { value: "ignore", label: "Ignorar" },
 ];
 
-const imageDestinationOptions: Array<{ value: ImageDestination; label: string }> = [
-  { value: "logo", label: "Logo" },
-  { value: "top", label: "Destaque inicial" },
-  { value: "gallery", label: "Galeria" },
-  { value: "space", label: "Nosso Espaço" },
-  { value: "ignore", label: "Ignorar" },
+const IMAGE_SECTION_ORDER: ImageDestination[] = [
+  "bank",
+  "logo",
+  "top",
+  "gallery",
+  "space",
+  "ignore",
 ];
 
 const reviewSourceOptions: Array<{ value: SalonReviewSource; label: string }> = [
@@ -333,8 +344,16 @@ export function SalonForm({
   onSubmit,
 }: SalonFormProps) {
   const formRef = useRef<HTMLFormElement>(null);
+  const initialRealImages = getInitialRealImages(initialSalon);
+  const initialEffectiveLayoutImagePlan = buildEffectiveLayoutImagePlan(
+    initialRealImages,
+    initialSalon?.layoutImagePlan,
+  );
   const [realImages, setRealImages] = useState<SalonGalleryImage[]>(() =>
-    getInitialRealImages(initialSalon),
+    syncImagesWithPlan(
+      initialRealImages,
+      initialEffectiveLayoutImagePlan,
+    ),
   );
   const [realReviews, setRealReviews] = useState<SalonTestimonial[]>(() =>
     getInitialRealReviews(initialSalon),
@@ -348,7 +367,7 @@ export function SalonForm({
     );
   const [layoutImagePlan, setLayoutImagePlan] = useState<
     SalonLayoutImagePlan | undefined
-  >(() => initialSalon?.layoutImagePlan);
+  >(() => initialEffectiveLayoutImagePlan);
   const [copySuggestion, setCopySuggestion] = useState<
     SalonCopySuggestion | undefined
   >(() => initialSalon?.copySuggestions ?? initialSalon?.generatedCopy);
@@ -366,6 +385,10 @@ export function SalonForm({
   );
   const [copyMessage, setCopyMessage] = useState("");
   const repositoryStatus = getSalonRepositoryStatus();
+  const effectiveLayoutImagePlan = useMemo(
+    () => buildEffectiveLayoutImagePlan(realImages, layoutImagePlan),
+    [realImages, layoutImagePlan],
+  );
   const availableServices = Array.from(
     new Set([...serviceOptions, ...(initialSalon?.selectedServices ?? [])]),
   );
@@ -406,7 +429,10 @@ export function SalonForm({
       galleryImages: overrides?.galleryImages ?? realImages,
       imageCandidates,
       imageSelectionSummary,
-      layoutImagePlan,
+      layoutImagePlan: buildEffectiveLayoutImagePlan(
+        overrides?.galleryImages ?? realImages,
+        effectiveLayoutImagePlan,
+      ),
       testimonials: overrides?.testimonials ?? realReviews,
       sourceMaterials: buildSourceMaterials(
         overrides?.galleryImages ?? realImages,
@@ -458,7 +484,10 @@ export function SalonForm({
       galleryImages: realImages.length ? realImages : initialSalon?.galleryImages,
       imageCandidates,
       imageSelectionSummary,
-      layoutImagePlan,
+      layoutImagePlan: buildEffectiveLayoutImagePlan(
+        realImages,
+        effectiveLayoutImagePlan,
+      ),
       testimonials: realReviews,
       businessHours: input.businessHours,
       address: input.address,
@@ -551,7 +580,9 @@ export function SalonForm({
     fillCheckboxGroup("services", testSalonPreset.services);
     const nextImages = mergePresetImages(realImages, testSalonImages);
     const nextReviews = mergePresetReviews(realReviews, testSalonReviews);
-    const nextLayoutImagePlan = buildTestSalonLayoutImagePlan(layoutImagePlan);
+    const nextLayoutImagePlan = buildTestSalonLayoutImagePlan(
+      effectiveLayoutImagePlan,
+    );
     const nextImageSelectionSummary =
       buildTestSalonImageSelectionSummary(imageSelectionSummary);
 
@@ -1403,6 +1434,11 @@ function RealImagesSection({
   const [validatedPlan, setValidatedPlan] = useState<SalonLayoutImagePlan | undefined>(
     undefined,
   );
+  const [draggedImageId, setDraggedImageId] = useState<string | null>(null);
+  const effectiveLayoutImagePlan = useMemo(
+    () => buildEffectiveLayoutImagePlan(images, layoutImagePlan),
+    [images, layoutImagePlan],
+  );
 
   function addImage() {
     const url = draft.url.trim();
@@ -1411,6 +1447,11 @@ function RealImagesSection({
       setMessage("Cole uma URL de imagem antes de adicionar.");
       return;
     }
+
+    const destination =
+      draft.selectedForLanding || draft.type === "hero"
+        ? imageTypeToDestination(draft.type)
+        : "ignore";
 
     const image: SalonGalleryImage = {
       id: createLocalId("image"),
@@ -1430,7 +1471,22 @@ function RealImagesSection({
       createdAt: new Date().toISOString(),
     };
 
-    onChange((current) => normalizeHeroImages([...current, image]));
+    const moveResult = moveImageToDestination(
+      effectiveLayoutImagePlan,
+      image.id,
+      destination,
+      {
+        availableImageIds: [...images.map((currentImage) => currentImage.id), image.id],
+      },
+    );
+
+    if (moveResult.blockedReason) {
+      setMessage(moveResult.blockedReason);
+      return;
+    }
+
+    onChange((current) => syncImagesWithPlan([...current, image], moveResult.plan));
+    onLayoutPlanChange(() => moveResult.plan);
     setDraft(defaultImageDraft);
     setMessage("Imagem adicionada. Salve as alteracoes para gravar.");
   }
@@ -1454,41 +1510,87 @@ function RealImagesSection({
     );
   }
 
-  function setHeroImage(id: string) {
-    onChange((current) =>
-      current.map((image) => ({
-        ...image,
-        type: image.id === id ? "hero" : image.type === "hero" ? "gallery" : image.type,
-        selectedForLanding: image.id === id ? true : image.selectedForLanding,
-      })),
-    );
-    onLayoutPlanChange((current) => setImagePlanDestination(current, id, "top"));
-  }
-
   function removeImage(id: string) {
-    onChange((current) => current.filter((image) => image.id !== id));
-    onLayoutPlanChange((current) => removeImageFromPlan(current, id));
+    const nextImages = images.filter((image) => image.id !== id);
+    const nextPlan = removeImageFromLayoutPlan(
+      effectiveLayoutImagePlan,
+      id,
+      {
+        availableImageIds: nextImages.map((image) => image.id),
+      },
+    );
+
+    onChange(nextImages);
+    onLayoutPlanChange(nextPlan);
   }
 
   function setImageDestination(id: string, destination: ImageDestination) {
-    onChange((current) =>
-      normalizeHeroImages(
-        current.map((image) =>
-          image.id === id
-            ? {
-                ...image,
-                type: imageDestinationToType(destination),
-                selectedForLanding: destination !== "ignore",
-              }
-            : image,
-        ),
-      ),
+    const result = moveImageToDestination(
+      effectiveLayoutImagePlan,
+      id,
+      destination,
+      {
+        availableImageIds: images.map((image) => image.id),
+      },
     );
-    onLayoutPlanChange((current) => setImagePlanDestination(current, id, destination));
+
+    if (result.blockedReason) {
+      setMessage(result.blockedReason);
+      return;
+    }
+
+    onLayoutPlanChange(result.plan);
+    onChange((current) => syncImagesWithPlan(current, result.plan));
+    setMessage(
+      result.replacedLogoImageId
+        ? "Nova logo definida. A logo anterior foi movida para Ignorar."
+        : destination === "bank"
+          ? "Imagem enviada para o banco de fotos. Salve as alteracoes para gravar."
+          : "Destino da imagem atualizado. Salve as alteracoes para gravar.",
+    );
+  }
+
+  function handleImageDragStart(
+    event: DragEvent<HTMLElement>,
+    imageId: string,
+  ) {
+    setDraggedImageId(imageId);
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("text/plain", imageId);
+  }
+
+  function handleDropOnDestination(
+    event: DragEvent<HTMLElement>,
+    destination: ImageDestination,
+  ) {
+    event.preventDefault();
+    const imageId = event.dataTransfer.getData("text/plain") || draggedImageId;
+
+    if (!imageId) {
+      return;
+    }
+
+    setImageDestination(imageId, destination);
+    setDraggedImageId(null);
+  }
+
+  function handleDragOverDestination(event: DragEvent<HTMLElement>) {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
   }
 
   function moveImageInPlan(id: string, direction: -1 | 1) {
-    onLayoutPlanChange((current) => moveImageWithinPlan(current, id, direction));
+    const nextPlan = moveImageWithinDestination(
+      effectiveLayoutImagePlan,
+      id,
+      direction,
+      {
+        availableImageIds: images.map((image) => image.id),
+      },
+    );
+
+    onLayoutPlanChange(nextPlan);
+    onChange((current) => syncImagesWithPlan(current, nextPlan));
   }
 
   function updateSpaceSettings(
@@ -1497,7 +1599,15 @@ function RealImagesSection({
       "spaceEnabled" | "spaceTitle" | "spaceDescription"
     >>,
   ) {
-    onLayoutPlanChange((current) => updatePlanSpaceSettings(current, updates));
+    onLayoutPlanChange(
+      updateLayoutPlanSpaceSettings(
+        effectiveLayoutImagePlan,
+        updates,
+        {
+          availableImageIds: images.map((image) => image.id),
+        },
+      ),
+    );
   }
 
   async function handleFileSelected(event: ChangeEvent<HTMLInputElement>) {
@@ -1543,7 +1653,26 @@ function RealImagesSection({
         createdAt: new Date().toISOString(),
       };
 
-      onChange((current) => normalizeHeroImages([...current, image]));
+      const destination =
+        draft.selectedForLanding || draft.type === "hero"
+          ? imageTypeToDestination(draft.type)
+          : "ignore";
+      const moveResult = moveImageToDestination(
+        effectiveLayoutImagePlan,
+        image.id,
+        destination,
+        {
+          availableImageIds: [...images.map((currentImage) => currentImage.id), image.id],
+        },
+      );
+
+      if (moveResult.blockedReason) {
+        setMessage(moveResult.blockedReason);
+        return;
+      }
+
+      onChange((current) => syncImagesWithPlan([...current, image], moveResult.plan));
+      onLayoutPlanChange(() => moveResult.plan);
       setMessage(
         "Upload local concluido. A imagem foi salva neste navegador. Salve as alteracoes para gravar.",
       );
@@ -1576,7 +1705,7 @@ function RealImagesSection({
       galleryImages: images,
       imageCandidates: candidates,
       imageSelectionSummary: selectionSummary,
-      layoutImagePlan,
+      layoutImagePlan: effectiveLayoutImagePlan,
     });
   }
 
@@ -1744,7 +1873,7 @@ function RealImagesSection({
         analyzeImageCandidates(mergeImageCandidates(current, imported)),
       );
       onSelectionChange(undefined);
-      onLayoutPlanChange(undefined);
+      onLayoutPlanChange(buildEffectiveLayoutImagePlan(images, undefined));
       setImportMessage(
         `${imported.length} candidata(s) coletada(s). Revise score, sugestao e justificativas antes de aplicar.` +
           (usedTestCandidates
@@ -1775,9 +1904,29 @@ function RealImagesSection({
     );
   }
 
-  function applyCandidate(candidate: SalonImageCandidate, type: SalonImageType) {
+  function applyCandidate(
+    candidate: SalonImageCandidate,
+    destination: ImageDestination,
+  ) {
     const imageId = `image-${candidate.id}`;
-    const destination = imageTypeToDestination(type);
+    const type = imageDestinationToType(destination);
+    const moveResult = moveImageToDestination(
+      effectiveLayoutImagePlan,
+      imageId,
+      destination,
+      {
+        availableImageIds: [
+          ...images.map((currentImage) => currentImage.id),
+          imageId,
+        ],
+      },
+    );
+
+    if (moveResult.blockedReason) {
+      setImportMessage(moveResult.blockedReason);
+      return;
+    }
+
     const image: SalonGalleryImage = {
       id: imageId,
       url: candidate.imageUrl,
@@ -1791,7 +1940,7 @@ function RealImagesSection({
       sourceUrl: candidate.sourceUrl ?? candidate.pageUrl,
       originalPostUrl: candidate.originalPostUrl,
       isReal: true,
-      selectedForLanding: true,
+      selectedForLanding: destination !== "bank" && destination !== "ignore",
       createdAt: new Date().toISOString(),
     };
 
@@ -1807,10 +1956,10 @@ function RealImagesSection({
           ...image,
           id: nextImages[existingIndex].id,
         };
-        return normalizeHeroImages(nextImages);
+        return syncImagesWithPlan(nextImages, moveResult.plan);
       }
 
-      return normalizeHeroImages([...current, image]);
+      return syncImagesWithPlan([...current, image], moveResult.plan);
     });
 
     updateCandidate(candidate.id, {
@@ -1818,25 +1967,25 @@ function RealImagesSection({
       suggestedUse: destinationToSuggestedUse(destination),
     });
     onSelectionChange((current) => ({
-      logoId: type === "logo" ? candidate.id : current?.logoId,
-      heroId: type === "hero" ? candidate.id : current?.heroId,
+      logoId: destination === "logo" ? candidate.id : current?.logoId,
+      heroId: destination === "top" ? candidate.id : current?.heroId,
       interiorIds:
-        type === "interior"
+        destination === "space"
           ? Array.from(new Set([...(current?.interiorIds ?? []), candidate.id]))
           : current?.interiorIds ?? [],
-      resultIds:
-        type === "result"
-          ? Array.from(new Set([...(current?.resultIds ?? []), candidate.id]))
-          : current?.resultIds ?? [],
+      resultIds: current?.resultIds ?? [],
       galleryIds:
-        type === "gallery" || type === "service"
+        destination === "gallery"
           ? Array.from(new Set([...(current?.galleryIds ?? []), candidate.id]))
           : current?.galleryIds ?? [],
-      ignoredIds: current?.ignoredIds ?? [],
+      ignoredIds:
+        destination === "ignore"
+          ? Array.from(new Set([...(current?.ignoredIds ?? []), candidate.id]))
+          : current?.ignoredIds ?? [],
       selectedAt: current?.selectedAt ?? new Date().toISOString(),
       appliedAt: new Date().toISOString(),
     }));
-    onLayoutPlanChange((current) => setImagePlanDestination(current, image.id, destination));
+    onLayoutPlanChange(() => moveResult.plan);
     setImportMessage("Imagem candidata aplicada na landing. Salve as alteracoes para gravar.");
   }
 
@@ -1918,11 +2067,11 @@ function RealImagesSection({
       return;
     }
 
-    if (layoutImagePlan) {
+    if (effectiveLayoutImagePlan) {
       const appliedPlan = applyLayoutImagePlan({
         currentImages: images,
         candidates,
-        plan: layoutImagePlan,
+        plan: effectiveLayoutImagePlan,
         salonName: salonName || "Salao",
       });
 
@@ -2024,7 +2173,11 @@ function RealImagesSection({
 
   const hasSelectedCandidates = candidates.some(
     (candidate) => candidate.status === "selected" || candidate.status === "applied",
-  ) || Boolean(layoutImagePlan);
+  ) || Boolean(effectiveLayoutImagePlan);
+  const imagesByDestination = useMemo(
+    () => groupImagesByDestination(images, effectiveLayoutImagePlan),
+    [images, effectiveLayoutImagePlan],
+  );
 
   return (
     <section className="rounded-[2rem] border border-zinc-200 bg-white p-6 shadow-xl shadow-zinc-950/5">
@@ -2340,7 +2493,7 @@ function RealImagesSection({
             <label className="flex items-center gap-3 text-sm font-semibold text-zinc-800">
               <input
                 type="checkbox"
-                checked={Boolean(layoutImagePlan?.spaceEnabled)}
+                checked={Boolean(effectiveLayoutImagePlan?.spaceEnabled)}
                 onChange={(event) =>
                   updateSpaceSettings({
                     spaceEnabled: event.currentTarget.checked,
@@ -2353,7 +2506,7 @@ function RealImagesSection({
             <div className="mt-3 grid gap-3">
               <TextInput
                 label="Título da seção"
-                value={layoutImagePlan?.spaceTitle ?? "Nosso Espaço"}
+                value={effectiveLayoutImagePlan?.spaceTitle ?? "Nosso Espaço"}
                 onChange={(value) =>
                   updateSpaceSettings({
                     spaceTitle: value,
@@ -2363,7 +2516,7 @@ function RealImagesSection({
               <TextInput
                 label="Descrição curta"
                 value={
-                  layoutImagePlan?.spaceDescription ??
+                  effectiveLayoutImagePlan?.spaceDescription ??
                   "Conheça um pouco do ambiente e dos detalhes do salão."
                 }
                 onChange={(value) =>
@@ -2374,24 +2527,24 @@ function RealImagesSection({
               />
             </div>
           </div>
-          {layoutImagePlan ? (
+          {effectiveLayoutImagePlan ? (
             <div className="mt-4 rounded-2xl border border-zinc-200 bg-white px-4 py-3 text-xs leading-5 text-zinc-600">
               <p className="font-semibold text-zinc-900">
-                Resumo da curadoria atual ({layoutImagePlan.mode === "chatgpt_manual" ? "ChatGPT manual" : "local automatico"})
+                Resumo da curadoria atual ({effectiveLayoutImagePlan.mode === "chatgpt_manual" ? "ChatGPT manual" : "local automatico"})
               </p>
               <ul className="mt-2 grid gap-1">
-                <li>Logo: {layoutImagePlan.logoImageId || "nao definida"}</li>
-                <li>Destaque inicial: {(layoutImagePlan.topImageIds ?? []).length}</li>
-                <li>Galeria: {layoutImagePlan.galleryImageIds.length}</li>
-                <li>Nosso Espaco: {layoutImagePlan.spaceEnabled ? (layoutImagePlan.spaceImageIds ?? []).length : 0}</li>
-                <li>Ignoradas: {layoutImagePlan.ignoredImageIds.length}</li>
+                <li>Logo: {effectiveLayoutImagePlan.logoImageId || "nao definida"}</li>
+                <li>Destaque inicial: {(effectiveLayoutImagePlan.topImageIds ?? []).length}</li>
+                <li>Galeria: {effectiveLayoutImagePlan.galleryImageIds.length}</li>
+                <li>Nosso Espaco: {effectiveLayoutImagePlan.spaceEnabled ? (effectiveLayoutImagePlan.spaceImageIds ?? []).length : 0}</li>
+                <li>Ignoradas: {effectiveLayoutImagePlan.ignoredImageIds.length}</li>
               </ul>
-              {layoutImagePlan.summary ? (
-                <p className="mt-3 text-zinc-700">{layoutImagePlan.summary}</p>
+              {effectiveLayoutImagePlan.summary ? (
+                <p className="mt-3 text-zinc-700">{effectiveLayoutImagePlan.summary}</p>
               ) : null}
-              {layoutImagePlan.warnings.length ? (
+              {effectiveLayoutImagePlan.warnings.length ? (
                 <ul className="mt-3 grid gap-1 text-amber-800">
-                  {layoutImagePlan.warnings.map((warning) => (
+                  {effectiveLayoutImagePlan.warnings.map((warning) => (
                     <li key={warning}>- {warning}</li>
                   ))}
                 </ul>
@@ -2553,9 +2706,9 @@ function RealImagesSection({
                       </span>
                     </div>
                     <p className="mt-2 text-xs leading-5 text-zinc-500">
-                      Sugestao atual:{" "}
+                      Curadoria local:{" "}
                       <span className="font-semibold text-zinc-700">
-                        {getSuggestedUseLabel(suggestedUseToDestination(candidate.suggestedUse))}
+                        {getDestinationLabel(suggestedUseToDestination(candidate.suggestedUse))}
                       </span>
                     </p>
                     {candidate.collectorOrigin ? (
@@ -2570,20 +2723,10 @@ function RealImagesSection({
                     ) : null}
                   </div>
 
-                  <SelectInput
-                    label="Destino na landing"
-                    value={suggestedUseToDestination(candidate.suggestedUse)}
-                    options={candidateSuggestedUseOptions}
-                    onChange={(value) =>
-                      updateCandidate(candidate.id, {
-                        suggestedUse: destinationToSuggestedUse(value as ImageDestination),
-                        status: value === "ignore" ? "rejected" : "selected",
-                      })
-                    }
-                  />
-
-                  <div className="rounded-2xl border border-zinc-200 bg-zinc-50 px-3 py-3 text-xs leading-5 text-zinc-600">
-                    <p className="font-semibold text-zinc-800">Justificativas</p>
+                  <details className="rounded-2xl border border-zinc-200 bg-zinc-50 px-3 py-3 text-xs leading-5 text-zinc-600">
+                    <summary className="cursor-pointer font-semibold text-zinc-800">
+                      Ver justificativas
+                    </summary>
                     <ul className="mt-2 grid gap-1">
                       {candidate.reasons.map((reason) => (
                         <li key={reason}>• {reason}</li>
@@ -2596,38 +2739,20 @@ function RealImagesSection({
                         ))}
                       </ul>
                     ) : null}
-                  </div>
+                  </details>
 
                   <div className="flex flex-wrap gap-2">
                     <button
                       type="button"
-                      onClick={() =>
-                        applyCandidate(
-                          candidate,
-                          mapSuggestedUseToImageType(
-                            candidate.suggestedUse,
-                            candidate.id,
-                            selectionSummary,
-                          ),
-                        )
-                      }
+                      onClick={() => applyCandidate(candidate, "bank")}
                       className="btn btn-primary min-h-10 px-3 py-2 text-xs"
                     >
-                      Aplicar agora
+                      Adicionar ao banco
                     </button>
                     <button
                       type="button"
                       onClick={() =>
-                        updateCandidate(candidate.id, { status: "selected" })
-                      }
-                      className="btn btn-secondary min-h-10 px-3 py-2 text-xs"
-                    >
-                      Selecionar
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        applyCandidate(candidate, "hero")
+                        applyCandidate(candidate, "top")
                       }
                       className="btn btn-secondary min-h-10 px-3 py-2 text-xs"
                     >
@@ -2645,7 +2770,7 @@ function RealImagesSection({
                     <button
                       type="button"
                       onClick={() =>
-                        applyCandidate(candidate, "interior")
+                        applyCandidate(candidate, "space")
                       }
                       className="btn btn-secondary min-h-10 px-3 py-2 text-xs"
                     >
@@ -2688,11 +2813,11 @@ function RealImagesSection({
         <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="text-sm font-semibold text-zinc-950">
-              Imagens reais cadastradas
+              Organizador de fotos da landing
             </p>
             <p className="mt-1 text-xs leading-5 text-zinc-500">
-              Escolha se cada imagem vai para logo, destaque inicial, galeria,
-              Nosso Espaco ou fica fora da landing.
+              Arraste uma foto para uma area ou use os botoes do card. A foto
+              sai do grupo antigo e entra no novo destino imediatamente.
             </p>
           </div>
           <span className="rounded-full bg-zinc-100 px-3 py-1 text-xs font-semibold text-zinc-600">
@@ -2700,122 +2825,227 @@ function RealImagesSection({
           </span>
         </div>
 
-        {images.length ? (
-          <div className="mt-4 grid gap-4 lg:grid-cols-2">
-            {images.map((image) => (
-              <article
-                key={image.id}
-                className="grid gap-4 rounded-[1.5rem] border border-zinc-200 bg-zinc-50 p-4 sm:grid-cols-[9rem_1fr]"
-              >
-                <div className="relative aspect-[4/5] overflow-hidden rounded-2xl bg-zinc-200">
-                  <Image
-                    src={image.src}
-                    alt={image.alt}
-                    fill
-                    sizes="9rem"
-                    className="object-cover"
-                  />
-                  {image.type === "hero" ? (
-                    <span className="absolute left-2 top-2 rounded-full bg-zinc-950/80 px-2 py-1 text-[11px] font-semibold text-white">
-                      Principal
-                    </span>
-                  ) : null}
-                </div>
-                <div className="grid gap-3">
-                  {(() => {
-                    const destination = getImageDestination(image, layoutImagePlan);
-                    const canOrder =
-                      destination === "top" ||
-                      destination === "gallery" ||
-                      destination === "space";
+        {message ? (
+          <p className="mt-4 rounded-2xl border border-teal-100 bg-teal-50 px-4 py-3 text-sm font-semibold text-teal-950">
+            {message}
+          </p>
+        ) : null}
 
-                    return (
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-zinc-700 ring-1 ring-zinc-200">
-                          {getDestinationLabel(destination)}
-                        </span>
-                        {canOrder ? (
-                          <>
-                            <button
-                              type="button"
-                              onClick={() => moveImageInPlan(image.id, -1)}
-                              className="btn btn-secondary min-h-8 px-2.5 py-1.5 text-xs"
-                              aria-label="Mover imagem para cima"
-                            >
-                              <ArrowUp className="h-3.5 w-3.5" />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => moveImageInPlan(image.id, 1)}
-                              className="btn btn-secondary min-h-8 px-2.5 py-1.5 text-xs"
-                              aria-label="Mover imagem para baixo"
-                            >
-                              <ArrowDown className="h-3.5 w-3.5" />
-                            </button>
-                          </>
-                        ) : null}
-                      </div>
-                    );
-                  })()}
-                  <TextInput
-                    label="Descricao"
-                    value={image.alt}
-                    onChange={(value) => updateImage(image.id, { alt: value })}
-                  />
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <SelectInput
-                      label="Destino"
-                      value={getImageDestination(image, layoutImagePlan)}
-                      options={imageDestinationOptions}
-                      onChange={(value) =>
-                        setImageDestination(image.id, value as ImageDestination)
-                      }
-                    />
-                    <SelectInput
-                      label="Origem"
-                      value={image.source}
-                      options={imageSourceOptions}
-                      onChange={(value) =>
-                        updateImage(image.id, { source: value as SalonImageSource })
-                      }
-                    />
-                  </div>
-                  <label className="flex items-center gap-3 text-sm font-semibold text-zinc-700">
-                    <input
-                      type="checkbox"
-                      checked={image.selectedForLanding}
-                      onChange={(event) =>
-                        updateImage(image.id, {
-                          selectedForLanding: event.currentTarget.checked,
-                        })
-                      }
-                      className="h-4 w-4 accent-teal-700"
-                    />
-                    Usar na landing
-                  </label>
-                  <div className="flex flex-wrap gap-2">
-                    {image.type !== "logo" ? (
-                      <button
-                        type="button"
-                        onClick={() => setHeroImage(image.id)}
-                        className="btn btn-secondary min-h-10 px-3 py-2 text-xs"
-                      >
-                        <CheckCircle2 className="h-4 w-4" />
-                        Mandar para destaque
-                      </button>
-                    ) : null}
-                    <button
-                      type="button"
-                      onClick={() => removeImage(image.id)}
-                      className="btn min-h-10 border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-950 hover:bg-rose-100"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                      Remover
-                    </button>
-                  </div>
+        {images.length ? (
+          <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-6">
+            {IMAGE_SECTION_ORDER.map((destination) => {
+              const sectionImages = imagesByDestination[destination];
+
+              return (
+                <div
+                  key={destination}
+                  className="rounded-2xl border border-zinc-200 bg-zinc-50 px-3 py-2"
+                >
+                  <p className="text-xs font-semibold text-zinc-950">
+                    {getDestinationSectionTitle(destination)}
+                  </p>
+                  <p className="mt-1 text-[11px] font-semibold text-zinc-500">
+                    {destination === "top"
+                      ? `${sectionImages.length}/3`
+                      : destination === "logo"
+                        ? `${sectionImages.length}/1`
+                        : sectionImages.length}
+                  </p>
                 </div>
-              </article>
-            ))}
+              );
+            })}
+          </div>
+        ) : null}
+
+        {images.length ? (
+          <div className="mt-4 grid gap-4 xl:grid-cols-3">
+            {IMAGE_SECTION_ORDER.map((destination) => {
+              const sectionImages = imagesByDestination[destination];
+
+              return (
+                <div
+                  key={destination}
+                  data-image-destination={destination}
+                  onDragOver={handleDragOverDestination}
+                  onDrop={(event) => handleDropOnDestination(event, destination)}
+                  className={`min-h-[14rem] rounded-[1.5rem] border border-dashed p-4 transition ${
+                    draggedImageId
+                      ? "border-teal-400 bg-teal-50/50"
+                      : "border-zinc-200 bg-zinc-50"
+                  }`}
+                >
+                  <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <p className="text-sm font-semibold text-zinc-950">
+                        {getDestinationSectionTitle(destination)}
+                      </p>
+                      <p className="mt-1 text-xs leading-5 text-zinc-500">
+                        {getDestinationSectionDescription(destination)}
+                      </p>
+                    </div>
+                    <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-zinc-700 ring-1 ring-zinc-200">
+                      {destination === "top"
+                        ? `${sectionImages.length}/3`
+                        : `${sectionImages.length}`}
+                    </span>
+                  </div>
+
+                  {sectionImages.length ? (
+                  <div className="grid gap-3">
+                    {sectionImages.map((image) => (
+                      <article
+                        key={image.id}
+                        data-image-id={image.id}
+                        draggable
+                        onDragStart={(event) =>
+                          handleImageDragStart(event, image.id)
+                        }
+                        onDragEnd={() => setDraggedImageId(null)}
+                        className="grid cursor-grab gap-3 rounded-[1.25rem] border border-zinc-200 bg-white p-3 shadow-sm active:cursor-grabbing sm:grid-cols-[7.5rem_1fr]"
+                      >
+                        <div className="relative aspect-square overflow-hidden rounded-2xl bg-zinc-200">
+                          <Image
+                            src={image.src}
+                            alt={image.alt}
+                            fill
+                            sizes="8rem"
+                            className="object-cover"
+                          />
+                        </div>
+                        <div className="grid gap-3">
+                          {(() => {
+                            const destinationValue = getImageDestination(
+                              image,
+                              effectiveLayoutImagePlan,
+                            );
+                            const canOrder =
+                              destinationValue === "top" ||
+                              destinationValue === "gallery" ||
+                              destinationValue === "space";
+
+                            return (
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span className="rounded-full bg-zinc-100 px-3 py-1 text-xs font-semibold text-zinc-700 ring-1 ring-zinc-200">
+                                  {getDestinationLabel(destinationValue)}
+                                </span>
+                                {canOrder ? (
+                                  <>
+                                    <button
+                                      type="button"
+                                      onClick={() => moveImageInPlan(image.id, -1)}
+                                      className="btn btn-secondary min-h-8 px-2.5 py-1.5 text-xs"
+                                      aria-label="Mover imagem para cima"
+                                    >
+                                      <ArrowUp className="h-3.5 w-3.5" />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => moveImageInPlan(image.id, 1)}
+                                      className="btn btn-secondary min-h-8 px-2.5 py-1.5 text-xs"
+                                      aria-label="Mover imagem para baixo"
+                                    >
+                                      <ArrowDown className="h-3.5 w-3.5" />
+                                    </button>
+                                  </>
+                                ) : null}
+                              </div>
+                            );
+                          })()}
+                          <TextInput
+                            label="Descricao"
+                            value={image.alt}
+                            onChange={(value) => updateImage(image.id, { alt: value })}
+                          />
+                          <div className="flex flex-wrap gap-2 text-[11px] font-semibold text-zinc-500">
+                            <span className="rounded-full bg-zinc-100 px-2.5 py-1">
+                              Origem: {getImageSourceLabel(image.source)}
+                            </span>
+                            <span className="rounded-full bg-zinc-100 px-2.5 py-1">
+                              Arraste para mover
+                            </span>
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            {destination !== "bank" ? (
+                              <button
+                                type="button"
+                                data-image-action="bank"
+                                onClick={() => setImageDestination(image.id, "bank")}
+                                className="btn btn-secondary min-h-9 px-3 py-2 text-xs"
+                              >
+                                Banco
+                              </button>
+                            ) : null}
+                            {destination !== "logo" ? (
+                              <button
+                                type="button"
+                                data-image-action="logo"
+                                onClick={() => setImageDestination(image.id, "logo")}
+                                className="btn btn-secondary min-h-9 px-3 py-2 text-xs"
+                              >
+                                Logo
+                              </button>
+                            ) : null}
+                            {destination !== "top" ? (
+                              <button
+                                type="button"
+                                data-image-action="top"
+                                onClick={() => setImageDestination(image.id, "top")}
+                                className="btn btn-secondary min-h-9 px-3 py-2 text-xs"
+                              >
+                                Destaque
+                              </button>
+                            ) : null}
+                            {destination !== "gallery" ? (
+                              <button
+                                type="button"
+                                data-image-action="gallery"
+                                onClick={() => setImageDestination(image.id, "gallery")}
+                                className="btn btn-secondary min-h-9 px-3 py-2 text-xs"
+                              >
+                                Galeria
+                              </button>
+                            ) : null}
+                            {destination !== "space" ? (
+                              <button
+                                type="button"
+                                data-image-action="space"
+                                onClick={() => setImageDestination(image.id, "space")}
+                                className="btn btn-secondary min-h-9 px-3 py-2 text-xs"
+                              >
+                                Nosso Espaco
+                              </button>
+                            ) : null}
+                            {destination !== "ignore" ? (
+                              <button
+                                type="button"
+                                data-image-action="ignore"
+                                onClick={() => setImageDestination(image.id, "ignore")}
+                                className="btn btn-secondary min-h-9 px-3 py-2 text-xs"
+                              >
+                                Ignorar
+                              </button>
+                            ) : null}
+                            <button
+                              type="button"
+                              onClick={() => removeImage(image.id)}
+                              className="btn min-h-9 border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-950 hover:bg-rose-100"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                              Remover
+                            </button>
+                          </div>
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                  ) : (
+                    <div className="flex min-h-[8rem] items-center justify-center rounded-2xl border border-dashed border-zinc-300 bg-white/70 px-4 py-6 text-center text-xs font-semibold leading-5 text-zinc-500">
+                      Arraste uma foto para {getDestinationSectionTitle(destination)}.
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         ) : (
           <div className="mt-4 rounded-[1.5rem] border border-dashed border-zinc-300 bg-zinc-50 p-5 text-sm leading-6 text-zinc-500">
@@ -3376,6 +3606,83 @@ function getInitialRealReviews(salon?: Salon) {
   return (salon?.testimonials ?? []).filter((review) => review.isReal);
 }
 
+function buildEffectiveLayoutImagePlan(
+  images: SalonGalleryImage[],
+  plan?: SalonLayoutImagePlan,
+) {
+  const availableImageIds = images.map((image) => image.id);
+  const normalizedPlan = normalizeSalonLayoutImagePlan(plan, {
+    availableImageIds,
+  });
+
+  const topImageIds = [...(normalizedPlan?.topImageIds ?? [])];
+  const galleryImageIds = [...(normalizedPlan?.galleryImageIds ?? [])];
+  const spaceImageIds = [...(normalizedPlan?.spaceImageIds ?? [])];
+  const ignoredImageIds = [...(normalizedPlan?.ignoredImageIds ?? [])];
+
+  for (const image of images) {
+    if (getImageDestinationFromPlan(image.id, normalizedPlan)) {
+      continue;
+    }
+
+    if (!image.selectedForLanding) {
+      continue;
+    }
+
+    switch (imageTypeToDestination(image.type)) {
+      case "logo":
+        break;
+      case "top":
+        if (topImageIds.length < 3) {
+          pushUniqueId(topImageIds, image.id);
+        } else {
+          pushUniqueId(galleryImageIds, image.id);
+        }
+        break;
+      case "space":
+        pushUniqueId(spaceImageIds, image.id);
+        break;
+      default:
+        pushUniqueId(galleryImageIds, image.id);
+        break;
+    }
+  }
+
+  const fallbackLogo =
+    normalizedPlan?.logoImageId ??
+    images.find((image) => image.selectedForLanding && image.type === "logo")?.id ??
+    null;
+
+  return normalizeSalonLayoutImagePlan(
+    {
+      ...(normalizedPlan ?? {
+        mode: "local_auto" as const,
+        logoImageId: null,
+        topImageIds: [],
+        heroImageId: null,
+        heroMosaicImageIds: [],
+        galleryImageIds: [],
+        spaceEnabled: false,
+        spaceTitle: "Nosso Espaco",
+        spaceDescription: "Conheca um pouco do ambiente e dos detalhes do salao.",
+        spaceImageIds: [],
+        experienceImageIds: [],
+        resultImageIds: [],
+        ignoredImageIds: [],
+        warnings: [],
+      }),
+      logoImageId: fallbackLogo,
+      topImageIds,
+      galleryImageIds,
+      spaceImageIds,
+      ignoredImageIds,
+    },
+    {
+      availableImageIds,
+    },
+  );
+}
+
 function normalizeHeroImages(images: SalonGalleryImage[]) {
   let hasHeroImage = false;
 
@@ -3440,9 +3747,29 @@ function mergePresetReviews(
 function buildTestSalonLayoutImagePlan(
   currentPlan?: SalonLayoutImagePlan,
 ): SalonLayoutImagePlan {
-  const basePlan = createSimpleImagePlan(currentPlan);
+  const basePlan: SalonLayoutImagePlan =
+    normalizeSalonLayoutImagePlan(currentPlan) ?? {
+      mode: "local_auto" as const,
+      logoImageId: null,
+      topImageIds: [],
+      heroImageId: null,
+      heroMosaicImageIds: [],
+      galleryImageIds: [],
+      spaceEnabled: false,
+      spaceTitle: "Nosso Espaco",
+      spaceDescription: "Conheca um pouco do ambiente e dos detalhes do salao.",
+      spaceImageIds: [],
+      experienceImageIds: [],
+      resultImageIds: [],
+      ignoredImageIds: [],
+      summary: undefined,
+      warnings: [],
+      generatedAt: undefined,
+      appliedAt: undefined,
+      updatedAt: undefined,
+    };
 
-  return syncLegacyImagePlan({
+  return normalizeSalonLayoutImagePlan({
     ...basePlan,
     mode: "local_auto",
     logoImageId: "dev-logo-365-divas",
@@ -3468,7 +3795,7 @@ function buildTestSalonLayoutImagePlan(
     warnings: basePlan.warnings ?? [],
     generatedAt: basePlan.generatedAt ?? new Date().toISOString(),
     updatedAt: new Date().toISOString(),
-  });
+  }) as SalonLayoutImagePlan;
 }
 
 function buildTestSalonImageSelectionSummary(
@@ -3519,190 +3846,22 @@ function buildSourceMaterials(
   ];
 }
 
-function createSimpleImagePlan(plan?: SalonLayoutImagePlan): SalonLayoutImagePlan {
-  const topImageIds = getPlanTopImageIds(plan);
-  const spaceImageIds = getPlanSpaceImageIds(plan);
-
-  return {
-    mode: plan?.mode ?? "local_auto",
-    logoImageId: plan?.logoImageId ?? null,
-    topImageIds,
-    heroImageId: topImageIds.length === 1 ? topImageIds[0] : null,
-    heroMosaicImageIds: topImageIds.length > 1 ? topImageIds.slice(0, 3) : [],
-    galleryImageIds: uniqueIds(plan?.galleryImageIds ?? []),
-    spaceEnabled: Boolean(plan?.spaceEnabled),
-    spaceTitle: plan?.spaceTitle || "Nosso Espaço",
-    spaceDescription:
-      plan?.spaceDescription ||
-      "Conheça um pouco do ambiente e dos detalhes do salão.",
-    spaceImageIds,
-    experienceImageIds: spaceImageIds,
-    resultImageIds: [],
-    ignoredImageIds: uniqueIds(plan?.ignoredImageIds ?? []),
-    summary: plan?.summary,
-    warnings: plan?.warnings ?? [],
-    generatedAt: plan?.generatedAt,
-    appliedAt: plan?.appliedAt,
-    updatedAt: new Date().toISOString(),
-  };
-}
-
-function setImagePlanDestination(
-  currentPlan: SalonLayoutImagePlan | undefined,
-  imageId: string,
-  destination: ImageDestination,
-) {
-  const plan = removeImageFromPlan(currentPlan, imageId) ?? createSimpleImagePlan();
-
-  if (destination === "logo") {
-    return syncLegacyImagePlan({
-      ...plan,
-      logoImageId: imageId,
-    });
-  }
-
-  if (destination === "top") {
-    return syncLegacyImagePlan({
-      ...plan,
-      topImageIds: [...(plan.topImageIds ?? []), imageId],
-    });
-  }
-
-  if (destination === "gallery") {
-    return syncLegacyImagePlan({
-      ...plan,
-      galleryImageIds: [...plan.galleryImageIds, imageId],
-    });
-  }
-
-  if (destination === "space") {
-    return syncLegacyImagePlan({
-      ...plan,
-      spaceEnabled: true,
-      spaceImageIds: [...(plan.spaceImageIds ?? []), imageId],
-    });
-  }
-
-  return syncLegacyImagePlan({
-    ...plan,
-    ignoredImageIds: [...plan.ignoredImageIds, imageId],
-  });
-}
-
-function removeImageFromPlan(
-  currentPlan: SalonLayoutImagePlan | undefined,
-  imageId: string,
-) {
-  if (!currentPlan) {
-    return undefined;
-  }
-
-  const plan = createSimpleImagePlan(currentPlan);
-
-  return syncLegacyImagePlan({
-    ...plan,
-    logoImageId: imageMatchesPlanId(imageId, plan.logoImageId ?? "")
-      ? null
-      : plan.logoImageId,
-    topImageIds: removeMatchingImageId(plan.topImageIds ?? [], imageId),
-    galleryImageIds: removeMatchingImageId(plan.galleryImageIds, imageId),
-    spaceImageIds: removeMatchingImageId(plan.spaceImageIds ?? [], imageId),
-    ignoredImageIds: removeMatchingImageId(plan.ignoredImageIds, imageId),
-  });
-}
-
-function moveImageWithinPlan(
-  currentPlan: SalonLayoutImagePlan | undefined,
-  imageId: string,
-  direction: -1 | 1,
-) {
-  if (!currentPlan) {
-    return currentPlan;
-  }
-
-  const plan = createSimpleImagePlan(currentPlan);
-
-  return syncLegacyImagePlan({
-    ...plan,
-    topImageIds: moveInMatchingList(plan.topImageIds ?? [], imageId, direction),
-    galleryImageIds: moveInMatchingList(plan.galleryImageIds, imageId, direction),
-    spaceImageIds: moveInMatchingList(plan.spaceImageIds ?? [], imageId, direction),
-  });
-}
-
-function updatePlanSpaceSettings(
-  currentPlan: SalonLayoutImagePlan | undefined,
-  updates: Partial<Pick<
-    SalonLayoutImagePlan,
-    "spaceEnabled" | "spaceTitle" | "spaceDescription"
-  >>,
-) {
-  return syncLegacyImagePlan({
-    ...createSimpleImagePlan(currentPlan),
-    ...updates,
-  });
-}
-
-function syncLegacyImagePlan(plan: SalonLayoutImagePlan): SalonLayoutImagePlan {
-  const topImageIds = uniqueIds(plan.topImageIds ?? []);
-  const galleryImageIds = uniqueIds(plan.galleryImageIds).filter(
-    (id) => !containsMatchingImageId(topImageIds, id),
-  );
-  const spaceImageIds = uniqueIds(plan.spaceImageIds ?? []).filter(
-    (id) =>
-      !containsMatchingImageId(topImageIds, id) &&
-      !containsMatchingImageId(galleryImageIds, id),
-  );
-  const ignoredImageIds = uniqueIds(plan.ignoredImageIds).filter(
-    (id) =>
-      !containsMatchingImageId(topImageIds, id) &&
-      !containsMatchingImageId(galleryImageIds, id) &&
-      !containsMatchingImageId(spaceImageIds, id) &&
-      !imageMatchesPlanId(id, plan.logoImageId ?? ""),
-  );
-
-  return {
-    ...plan,
-    topImageIds,
-    heroImageId: topImageIds.length === 1 ? topImageIds[0] : null,
-    heroMosaicImageIds: topImageIds.length > 1 ? topImageIds.slice(0, 3) : [],
-    galleryImageIds,
-    spaceImageIds,
-    experienceImageIds: spaceImageIds,
-    resultImageIds: [],
-    ignoredImageIds,
-    updatedAt: new Date().toISOString(),
-  };
-}
-
 function getImageDestination(
   image: SalonGalleryImage,
   plan?: SalonLayoutImagePlan,
 ): ImageDestination {
+  const plannedDestination = getImageDestinationFromPlan(image.id, plan);
+
+  if (plannedDestination) {
+    return plannedDestination;
+  }
+
+  if (plan) {
+    return "bank";
+  }
+
   if (!image.selectedForLanding) {
-    return "ignore";
-  }
-
-  const simplePlan = plan ? createSimpleImagePlan(plan) : undefined;
-
-  if (simplePlan?.logoImageId && imageMatchesPlanId(image.id, simplePlan.logoImageId)) {
-    return "logo";
-  }
-
-  if (containsMatchingImageId(simplePlan?.topImageIds ?? [], image.id)) {
-    return "top";
-  }
-
-  if (containsMatchingImageId(simplePlan?.galleryImageIds ?? [], image.id)) {
-    return "gallery";
-  }
-
-  if (containsMatchingImageId(simplePlan?.spaceImageIds ?? [], image.id)) {
-    return "space";
-  }
-
-  if (containsMatchingImageId(simplePlan?.ignoredImageIds ?? [], image.id)) {
-    return "ignore";
+    return "bank";
   }
 
   return imageTypeToDestination(image.type);
@@ -3710,6 +3869,8 @@ function getImageDestination(
 
 function imageDestinationToType(destination: ImageDestination): SalonImageType {
   switch (destination) {
+    case "bank":
+      return "gallery";
     case "logo":
       return "logo";
     case "top":
@@ -3760,6 +3921,8 @@ function destinationToSuggestedUse(
   destination: ImageDestination,
 ): SalonImageCandidate["suggestedUse"] {
   switch (destination) {
+    case "bank":
+      return "ignore";
     case "logo":
       return "logo";
     case "top":
@@ -3773,31 +3936,6 @@ function destinationToSuggestedUse(
   }
 }
 
-function getPlanTopImageIds(plan?: SalonLayoutImagePlan) {
-  if (!plan) {
-    return [];
-  }
-
-  return uniqueIds(
-    plan.topImageIds?.length
-      ? plan.topImageIds
-      : [
-          ...(plan.heroImageId ? [plan.heroImageId] : []),
-          ...(plan.heroMosaicImageIds ?? []),
-        ],
-  );
-}
-
-function getPlanSpaceImageIds(plan?: SalonLayoutImagePlan) {
-  if (!plan) {
-    return [];
-  }
-
-  return uniqueIds(
-    plan.spaceImageIds?.length ? plan.spaceImageIds : plan.experienceImageIds ?? [],
-  );
-}
-
 function getDestinationLabel(destination: ImageDestination) {
   return (
     imageDestinationOptions.find((option) => option.value === destination)?.label ??
@@ -3805,53 +3943,101 @@ function getDestinationLabel(destination: ImageDestination) {
   );
 }
 
+function getDestinationSectionTitle(destination: ImageDestination) {
+  switch (destination) {
+    case "bank":
+      return "Banco de fotos";
+    case "logo":
+      return "Logo";
+    case "top":
+      return "Destaque inicial";
+    case "gallery":
+      return "Galeria";
+    case "space":
+      return "Nosso Espaco";
+    default:
+      return "Ignoradas";
+  }
+}
+
+function getDestinationSectionDescription(destination: ImageDestination) {
+  switch (destination) {
+    case "bank":
+      return "Fotos salvas, mas ainda fora da landing.";
+    case "logo":
+      return "Imagem usada apenas como identidade visual.";
+    case "top":
+      return "Fotos exibidas na parte de cima da landing.";
+    case "gallery":
+      return "Imagens que entram na galeria publica.";
+    case "space":
+      return "Fotos reservadas para a secao opcional Nosso Espaco.";
+    default:
+      return "Imagens que ficam fora da landing publica.";
+  }
+}
+
+function groupImagesByDestination(
+  images: SalonGalleryImage[],
+  plan?: SalonLayoutImagePlan,
+) {
+  const groups: Record<ImageDestination, SalonGalleryImage[]> = {
+    bank: [],
+    logo: [],
+    top: [],
+    gallery: [],
+    space: [],
+    ignore: [],
+  };
+
+  for (const image of images) {
+    groups[getImageDestination(image, plan)].push(image);
+  }
+
+  return groups;
+}
+
+function getImageSourceLabel(source: SalonImageSource) {
+  return imageSourceOptions.find((option) => option.value === source)?.label ?? source;
+}
+
 function uniqueIds(ids: string[]) {
   return Array.from(new Set(ids.map((id) => id.trim()).filter(Boolean)));
 }
 
-function removeMatchingImageId(ids: string[], imageId: string) {
-  return ids.filter((id) => !imageMatchesPlanId(imageId, id));
-}
-
-function containsMatchingImageId(ids: string[], imageId: string) {
-  return ids.some((id) => imageMatchesPlanId(imageId, id));
-}
-
-function moveInMatchingList(ids: string[], imageId: string, direction: -1 | 1) {
-  const nextIds = [...ids];
-  const index = nextIds.findIndex((id) => imageMatchesPlanId(imageId, id));
-
-  if (index < 0) {
-    return nextIds;
+function pushUniqueId(ids: string[], imageId: string) {
+  if (!ids.includes(imageId)) {
+    ids.push(imageId);
   }
-
-  const nextIndex = index + direction;
-
-  if (nextIndex < 0 || nextIndex >= nextIds.length) {
-    return nextIds;
-  }
-
-  const [item] = nextIds.splice(index, 1);
-  nextIds.splice(nextIndex, 0, item);
-  return nextIds;
 }
 
-function imageMatchesPlanId(imageId: string, planId: string) {
-  if (!planId) {
-    return false;
-  }
+function syncImagesWithPlan(
+  images: SalonGalleryImage[],
+  plan: SalonLayoutImagePlan | undefined,
+) {
+  return images.map((image) => {
+    const destination = getImageDestinationFromPlan(image.id, plan);
 
-  return imageId === planId || imageId === `image-${planId}` || imageId.endsWith(planId);
+    if (!destination) {
+      if (!plan) {
+        return image;
+      }
+
+      return {
+        ...image,
+        selectedForLanding: false,
+      };
+    }
+
+    return {
+      ...image,
+      type: imageDestinationToType(destination),
+      selectedForLanding: destination !== "ignore",
+    };
+  });
 }
-
 function getImageTypeLabel(type: SalonImageType) {
   return imageTypeOptions.find((item) => item.value === type)?.label ?? type;
-}
-
-function getSuggestedUseLabel(use: SalonImageCandidate["suggestedUse"]) {
-  return (
-    candidateSuggestedUseOptions.find((item) => item.value === use)?.label ?? use
-  );
 }
 
 function getCandidateSourceLabel(source: SalonImageCandidate["source"]) {
@@ -3996,3 +4182,4 @@ function readFileAsDataUrl(file: File) {
     reader.readAsDataURL(file);
   });
 }
+

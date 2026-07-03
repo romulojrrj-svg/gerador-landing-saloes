@@ -5,6 +5,7 @@ import type {
   SalonService,
   SalonTestimonial,
 } from "@/types/salon";
+import { normalizeSalonLayoutImagePlan } from "./salon-image-plan";
 
 type PublicServiceKey =
   | "hair"
@@ -971,37 +972,36 @@ function resolvePlanImages(salon: Salon, imageIds: string[]) {
     });
 }
 
+function getNormalizedPublicImagePlan(salon: Salon) {
+  return normalizeSalonLayoutImagePlan(salon.layoutImagePlan, {
+    availableImageIds: (salon.realImages?.length ? salon.realImages : salon.gallery)
+      .filter((image) => image.isReal && image.selectedForLanding)
+      .map((image) => image.id),
+  });
+}
+
 function getTopImageIds(salon: Salon) {
-  const plan = salon.layoutImagePlan;
+  const plan = getNormalizedPublicImagePlan(salon);
 
   if (!plan) {
     return [];
   }
 
-  if (plan.topImageIds?.length) {
-    return plan.topImageIds;
-  }
-
-  return [
-    ...(plan.heroImageId ? [plan.heroImageId] : []),
-    ...(plan.heroMosaicImageIds ?? []),
-  ].filter(Boolean);
+  return plan.topImageIds ?? [];
 }
 
 function getSpaceImageIds(salon: Salon) {
-  const plan = salon.layoutImagePlan;
+  const plan = getNormalizedPublicImagePlan(salon);
 
   if (!plan) {
     return [];
   }
 
-  return plan.spaceImageIds?.length
-    ? plan.spaceImageIds
-    : plan.experienceImageIds ?? [];
+  return plan.spaceImageIds ?? [];
 }
 
 function getIgnoredImageIds(salon: Salon) {
-  return new Set(salon.layoutImagePlan?.ignoredImageIds ?? []);
+  return new Set(getNormalizedPublicImagePlan(salon)?.ignoredImageIds ?? []);
 }
 
 function imageMatchesPlanId(imageId: string, planId: string) {
@@ -1066,8 +1066,9 @@ export function getPublicHeroMosaicImages(salon: Salon) {
 }
 
 export function getPublicLogoImage(salon: Salon) {
-  const plannedLogo = salon.layoutImagePlan?.logoImageId
-    ? resolveAnyImageFromPlanId(salon, salon.layoutImagePlan.logoImageId)
+  const normalizedPlan = getNormalizedPublicImagePlan(salon);
+  const plannedLogo = normalizedPlan?.logoImageId
+    ? resolveAnyImageFromPlanId(salon, normalizedPlan.logoImageId)
     : undefined;
 
   if (plannedLogo?.type === "logo") {
@@ -1095,12 +1096,13 @@ export function getPublicSupportingImage(salon: Salon) {
 }
 
 export function getPublicGalleryImages(salon: Salon) {
+  const normalizedPlan = getNormalizedPublicImagePlan(salon);
   const ignoredIds = getIgnoredImageIds(salon);
   const topIds = new Set(getTopImageIds(salon));
   const spaceIds = new Set(getSpaceImageIds(salon));
   const plannedGallery = resolvePlanImages(
     salon,
-    salon.layoutImagePlan?.galleryImageIds ?? [],
+    normalizedPlan?.galleryImageIds ?? [],
   ).filter(
     (image) =>
       !planIdsIncludeImage(ignoredIds, image) &&
@@ -1123,10 +1125,7 @@ export function getPublicGalleryImages(salon: Salon) {
 }
 
 export function getPublicExperienceImages(salon: Salon) {
-  const plannedImages = resolvePlanImages(
-    salon,
-    salon.layoutImagePlan?.experienceImageIds ?? [],
-  );
+  const plannedImages = getPublicSpaceImages(salon);
 
   if (plannedImages.length) {
     return plannedImages;
@@ -1138,30 +1137,22 @@ export function getPublicExperienceImages(salon: Salon) {
 }
 
 export function getPublicSpaceImages(salon: Salon) {
-  if (!salon.layoutImagePlan?.spaceEnabled) {
+  const normalizedPlan = getNormalizedPublicImagePlan(salon);
+
+  if (!normalizedPlan?.spaceEnabled) {
     return [];
   }
 
   const ignoredIds = getIgnoredImageIds(salon);
 
-  return resolvePlanImages(salon, getSpaceImageIds(salon)).filter(
+  return resolvePlanImages(salon, normalizedPlan.spaceImageIds ?? []).filter(
     (image) => image.type !== "logo" && !planIdsIncludeImage(ignoredIds, image),
   );
 }
 
 export function getPublicResultImages(salon: Salon) {
-  const plannedImages = resolvePlanImages(
-    salon,
-    salon.layoutImagePlan?.resultImageIds ?? [],
-  );
-
-  if (plannedImages.length) {
-    return plannedImages;
-  }
-
-  return getRealLandingImages(salon)
-    .filter((image) => image.type === "result" || image.type === "service")
-    .slice(0, 3);
+  void salon;
+  return [];
 }
 
 export function getRealReviews(salon: Salon): SalonTestimonial[] {

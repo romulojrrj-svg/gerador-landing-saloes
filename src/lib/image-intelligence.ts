@@ -2,6 +2,7 @@ import {
   buildGalleryImageFromCandidate,
   mapSuggestedUseToImageType,
 } from "@/lib/image-curation";
+import { normalizeSalonLayoutImagePlan } from "@/lib/salon-image-plan";
 import type {
   Salon,
   SalonDataConfidence,
@@ -294,7 +295,7 @@ export function createLocalImagePlan(
     );
   }
 
-  const plan: SalonLayoutImagePlan = {
+  const plan = normalizeSalonLayoutImagePlan({
     mode: "local_auto",
     logoImageId: logoCandidate?.id ?? null,
     topImageIds: topCandidates.map((candidate) => candidate.id),
@@ -314,7 +315,7 @@ export function createLocalImagePlan(
     warnings,
     generatedAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
-  };
+  }) as SalonLayoutImagePlan;
 
   return {
     analyzedCandidates: markCandidatesFromPlan(analyzedCandidates, plan),
@@ -552,7 +553,7 @@ export function validateChatGptCurationJson(
     };
   }
 
-  const plan: SalonLayoutImagePlan = {
+  const plan = normalizeSalonLayoutImagePlan({
     mode: "chatgpt_manual",
     logoImageId,
     topImageIds,
@@ -572,7 +573,7 @@ export function validateChatGptCurationJson(
     warnings: toStringArray(payload.warnings),
     generatedAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
-  };
+  }) as SalonLayoutImagePlan;
 
   return {
     ok: true,
@@ -594,16 +595,19 @@ export function applyLayoutImagePlan(params: {
   salonName: string;
 }) {
   const { currentImages, candidates, plan, salonName } = params;
+  const normalizedPlan = normalizeSalonLayoutImagePlan(plan) ?? plan;
   const candidateMap = new Map(candidates.map((candidate) => [candidate.id, candidate]));
   const nextImages = [...currentImages];
   const activeIds = [
-    ...(plan.logoImageId ? [plan.logoImageId] : []),
-    ...(plan.topImageIds ?? [
-      ...(plan.heroImageId ? [plan.heroImageId] : []),
-      ...plan.heroMosaicImageIds,
+    ...(normalizedPlan.logoImageId ? [normalizedPlan.logoImageId] : []),
+    ...(normalizedPlan.topImageIds ?? [
+      ...(normalizedPlan.heroImageId ? [normalizedPlan.heroImageId] : []),
+      ...normalizedPlan.heroMosaicImageIds,
     ]),
-    ...plan.galleryImageIds,
-    ...(plan.spaceEnabled ? plan.spaceImageIds ?? plan.experienceImageIds : []),
+    ...normalizedPlan.galleryImageIds,
+    ...(normalizedPlan.spaceEnabled
+      ? normalizedPlan.spaceImageIds ?? normalizedPlan.experienceImageIds
+      : []),
   ];
 
   for (const candidateId of activeIds) {
@@ -616,7 +620,7 @@ export function applyLayoutImagePlan(params: {
     const existingIndex = nextImages.findIndex(
       (image) => normalizeUrl(image.src) === normalizeUrl(candidate.imageUrl),
     );
-    const imageType = resolveImageTypeFromPlan(candidateId, candidate, plan);
+    const imageType = resolveImageTypeFromPlan(candidateId, candidate, normalizedPlan);
     const image = buildGalleryImageFromCandidate(candidate, imageType, salonName);
 
     if (existingIndex >= 0) {
@@ -631,7 +635,7 @@ export function applyLayoutImagePlan(params: {
   }
 
   const updatedCandidates = markCandidatesFromPlan(candidates, {
-    ...plan,
+    ...normalizedPlan,
     appliedAt: new Date().toISOString(),
   }).map((candidate) =>
     activeIds.includes(candidate.id)
@@ -640,13 +644,15 @@ export function applyLayoutImagePlan(params: {
   ) as SalonImageCandidate[];
 
   const selectionSummary: SalonImageSelectionSummary = {
-    heroId: (plan.topImageIds ?? [plan.heroImageId ?? ""]).filter(Boolean)[0],
-    logoId: plan.logoImageId ?? undefined,
-    interiorIds: plan.spaceEnabled ? plan.spaceImageIds ?? plan.experienceImageIds : [],
+    heroId: (normalizedPlan.topImageIds ?? [normalizedPlan.heroImageId ?? ""]).filter(Boolean)[0],
+    logoId: normalizedPlan.logoImageId ?? undefined,
+    interiorIds: normalizedPlan.spaceEnabled
+      ? normalizedPlan.spaceImageIds ?? normalizedPlan.experienceImageIds
+      : [],
     resultIds: [],
-    galleryIds: plan.galleryImageIds,
-    ignoredIds: plan.ignoredImageIds,
-    selectedAt: plan.generatedAt ?? new Date().toISOString(),
+    galleryIds: normalizedPlan.galleryImageIds,
+    ignoredIds: normalizedPlan.ignoredImageIds,
+    selectedAt: normalizedPlan.generatedAt ?? new Date().toISOString(),
     appliedAt: new Date().toISOString(),
   };
 
@@ -655,7 +661,7 @@ export function applyLayoutImagePlan(params: {
     updatedCandidates,
     selectionSummary,
     plan: {
-      ...plan,
+      ...normalizedPlan,
       appliedAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     },

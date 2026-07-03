@@ -1,4 +1,4 @@
-import type {
+﻿import type {
   Salon,
   SalonCommercialStatus,
   SalonCopySuggestion,
@@ -19,6 +19,7 @@ import type {
 import { applyCopySuggestionToServices } from "./copy-generator";
 import { getLandingCopy } from "./landing-copy";
 import { normalizeCommercialStatus } from "./salon-commercial-status";
+import { normalizeSalonLayoutImagePlan } from "./salon-image-plan";
 
 const STORAGE_PREFIX = "salon-lg:salons:";
 const STORAGE_INDEX_KEY = "salon-lg:salons:index";
@@ -36,24 +37,24 @@ export type SalonStorageResult =
   | { ok: false; error: string };
 
 export const landingLanguageLabels: Record<string, string> = {
-  "pt-BR": "Português do Brasil",
-  en: "Inglês",
+  "pt-BR": "PortuguÃªs do Brasil",
+  en: "InglÃªs",
   es: "Espanhol",
-  fr: "Francês",
+  fr: "FrancÃªs",
 };
 
 const serviceDescriptions: Record<string, string> = {
   "Design de cabelo":
     "Personalized cut, finish, and styling direction planned around face shape, lifestyle, and texture.",
-  Coloração:
+  "Coloracao":
     "Dimensional color, glossing, and tone correction for a luminous result that looks polished in natural and studio light.",
   "Rituais de pele":
     "A calm skin ritual combining cleansing, sculpting massage, and glow-focused finishing products.",
   "Noivas e eventos":
     "Camera-ready styling for weddings, dinners, launches, and private event preparation.",
-  "Ateliê de unhas":
+  "AteliÃª de unhas":
     "Detailed nail care with refined shaping, long-wear color, and a clean editorial finish.",
-  Maquiagem:
+  "Maquiagem":
     "Soft, elevated makeup for photos, events, and clients who want a polished but breathable finish.",
 };
 
@@ -85,7 +86,7 @@ const defaultGalleryImages: SalonGalleryImage[] = [
     url: "https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?auto=format&fit=crop&w=1000&q=80",
     src: "https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?auto=format&fit=crop&w=1000&q=80",
     alt: "Hair stylist finishing a luxury look",
-    title: "Imagem de serviço",
+    title: "Imagem de serviÃ§o",
     type: "service",
     source: "placeholder",
     isReal: false,
@@ -171,7 +172,7 @@ export function updateSalon(
   if (!existingSalon) {
     return {
       ok: false,
-      error: "Salão não encontrado no armazenamento local.",
+      error: "SalÃ£o nÃ£o encontrado no armazenamento local.",
     };
   }
 
@@ -184,7 +185,7 @@ export function saveSalon(salon: Salon): SalonStorageResult {
   if (!isBrowser()) {
     return {
       ok: false,
-      error: "O armazenamento local só está disponível no navegador.",
+      error: "O armazenamento local sÃ³ estÃ¡ disponÃ­vel no navegador.",
     };
   }
 
@@ -206,7 +207,7 @@ export function saveSalon(salon: Salon): SalonStorageResult {
     const message =
       error instanceof Error
         ? error.message
-        : "Não foi possível salvar o salão.";
+        : "NÃ£o foi possÃ­vel salvar o salÃ£o.";
 
     debugSalonStorage("save-failed", { slug: salon.slug, message });
 
@@ -237,7 +238,7 @@ export function getSalonBySlug(slug: string) {
     return salon;
   } catch (error) {
     const message =
-      error instanceof Error ? error.message : "JSON inválido no localStorage.";
+      error instanceof Error ? error.message : "JSON invÃ¡lido no localStorage.";
 
     debugSalonStorage("load-failed", { slug, message });
 
@@ -267,7 +268,7 @@ export function deleteSalon(slug: string) {
     return true;
   } catch (error) {
     const message =
-      error instanceof Error ? error.message : "Erro ao deletar salão.";
+      error instanceof Error ? error.message : "Erro ao deletar salÃ£o.";
 
     debugSalonStorage("delete-failed", { slug, message });
 
@@ -281,7 +282,7 @@ export function duplicateSalon(slug: string): SalonStorageResult {
   if (!existingSalon) {
     return {
       ok: false,
-      error: "Salão não encontrado para duplicação.",
+      error: "SalÃ£o nÃ£o encontrado para duplicaÃ§Ã£o.",
     };
   }
 
@@ -289,7 +290,7 @@ export function duplicateSalon(slug: string): SalonStorageResult {
   const duplicatedSalon = ensureCompleteSalon({
     ...existingSalon,
     id: createId(),
-    name: `${existingSalon.name} (cópia)`,
+    name: `${existingSalon.name} (cÃ³pia)`,
     slug: generateUniqueSlug(`${existingSalon.name} copia`),
     status: "draft",
     sourceMode: "manual",
@@ -325,7 +326,7 @@ export function getSalonIndex(): SalonIndexItem[] {
       });
   } catch (error) {
     const message =
-      error instanceof Error ? error.message : "Índice local corrompido.";
+      error instanceof Error ? error.message : "Ãndice local corrompido.";
 
     debugSalonStorage("index-load-failed", { message });
 
@@ -443,7 +444,7 @@ export function formDataToInput(formData: FormData): SalonFormInput {
 
 function buildCompleteSalon(partialSalon: Partial<Salon>): Salon {
   const now = new Date().toISOString();
-  const name = clean(partialSalon.name) || "Novo Salão";
+  const name = clean(partialSalon.name) || "Novo SalÃ£o";
   const slug = clean(partialSalon.slug) || normalizeSlug(name);
   const language = partialSalon.language ?? partialSalon.landingLanguage ?? "en";
   const landingCopy = getLandingCopy(language);
@@ -464,11 +465,17 @@ function buildCompleteSalon(partialSalon: Partial<Salon>): Salon {
     partialSalon.galleryImages ?? partialSalon.gallery ?? defaultGalleryImages,
     name,
   );
+  const availableLayoutImageIds = galleryImages.some((image) => image.isReal)
+    ? galleryImages.filter((image) => image.isReal).map((image) => image.id)
+    : galleryImages.map((image) => image.id);
   const imageCandidates = normalizeImageCandidates(partialSalon.imageCandidates);
   const imageSelectionSummary = normalizeImageSelectionSummary(
     partialSalon.imageSelectionSummary,
   );
-  const layoutImagePlan = normalizeLayoutImagePlan(partialSalon.layoutImagePlan);
+  const layoutImagePlan = normalizeLayoutImagePlan(
+    partialSalon.layoutImagePlan,
+    availableLayoutImageIds,
+  );
   const realImages = galleryImages.filter((image) => image.isReal);
   const hasRealImages = realImages.length > 0;
   const landingReadyImages = galleryImages.filter(
@@ -847,8 +854,8 @@ function getFallbackServiceTitle(language: SalonLanguage) {
     "pt-BR": "Atendimento de beleza",
     en: "Beauty appointment",
     es: "Servicio de belleza",
-    fr: "Service beauté",
-    no: "Skjønnhetsbehandling",
+    fr: "Service beautÃ©",
+    no: "SkjÃ¸nnhetsbehandling",
   };
 
   return fallbackTitles[language] ?? fallbackTitles.en;
@@ -977,64 +984,13 @@ function normalizeImageCandidates(candidates?: SalonImageCandidate[]) {
     .sort((first, second) => second.score - first.score);
 }
 
-function normalizeLayoutImagePlan(plan?: SalonLayoutImagePlan) {
-  if (!plan) {
-    return undefined;
-  }
-
-  const legacyTopImageIds = uniqueImageIds([
-    clean(plan.heroImageId) || "",
-    ...(Array.isArray(plan.heroMosaicImageIds) ? plan.heroMosaicImageIds : []),
-  ]);
-  const topImageIds = uniqueImageIds(
-    Array.isArray(plan.topImageIds) && plan.topImageIds.length
-      ? plan.topImageIds
-      : legacyTopImageIds,
-  );
-  const legacyGalleryImageIds = uniqueImageIds([
-    ...(Array.isArray(plan.galleryImageIds) ? plan.galleryImageIds : []),
-    ...(Array.isArray(plan.resultImageIds) ? plan.resultImageIds : []),
-  ]);
-  const galleryImageIds = legacyGalleryImageIds.filter(
-    (id) => !topImageIds.includes(id),
-  );
-  const legacySpaceImageIds = uniqueImageIds([
-    ...(Array.isArray(plan.spaceImageIds) ? plan.spaceImageIds : []),
-    ...(Array.isArray(plan.experienceImageIds) ? plan.experienceImageIds : []),
-  ]).filter((id) => !topImageIds.includes(id) && !galleryImageIds.includes(id));
-  const spaceEnabled =
-    typeof plan.spaceEnabled === "boolean"
-      ? plan.spaceEnabled
-      : legacySpaceImageIds.length > 0 &&
-        Array.isArray(plan.experienceImageIds) &&
-        plan.experienceImageIds.length > 0;
-  const ignoredImageIds = uniqueImageIds(
-    Array.isArray(plan.ignoredImageIds) ? plan.ignoredImageIds : [],
-  );
-
-  return {
-    mode: plan.mode ?? "local_auto",
-    logoImageId: clean(plan.logoImageId) || null,
-    topImageIds,
-    heroImageId: topImageIds.length === 1 ? topImageIds[0] : null,
-    heroMosaicImageIds: topImageIds.length > 1 ? topImageIds.slice(0, 3) : [],
-    galleryImageIds,
-    spaceEnabled,
-    spaceTitle: clean(plan.spaceTitle) || "Nosso Espaço",
-    spaceDescription:
-      clean(plan.spaceDescription) ||
-      "Conheça um pouco do ambiente e dos detalhes do salão.",
-    spaceImageIds: legacySpaceImageIds,
-    experienceImageIds: legacySpaceImageIds,
-    resultImageIds: [],
-    ignoredImageIds,
-    summary: clean(plan.summary),
-    warnings: Array.isArray(plan.warnings) ? plan.warnings.filter(Boolean) : [],
-    generatedAt: plan.generatedAt,
-    appliedAt: plan.appliedAt,
-    updatedAt: plan.updatedAt,
-  };
+function normalizeLayoutImagePlan(
+  plan?: SalonLayoutImagePlan,
+  availableImageIds?: string[],
+) {
+  return normalizeSalonLayoutImagePlan(plan, { availableImageIds });
 }
+
 
 function simplifyImageDestination(value: SalonImageSuggestedUse): SalonImageSuggestedUse {
   switch (value) {
@@ -1054,10 +1010,6 @@ function simplifyImageDestination(value: SalonImageSuggestedUse): SalonImageSugg
     default:
       return "gallery";
   }
-}
-
-function uniqueImageIds(values: string[]) {
-  return Array.from(new Set(values.map((value) => clean(value)).filter(Boolean)));
 }
 
 function normalizeImageSelectionSummary(
@@ -1132,11 +1084,11 @@ function getServiceDescription(service: string, language: SalonLanguage) {
     en:
       "A tailored appointment shaped around the client profile, beauty goals, and preferred booking window.",
     es:
-      "Una cita personalizada según el perfil, los objetivos de belleza, la rutina y el horario preferido de la clienta.",
+      "Una cita personalizada segÃºn el perfil, los objetivos de belleza, la rutina y el horario preferido de la clienta.",
     fr:
-      "Un rendez-vous personnalisé selon le profil, les objectifs beauté, le rythme et le créneau préféré de la cliente.",
+      "Un rendez-vous personnalisÃ© selon le profil, les objectifs beautÃ©, le rythme et le crÃ©neau prÃ©fÃ©rÃ© de la cliente.",
     no:
-      "En personlig avtale tilpasset kundens profil, mål, rutine og ønsket bookingtid.",
+      "En personlig avtale tilpasset kundens profil, mÃ¥l, rutine og Ã¸nsket bookingtid.",
   };
 
   if (language === "en" && serviceDescriptions[service]) {
@@ -1152,7 +1104,7 @@ function getServicePriceLabel(language: SalonLanguage) {
     en: "on request",
     es: "bajo consulta",
     fr: "sur demande",
-    no: "på forespørsel",
+    no: "pÃ¥ forespÃ¸rsel",
   };
 
   return priceLabels[language] ?? priceLabels.en;
