@@ -219,6 +219,7 @@ async function saveAdminSalon(salon: Salon): Promise<AdminSalonResult> {
     slug: payload.slug,
     name: payload.name,
     status: payload.status,
+    commercialStatus: payload.commercialStatus,
     hasInstagram: Boolean(payload.instagramUrl),
     hasGoogleMaps: Boolean(payload.googleMapsUrl),
     servicesCount: payload.services?.length ?? 0,
@@ -226,11 +227,23 @@ async function saveAdminSalon(salon: Salon): Promise<AdminSalonResult> {
     reviewsCount: payload.testimonials?.length ?? 0,
     writeMode: process.env.NEXT_PUBLIC_SUPABASE_WRITE_MODE ?? "disabled",
   });
-  const { data, error } = await writeAccess.client
+  let { data, error } = await writeAccess.client
     .from("salons")
     .upsert(row, { onConflict: "slug" })
     .select("*")
     .single();
+
+  if (error && shouldRetryWithoutCommercialStatus(error)) {
+    debugAdminSalons("save-retry-without-commercial-status", {
+      slug: payload.slug,
+      error: error.message,
+    });
+    ({ data, error } = await writeAccess.client
+      .from("salons")
+      .upsert(stripCommercialStatus(row), { onConflict: "slug" })
+      .select("*")
+      .single());
+  }
 
   if (error) {
     debugAdminSalons("save-failed", {
@@ -290,6 +303,27 @@ function formatSupabaseError(error: {
   return [error.message, error.details, error.hint, error.code]
     .filter(Boolean)
     .join(" | ");
+}
+
+function shouldRetryWithoutCommercialStatus(error: {
+  message: string;
+  details?: string | null;
+}) {
+  const combinedMessage = `${error.message} ${error.details ?? ""}`.toLowerCase();
+
+  return combinedMessage.includes("commercial_status");
+}
+
+function stripCommercialStatus<
+  T extends {
+    commercial_status?: unknown;
+  },
+>(row: T) {
+  const fallbackRow = { ...row };
+
+  delete fallbackRow.commercial_status;
+
+  return fallbackRow;
 }
 
 function debugAdminSalons(event: string, payload: Record<string, unknown>) {

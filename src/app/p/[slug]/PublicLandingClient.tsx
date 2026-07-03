@@ -334,7 +334,7 @@ function PublicContactSection({ salon }: { salon: Salon }) {
                     isPrimary
                       ? isWhatsapp
                         ? "flex min-h-[3.35rem] items-center gap-3 rounded-[1.1rem] border border-[#24b75d] bg-[#22c55e] px-4 py-3 text-sm font-semibold text-white shadow-[0_16px_34px_rgba(34,197,94,0.22)] transition hover:-translate-y-0.5 hover:bg-[#16a34a] active:scale-[0.99] md:col-span-2 xl:col-span-2"
-                        : "flex min-h-[3.35rem] items-center gap-3 rounded-[1.1rem] border border-[#1f1f21] bg-zinc-950 px-4 py-3 text-sm font-semibold text-white shadow-[0_16px_34px_rgba(24,24,27,0.18)] transition hover:-translate-y-0.5 hover:bg-[#2c251d] active:scale-[0.99] md:col-span-2 xl:col-span-2"
+                        : "flex min-h-[3.35rem] items-center gap-3 rounded-[1.1rem] border border-[#d6be9e] bg-[#fff4e7] px-4 py-3 text-sm font-semibold text-zinc-950 shadow-[0_16px_34px_rgba(170,125,74,0.16)] transition hover:-translate-y-0.5 hover:bg-[#fde8d0] active:scale-[0.99] md:col-span-2 xl:col-span-2"
                       : "flex min-h-[3.25rem] items-center gap-3 rounded-[1.1rem] border border-[#eadfce] bg-white px-4 py-3 text-sm font-semibold text-zinc-900 shadow-sm transition hover:-translate-y-0.5 hover:border-[#d8c6af] hover:bg-[#fffaf3] active:scale-[0.99]"
                   }
                 >
@@ -354,7 +354,7 @@ function PublicContactSection({ salon }: { salon: Salon }) {
                         isPrimary
                           ? isWhatsapp
                             ? "h-4 w-4 text-white"
-                            : "h-4 w-4 text-[#f4dcb6]"
+                            : "h-4 w-4 text-[#9a6b3d]"
                           : "h-4 w-4 text-[#9a6b3d]"
                       }
                     />

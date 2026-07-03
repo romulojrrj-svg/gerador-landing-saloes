@@ -1,4 +1,5 @@
 import { calculateLandingReadiness } from "@/lib/copy-generator";
+import { normalizeCommercialStatus } from "@/lib/salon-commercial-status";
 import { ensureCompleteSalon } from "@/lib/salon-storage";
 import type {
   Salon,
@@ -23,6 +24,7 @@ export type SupabaseSalonRow = {
   slug: string;
   name: string;
   status: string | null;
+  commercial_status: string | null;
   language: string | null;
   country: string | null;
   city: string | null;
@@ -97,6 +99,7 @@ export function mapSalonToSupabaseRow(salon: Salon): SupabaseSalonWrite {
     slug: completeSalon.slug,
     name: completeSalon.name,
     status: completeSalon.status,
+    commercial_status: completeSalon.commercialStatus,
     language: completeSalon.language,
     country: emptyToNull(completeSalon.country),
     city: emptyToNull(completeSalon.city),
@@ -162,6 +165,9 @@ export function mapSupabaseRowToSalon(row: SupabaseSalonRow): Salon {
     slug: row.slug,
     name: row.name,
     status: normalizeStatus(row.status),
+    commercialStatus: normalizeCommercialStatus(
+      row.commercial_status ?? metadataSalon?.commercialStatus,
+    ),
     language: normalizeLanguage(row.language),
     landingLanguage: normalizeLanguage(row.language),
     country: row.country ?? metadataSalon?.country ?? "",

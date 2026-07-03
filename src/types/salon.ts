@@ -2,6 +2,14 @@ export type SalonLanguage = "pt-BR" | "en" | "es" | "fr" | "no";
 
 export type SalonStatus = "draft" | "preview" | "published";
 
+export type SalonCommercialStatus =
+  | "test"
+  | "draft_error"
+  | "review_photos"
+  | "ready_to_send"
+  | "sent"
+  | "sold";
+
 export type SalonSourceMode = "manual" | "assisted" | "imported";
 
 export type SalonGenerationStatus =
@@ -331,6 +339,7 @@ export type Salon = {
   socialLinks: SalonSocialLinks;
 
   status: SalonStatus;
+  commercialStatus: SalonCommercialStatus;
   createdAt: string;
   updatedAt: string;
   sourceMode: SalonSourceMode;
@@ -377,6 +386,7 @@ export type SalonFormInput = {
   city: string;
   country: string;
   status: SalonStatus;
+  commercialStatus?: SalonCommercialStatus;
   language: SalonLanguage;
   positioningLine: string;
   description: string;

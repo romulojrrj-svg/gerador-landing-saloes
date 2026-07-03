@@ -1,5 +1,6 @@
 import type {
   Salon,
+  SalonCommercialStatus,
   SalonCopySuggestion,
   SalonExtractedBusinessInfo,
   SalonFormInput,
@@ -17,6 +18,7 @@ import type {
 } from "@/types/salon";
 import { applyCopySuggestionToServices } from "./copy-generator";
 import { getLandingCopy } from "./landing-copy";
+import { normalizeCommercialStatus } from "./salon-commercial-status";
 
 const STORAGE_PREFIX = "salon-lg:salons:";
 const STORAGE_INDEX_KEY = "salon-lg:salons:index";
@@ -407,6 +409,7 @@ export function formDataToInput(formData: FormData): SalonFormInput {
     city: getString(formData, "city", ""),
     country: getString(formData, "country", ""),
     status: getStatus(formData),
+    commercialStatus: getCommercialStatus(formData),
     language: getLanguage(formData),
     positioningLine: getString(formData, "positioningLine", ""),
     description: getString(formData, "description", ""),
@@ -444,6 +447,9 @@ function buildCompleteSalon(partialSalon: Partial<Salon>): Salon {
   const slug = clean(partialSalon.slug) || normalizeSlug(name);
   const language = partialSalon.language ?? partialSalon.landingLanguage ?? "en";
   const landingCopy = getLandingCopy(language);
+  const commercialStatus = normalizeCommercialStatus(
+    partialSalon.commercialStatus,
+  );
   const location =
     clean(partialSalon.location) ||
     formatLocation(partialSalon.city, partialSalon.country);
@@ -622,6 +628,7 @@ function buildCompleteSalon(partialSalon: Partial<Salon>): Salon {
       phone,
     },
     status: partialSalon.status ?? "draft",
+    commercialStatus,
     createdAt: partialSalon.createdAt ?? now,
     updatedAt: partialSalon.updatedAt ?? now,
     sourceMode: partialSalon.sourceMode ?? "manual",
@@ -721,6 +728,7 @@ function dataToPartialSalon(data: SalonFormInput): Partial<Salon> {
     country: data.country,
     language: data.language,
     landingLanguage: data.language,
+    commercialStatus: normalizeCommercialStatus(data.commercialStatus),
     positioningLine: data.positioningLine,
     description: data.description,
     visualStyle: data.visualStyle,
@@ -1234,6 +1242,10 @@ function getStatus(formData: FormData): SalonStatus {
   }
 
   return "draft";
+}
+
+function getCommercialStatus(formData: FormData): SalonCommercialStatus {
+  return normalizeCommercialStatus(formData.get("commercialStatus")?.toString());
 }
 
 function formatLocation(city?: string, country?: string) {

@@ -371,6 +371,7 @@ export function buildSalonForOutscraperImport(
     language,
     landingLanguage: language,
     status,
+    commercialStatus: "review_photos",
     sourceMode: "imported",
     generationStatus: "needs_review",
     dataConfidence:

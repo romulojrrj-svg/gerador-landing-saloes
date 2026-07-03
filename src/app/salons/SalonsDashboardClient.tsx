@@ -14,11 +14,19 @@ import {
   MapPin,
   Plus,
   RefreshCw,
+  Search,
   Sparkles,
   Trash2,
   X,
 } from "lucide-react";
 import { calculateLandingReadiness } from "@/lib/copy-generator";
+import {
+  getSalonCommercialStatusClasses,
+  normalizeCommercialStatus,
+  salonCommercialStatusLabels,
+  salonCommercialStatusOptions,
+  salonCommercialStatusOrder,
+} from "@/lib/salon-commercial-status";
 import {
   getAbsoluteAppUrl,
   getApproachMessage,
@@ -37,11 +45,12 @@ import {
   listSalons,
   migrateLocalSalonsToSupabase,
   subscribeToSalonRepository,
+  upsertSalon,
   type SalonRepositorySource,
   type SalonRepositoryStatus,
 } from "@/lib/salon-repository";
 import { landingLanguageLabels } from "@/lib/salon-storage";
-import type { Salon } from "@/types/salon";
+import type { Salon, SalonCommercialStatus } from "@/types/salon";
 
 export function SalonsDashboardClient() {
   const repositoryStatus = getSalonRepositoryStatus();
@@ -59,6 +68,19 @@ export function SalonsDashboardClient() {
   );
   const [localCount, setLocalCount] = useState(0);
   const [supabaseCount, setSupabaseCount] = useState<number | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [commercialFilter, setCommercialFilter] = useState<
+    "all" | SalonCommercialStatus
+  >("all");
+  const [sortBy, setSortBy] = useState<
+    "updated_desc" | "name_asc" | "commercial" | "landing_status"
+  >("updated_desc");
+  const [inlineOrderSnapshot, setInlineOrderSnapshot] = useState<string[] | null>(
+    null,
+  );
+  const [forcedVisibleSalonSlug, setForcedVisibleSalonSlug] = useState<
+    string | null
+  >(null);
 
   async function loadDashboard() {
     setIsLoading(true);
@@ -197,6 +219,130 @@ export function SalonsDashboardClient() {
     await loadDashboard();
   }
 
+  async function handleCommercialStatusChange(
+    salon: Salon,
+    nextCommercialStatus: SalonCommercialStatus,
+  ) {
+    setMessage("");
+    setInlineOrderSnapshot(filteredSalons.map((currentSalon) => currentSalon.slug));
+    setForcedVisibleSalonSlug(
+      commercialFilter !== "all" && nextCommercialStatus !== commercialFilter
+        ? salon.slug
+        : null,
+    );
+
+    const result = await upsertSalon({
+      ...salon,
+      commercialStatus: nextCommercialStatus,
+      updatedAt: new Date().toISOString(),
+    });
+
+    if (!result.ok) {
+      setInlineOrderSnapshot(null);
+      setForcedVisibleSalonSlug(null);
+      setMessage(result.error);
+      return {
+        ok: false as const,
+        message: result.error,
+      };
+    }
+
+    setSalons((currentSalons) =>
+      currentSalons.map((currentSalon) =>
+        currentSalon.slug === salon.slug ? result.salon : currentSalon,
+      ),
+    );
+    setMessage("Classificacao atualizada.");
+
+    return {
+      ok: true as const,
+      message: "Classificacao atualizada.",
+    };
+  }
+
+  const filteredSalons = salons
+    .filter((salon) => {
+      const normalizedSearch = searchQuery.trim().toLowerCase();
+      const salonCommercialStatus = normalizeCommercialStatus(
+        salon.commercialStatus,
+      );
+      const isForcedVisible =
+        inlineOrderSnapshot !== null && forcedVisibleSalonSlug === salon.slug;
+
+      if (
+        commercialFilter !== "all" &&
+        salonCommercialStatus !== commercialFilter &&
+        !isForcedVisible
+      ) {
+        return false;
+      }
+
+      if (!normalizedSearch) {
+        return true;
+      }
+
+      const searchableText = [
+        salon.name,
+        salon.slug,
+        salon.city,
+        salon.location,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+
+      return searchableText.includes(normalizedSearch);
+    })
+    .sort((firstSalon, secondSalon) => {
+      if (inlineOrderSnapshot?.length) {
+        const firstIndex = inlineOrderSnapshot.indexOf(firstSalon.slug);
+        const secondIndex = inlineOrderSnapshot.indexOf(secondSalon.slug);
+
+        if (firstIndex !== -1 && secondIndex !== -1) {
+          return firstIndex - secondIndex;
+        }
+
+        if (firstIndex !== -1) {
+          return -1;
+        }
+
+        if (secondIndex !== -1) {
+          return 1;
+        }
+      }
+
+      if (sortBy === "name_asc") {
+        return firstSalon.name.localeCompare(secondSalon.name, "pt-BR");
+      }
+
+      if (sortBy === "commercial") {
+        const firstOrder =
+          salonCommercialStatusOrder[
+            normalizeCommercialStatus(firstSalon.commercialStatus)
+          ];
+        const secondOrder =
+          salonCommercialStatusOrder[
+            normalizeCommercialStatus(secondSalon.commercialStatus)
+          ];
+
+        if (firstOrder !== secondOrder) {
+          return firstOrder - secondOrder;
+        }
+
+        return secondSalon.updatedAt.localeCompare(firstSalon.updatedAt);
+      }
+
+      if (sortBy === "landing_status") {
+        if (firstSalon.status !== secondSalon.status) {
+          return firstSalon.status.localeCompare(secondSalon.status, "pt-BR");
+        }
+
+        return secondSalon.updatedAt.localeCompare(firstSalon.updatedAt);
+      }
+
+      return secondSalon.updatedAt.localeCompare(firstSalon.updatedAt);
+    });
+
   return (
     <main className="min-h-screen bg-[#fbfaf8]">
       <header className="border-b border-zinc-200/80 bg-white/80 backdrop-blur">
@@ -278,21 +424,111 @@ export function SalonsDashboardClient() {
           />
         ) : null}
 
+        <section className="mt-8 rounded-[2rem] border border-zinc-200 bg-white p-5 shadow-xl shadow-zinc-950/5">
+          <div className="flex flex-col gap-2 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-teal-700">
+                Organizacao comercial
+              </p>
+              <h2 className="mt-2 text-2xl font-semibold text-zinc-950">
+                Busque e classifique os saloes
+              </h2>
+              <p className="mt-2 text-sm leading-6 text-zinc-600">
+                Mostrando {filteredSalons.length} de {salons.length} salao(oes).
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-5 grid gap-3 lg:grid-cols-[1.4fr_0.9fr_0.9fr]">
+            <label className="flex min-h-[3.25rem] items-center gap-3 rounded-2xl border border-zinc-200 bg-zinc-50 px-4">
+              <Search className="h-4 w-4 text-zinc-400" />
+              <input
+                type="search"
+                value={searchQuery}
+                onChange={(event) => {
+                  setInlineOrderSnapshot(null);
+                  setForcedVisibleSalonSlug(null);
+                  setSearchQuery(event.currentTarget.value);
+                }}
+                placeholder="Buscar por nome do salao..."
+                className="w-full bg-transparent text-sm text-zinc-900 outline-none placeholder:text-zinc-400"
+              />
+            </label>
+
+            <label className="rounded-2xl border border-zinc-200 bg-zinc-50 px-4 py-3">
+              <span className="block text-[11px] font-semibold uppercase tracking-[0.16em] text-zinc-500">
+                Classificacao
+              </span>
+              <select
+                value={commercialFilter}
+                onChange={(event) => {
+                  setInlineOrderSnapshot(null);
+                  setForcedVisibleSalonSlug(null);
+                  setCommercialFilter(
+                    event.currentTarget.value as "all" | SalonCommercialStatus,
+                  );
+                }}
+                className="mt-2 w-full bg-transparent text-sm font-semibold text-zinc-900 outline-none"
+              >
+                <option value="all">Todas as classificacoes</option>
+                {salonCommercialStatusOptions.map((statusOption) => (
+                  <option key={statusOption} value={statusOption}>
+                    {salonCommercialStatusLabels[statusOption]}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="rounded-2xl border border-zinc-200 bg-zinc-50 px-4 py-3">
+              <span className="block text-[11px] font-semibold uppercase tracking-[0.16em] text-zinc-500">
+                Ordenar por
+              </span>
+              <select
+                value={sortBy}
+                onChange={(event) => {
+                  setInlineOrderSnapshot(null);
+                  setForcedVisibleSalonSlug(null);
+                  setSortBy(
+                    event.currentTarget.value as
+                      | "updated_desc"
+                      | "name_asc"
+                      | "commercial"
+                      | "landing_status",
+                  );
+                }}
+                className="mt-2 w-full bg-transparent text-sm font-semibold text-zinc-900 outline-none"
+              >
+                <option value="updated_desc">Mais recentes</option>
+                <option value="name_asc">Nome A-Z</option>
+                <option value="commercial">Classificacao</option>
+                <option value="landing_status">Status da landing</option>
+              </select>
+            </label>
+          </div>
+        </section>
+
         <div className="mt-8 grid gap-4">
           {isLoading ? (
             <EmptyState title="Carregando salões..." />
-          ) : salons.length ? (
-            salons.map((salon) => (
+          ) : filteredSalons.length ? (
+            filteredSalons.map((salon) => (
               <SalonRow
                 key={salon.slug}
                 salon={salon}
                 storageSource={source}
+                onCommercialStatusChange={handleCommercialStatusChange}
                 onDuplicate={handleDuplicate}
                 onDelete={handleDelete}
               />
             ))
           ) : (
-            <EmptyState title="Nenhum salão salvo ainda." />
+            <EmptyState
+              title={
+                salons.length
+                  ? "Nenhum salao encontrado com os filtros atuais."
+                  : "Nenhum salão salvo ainda."
+              }
+            />
           )}
         </div>
       </section>
@@ -493,18 +729,26 @@ function DatabasePanel({
 function SalonRow({
   salon,
   storageSource,
+  onCommercialStatusChange,
   onDuplicate,
   onDelete,
 }: {
   salon: Salon;
   storageSource: SalonRepositorySource;
+  onCommercialStatusChange: (
+    salon: Salon,
+    nextCommercialStatus: SalonCommercialStatus,
+  ) => Promise<{ ok: boolean; message: string }>;
   onDuplicate: (slug: string) => void;
   onDelete: (salon: Salon) => void;
 }) {
   const [feedback, setFeedback] = useState("");
+  const [isUpdatingCommercialStatus, setIsUpdatingCommercialStatus] =
+    useState(false);
   const readiness = calculateLandingReadiness(salon);
   const hasGeneratedCopy = Boolean(salon.copySuggestions || salon.generatedCopy);
   const hasAppliedCopy = Boolean(salon.generatedCopy?.status === "applied");
+  const commercialStatus = normalizeCommercialStatus(salon.commercialStatus);
   const previewPath = getPreviewPath(salon.slug);
   const publicPath = getPublicLandingPath(salon.slug);
   const previewUrl = getAbsoluteAppUrl(previewPath);
@@ -526,6 +770,15 @@ function SalonRow({
         ? "Mensagem de abordagem copiada."
         : "Não foi possível copiar a mensagem de abordagem.",
     );
+  }
+
+  async function handleCommercialStatusSelect(
+    nextCommercialStatus: SalonCommercialStatus,
+  ) {
+    setIsUpdatingCommercialStatus(true);
+    const result = await onCommercialStatusChange(salon, nextCommercialStatus);
+    setFeedback(result.message);
+    setIsUpdatingCommercialStatus(false);
   }
 
   return (
@@ -553,6 +806,38 @@ function SalonRow({
             </span>
             <span className="rounded-full bg-zinc-100 px-3 py-1.5 text-xs font-semibold text-zinc-600">
               Atualizado em {formatDate(salon.updatedAt)}
+            </span>
+          </div>
+
+          <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <label className="max-w-xs rounded-2xl border border-zinc-200 bg-zinc-50 px-4 py-3">
+              <span className="block text-[11px] font-semibold uppercase tracking-[0.16em] text-zinc-500">
+                Classificação interna
+              </span>
+              <select
+                value={commercialStatus}
+                onChange={(event) =>
+                  void handleCommercialStatusSelect(
+                    event.currentTarget.value as SalonCommercialStatus,
+                  )
+                }
+                disabled={isUpdatingCommercialStatus}
+                className="mt-2 w-full bg-transparent text-sm font-semibold text-zinc-900 outline-none disabled:cursor-not-allowed"
+              >
+                {salonCommercialStatusOptions.map((statusOption) => (
+                  <option key={statusOption} value={statusOption}>
+                    {salonCommercialStatusLabels[statusOption]}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <span
+              className={`inline-flex items-center self-start rounded-full border px-3 py-1.5 text-xs font-semibold ${getSalonCommercialStatusClasses(
+                commercialStatus,
+              )}`}
+            >
+              {salonCommercialStatusLabels[commercialStatus]}
             </span>
           </div>
 
