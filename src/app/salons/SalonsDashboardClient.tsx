@@ -165,15 +165,17 @@ export function SalonsDashboardClient() {
 
     if (!result.ok) {
       setMessage(result.error);
+      await loadDashboard();
       return;
     }
 
-    const summary = `Migração concluída: ${result.migrated} salões enviados, ${result.failed} falhas.`;
+    const summary = `Migração concluída: ${result.created} criado${result.created === 1 ? "" : "s"}, ${result.updated} atualizado${result.updated === 1 ? "" : "s"}, ${result.failed} falha${result.failed === 1 ? "" : "s"}.`;
     setMessage(
       result.failed && result.errors.length
         ? `${summary} ${result.errors.join(" | ")}`
         : summary,
     );
+    await loadDashboard();
   }
 
   async function handleCreateTestSalon() {
@@ -261,6 +263,7 @@ export function SalonsDashboardClient() {
           supabaseCount={supabaseCount}
           repositoryStatus={repositoryStatus}
           source={source}
+          sourceCount={salons.length}
           onMigrate={handleMigration}
         />
 
@@ -419,16 +422,20 @@ function DatabasePanel({
   supabaseCount,
   repositoryStatus,
   source,
+  sourceCount,
   onMigrate,
 }: {
   localCount: number;
   supabaseCount: number | null;
   repositoryStatus: SalonRepositoryStatus;
   source: SalonRepositorySource;
+  sourceCount: number;
   onMigrate: () => void;
 }) {
   const canMigrate =
     repositoryStatus.supabaseConfigured && repositoryStatus.supabaseWriteEnabled;
+  const migrationSourceLabel = source === "server-local" ? "Server-local" : "LocalStorage";
+  const migrationSourceCount = source === "server-local" ? sourceCount : localCount;
 
   return (
     <section className="mt-8 rounded-[2rem] border border-zinc-200 bg-white p-5 shadow-xl shadow-zinc-950/5">
@@ -453,7 +460,7 @@ function DatabasePanel({
         <button
           type="button"
           onClick={onMigrate}
-          disabled={!canMigrate || localCount === 0}
+          disabled={!canMigrate || migrationSourceCount === 0}
           className="btn btn-secondary min-h-10 px-4 py-2 disabled:cursor-not-allowed disabled:opacity-50"
         >
           <RefreshCw className="h-4 w-4" />
@@ -462,7 +469,10 @@ function DatabasePanel({
       </div>
 
       <div className="mt-5 grid gap-3 text-sm sm:grid-cols-3">
-        <Metric label="LocalStorage" value={`${localCount} salões`} />
+        <Metric
+          label={migrationSourceLabel}
+          value={`${migrationSourceCount} salões`}
+        />
         <Metric
           label="Supabase"
           value={

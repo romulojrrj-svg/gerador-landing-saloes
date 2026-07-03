@@ -70,9 +70,14 @@ export type SalonRepositoryListResult =
 export type SalonMigrationResult =
   | {
       ok: true;
-      migrated: number;
+      source: "local" | "server-local";
+      total: number;
+      created: number;
+      updated: number;
+      confirmed: number;
       failed: number;
       errors: string[];
+      migratedSlugs: string[];
     }
   | {
       ok: false;
@@ -699,7 +704,8 @@ export async function migrateLocalSalonsToSupabase(): Promise<SalonMigrationResu
   if (!status.supabaseConfigured) {
     return {
       ok: false,
-      error: "Supabase não configurado. Preencha as variáveis de ambiente antes de migrar.",
+      error:
+        "Supabase nao configurado. Verifique NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY e SUPABASE_SERVICE_ROLE_KEY.",
     };
   }
 
@@ -711,35 +717,151 @@ export async function migrateLocalSalonsToSupabase(): Promise<SalonMigrationResu
     };
   }
 
-  const localSalons = listLocalSalons();
+  const migrationSource = status.activeSource === "server-local" ? "server-local" : "local";
+  const sourceResult =
+    migrationSource === "server-local"
+      ? await listServerLocalSalons()
+      : ({
+          ok: true,
+          salons: listLocalSalons(),
+        } as const);
+
+  if (!sourceResult.ok) {
+    return {
+      ok: false,
+      error: `Nao foi possivel ler os saloes de ${migrationSource === "server-local" ? "server-local" : "localStorage"}: ${sourceResult.error}`,
+    };
+  }
+
+  const sourceSalons = sourceResult.salons;
+
+  if (!sourceSalons.length) {
+    return {
+      ok: false,
+      error:
+        migrationSource === "server-local"
+          ? "Nenhum salao encontrado no server-local para migrar."
+          : "Nenhum salao encontrado no localStorage para migrar.",
+    };
+  }
+
+  const adminPreflight = await fetchAdminSalonList();
+
+  if (!adminPreflight.ok) {
+    return {
+      ok: false,
+      error: getSupabaseMigrationConfigError(adminPreflight.error),
+    };
+  }
+
   const errors: string[] = [];
-  let migrated = 0;
+  const migratedSlugs: string[] = [];
+  let created = 0;
+  let updated = 0;
 
-  for (const salon of localSalons) {
-    const result = await upsertSalon(salon);
+  debugRepository("migrate-start", {
+    source: migrationSource,
+    total: sourceSalons.length,
+    salons: sourceSalons.map((salon) => ({
+      name: salon.name,
+      slug: salon.slug,
+      id: salon.id,
+      status: salon.status,
+    })),
+  });
 
-    if (result.ok) {
-      migrated += 1;
-      debugRepository("migrate-row-success", {
-        slug: result.salon.slug,
-        source: result.source,
+  for (const salon of sourceSalons) {
+    debugRepository("migrate-row-start", {
+      name: salon.name,
+      slug: salon.slug,
+      id: salon.id,
+      status: salon.status,
+      source: migrationSource,
+    });
+
+    const existingCheck = await fetchAdminRepository<{ salon: Salon }>(
+      `/api/admin/salons/${encodeURIComponent(salon.slug)}`,
+    );
+
+    if (!existingCheck.ok && existingCheck.status !== 404) {
+      const errorMessage = `${salon.name} (${salon.slug}): falha ao verificar existencia no Supabase. ${existingCheck.error}`;
+      errors.push(errorMessage);
+      debugRepository("migrate-row-verify-before-failed", {
+        slug: salon.slug,
+        status: existingCheck.status,
+        error: existingCheck.error,
+      });
+      continue;
+    }
+
+    const existedBefore = existingCheck.ok;
+    const upsertResult = await fetchAdminUpsertSalon(salon);
+
+    if (!upsertResult.ok) {
+      const errorMessage = `${salon.name} (${salon.slug}): ${upsertResult.error}`;
+      errors.push(errorMessage);
+      debugRepository("migrate-row-upsert-failed", {
+        slug: salon.slug,
+        error: upsertResult.error,
+      });
+      continue;
+    }
+
+    const confirmation = await fetchAdminRepository<{ salon: Salon }>(
+      `/api/admin/salons/${encodeURIComponent(salon.slug)}`,
+    );
+
+    if (!confirmation.ok || !confirmation.data?.salon) {
+      const errorMessage = `${salon.name} (${salon.slug}): upsert retornou sucesso, mas o salao nao foi confirmado no Supabase. ${confirmation.ok ? "Resposta sem salao." : confirmation.error}`;
+      errors.push(errorMessage);
+      debugRepository("migrate-row-confirmation-failed", {
+        slug: salon.slug,
+        status: confirmation.status,
+        error: confirmation.ok ? "missing-confirmed-salon" : confirmation.error,
+      });
+      continue;
+    }
+
+    migratedSlugs.push(salon.slug);
+
+    if (existedBefore) {
+      updated += 1;
+      debugRepository("migrate-row-updated", {
+        slug: salon.slug,
+        confirmedId: confirmation.data.salon.id,
       });
     } else {
-      errors.push(`${salon.name}: ${result.error}`);
-      debugRepository("migrate-row-failed", {
+      created += 1;
+      debugRepository("migrate-row-created", {
         slug: salon.slug,
-        error: result.error,
+        confirmedId: confirmation.data.salon.id,
       });
     }
   }
 
   notifyRepositoryChanged();
 
+  const confirmed = created + updated;
+
+  if (confirmed === 0) {
+    return {
+      ok: false,
+      error: errors.length
+        ? `Migracao falhou: nenhum salao foi confirmado no Supabase. ${errors.join(" | ")}`
+        : "Migracao falhou: nenhum salao foi confirmado no Supabase.",
+    };
+  }
+
   return {
     ok: true,
-    migrated,
+    source: migrationSource,
+    total: sourceSalons.length,
+    created,
+    updated,
+    confirmed,
     failed: errors.length,
     errors,
+    migratedSlugs,
   };
 }
 
@@ -1440,4 +1562,16 @@ function createId() {
 
 function getErrorMessage(error: unknown, fallback: string) {
   return error instanceof Error ? error.message : fallback;
+}
+
+function getSupabaseMigrationConfigError(error: string) {
+  if (
+    error.includes("SUPABASE_SERVICE_ROLE_KEY") ||
+    error.includes("NEXT_PUBLIC_SUPABASE_WRITE_MODE") ||
+    error.includes("Supabase")
+  ) {
+    return `Supabase nao configurado. Verifique NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY e SUPABASE_SERVICE_ROLE_KEY. ${error}`;
+  }
+
+  return error;
 }
