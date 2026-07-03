@@ -49,26 +49,23 @@ export function Hero({ salon, mode = "public" }: HeroProps) {
   const trustPoints = buildTrustPoints(salon, serviceSummary);
 
   return (
-    <section className="relative overflow-hidden bg-[linear-gradient(180deg,#f8f1e8_0%,#fcfaf7_28%,#ffffff_100%)]">
-      <div className="absolute inset-x-0 top-0 h-56 bg-[radial-gradient(circle_at_top_left,rgba(215,177,129,0.28),transparent_52%)]" />
-      <div className="absolute right-0 top-20 h-72 w-72 rounded-full bg-[radial-gradient(circle,rgba(255,228,230,0.9),rgba(255,228,230,0))]" />
-
-      <div className="relative mx-auto max-w-7xl px-5 pb-9 pt-5 sm:px-8 sm:pb-12 lg:px-10 lg:pb-16 lg:pt-9">
-        <div className="grid gap-6 lg:grid-cols-[0.92fr_1.08fr] lg:items-center">
+    <section className="relative overflow-hidden border-b border-[#eadfce]/70 bg-[linear-gradient(180deg,#fbf5ed_0%,#fcfaf7_42%,#ffffff_100%)]">
+      <div className="relative mx-auto max-w-7xl px-4 pb-8 pt-4 sm:px-8 sm:pb-12 lg:px-10 lg:pb-16 lg:pt-9">
+        <div className="grid gap-5 lg:grid-cols-[0.9fr_1.1fr] lg:items-center lg:gap-10">
           <div className="max-w-2xl">
             {eyebrow ? (
-              <div className="inline-flex items-center gap-2 rounded-full border border-[#dcc7af] bg-white/80 px-3.5 py-2 text-[0.68rem] font-semibold uppercase tracking-[0.18em] text-[#8d6239] shadow-sm sm:px-4 sm:text-[0.72rem]">
+              <div className="inline-flex items-center gap-2 rounded-full border border-[#dcc7af] bg-white/86 px-3.5 py-2 text-[0.68rem] font-semibold uppercase tracking-normal text-[#8d6239] shadow-sm sm:px-4 sm:text-[0.72rem]">
                 <MapPin className="h-3.5 w-3.5" />
                 {eyebrow}
               </div>
             ) : null}
 
-            <h1 className="mt-5 font-serif text-[2.2rem] font-semibold leading-[0.98] text-zinc-950 sm:text-[4rem] lg:text-[5.1rem]">
+            <h1 className="mt-4 font-serif text-[2.05rem] font-semibold leading-[1.02] text-zinc-950 sm:text-[3.55rem] lg:text-[4.85rem]">
               {salon.name}
             </h1>
 
             {headline ? (
-              <p className="mt-4 max-w-2xl text-[1rem] leading-7 text-zinc-800 sm:text-[1.3rem] sm:leading-9">
+              <p className="mt-3 max-w-2xl text-[1rem] leading-7 text-zinc-800 sm:text-[1.26rem] sm:leading-8">
                 {headline}
               </p>
             ) : null}
@@ -84,9 +81,9 @@ export function Hero({ salon, mode = "public" }: HeroProps) {
                   {reviewMetrics.averageRating.toFixed(1)}
                   <span className="text-zinc-500">
                     {salon.language === "pt-BR"
-                      ? "Avaliacao do salao"
+                      ? "Avaliação do salão"
                       : salon.language === "es"
-                        ? "Valoracion"
+                        ? "Valoración"
                         : salon.language === "no"
                           ? "Vurdering"
                           : "Salon rating"}
@@ -132,7 +129,11 @@ export function Hero({ salon, mode = "public" }: HeroProps) {
               {showServicesCta ? (
                 <a
                   href="#services"
-                  className="btn w-full border border-[#d8c6af] bg-[#fff8f0] px-6 py-3 text-sm font-semibold text-zinc-900 shadow-sm transition hover:-translate-y-0.5 hover:bg-white active:scale-[0.99] sm:w-auto sm:py-3.5 sm:text-base"
+                  className={`btn border border-[#d8c6af] bg-[#fff8f0] px-6 py-3 text-sm font-semibold text-zinc-900 shadow-sm transition hover:-translate-y-0.5 hover:bg-white active:scale-[0.99] sm:w-auto sm:py-3.5 sm:text-base ${
+                    primaryContactAction.href && mode === "public"
+                      ? "hidden sm:inline-flex"
+                      : "w-full"
+                  }`}
                 >
                   {copy.exploreServices}
                 </a>
@@ -146,7 +147,7 @@ export function Hero({ salon, mode = "public" }: HeroProps) {
                     key={`${point.label}-${point.value}`}
                     className="rounded-[1.4rem] border border-[#eadfce] bg-white/82 px-4 py-4 shadow-sm backdrop-blur transition-transform duration-200 hover:-translate-y-0.5"
                   >
-                    <p className="text-[0.68rem] font-semibold uppercase tracking-[0.2em] text-[#9a6b3d]">
+                    <p className="text-[0.68rem] font-semibold uppercase tracking-normal text-[#9a6b3d]">
                       {point.label}
                     </p>
                     <p className="mt-2 text-sm leading-6 text-zinc-800">{point.value}</p>
@@ -157,8 +158,6 @@ export function Hero({ salon, mode = "public" }: HeroProps) {
           </div>
 
           <div className="relative">
-            <div className="absolute -left-4 top-10 hidden h-24 w-24 rounded-full bg-[#f6d7c7]/60 blur-2xl lg:block" />
-            <div className="absolute -right-6 bottom-8 hidden h-32 w-32 rounded-full bg-[#ead7bb]/70 blur-3xl lg:block" />
             {useHeroMosaic ? (
               <HeroMosaic images={heroMosaicImages} salon={salon} />
             ) : (
@@ -178,6 +177,8 @@ function HeroImageCard({
   heroImage: string;
   salon: Salon;
 }) {
+  const serviceSummary = getPublicServiceSummary(salon.services, salon.language);
+
   return (
     <div className="relative overflow-hidden rounded-[1.6rem] border border-white/60 bg-[#efe4d5] p-2 shadow-[0_20px_50px_rgba(83,57,33,0.13)] sm:rounded-[2.4rem] sm:p-3 sm:shadow-[0_32px_80px_rgba(83,57,33,0.16)]">
       <div className="relative aspect-[4/3] max-h-[17.5rem] overflow-hidden rounded-[1.25rem] bg-zinc-200 sm:aspect-[5/5.3] sm:max-h-none sm:rounded-[2rem]">
@@ -195,9 +196,27 @@ function HeroImageCard({
             className="object-cover transition-transform duration-700 hover:scale-[1.02]"
           />
         ) : (
-          <div className="absolute inset-0 bg-[linear-gradient(135deg,#f3e7d8_0%,#fffaf4_100%)]" />
+          <div className="absolute inset-0 flex items-center justify-center bg-[linear-gradient(135deg,#f3e7d8_0%,#fffaf4_100%)] px-6 text-center">
+            <span className="font-serif text-3xl font-semibold text-[#8d6239]/80">
+              {salon.name}
+            </span>
+          </div>
         )}
         <div className="absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-black/30 to-transparent" />
+        {salon.location || serviceSummary ? (
+          <div className="absolute inset-x-3 bottom-3 rounded-[1rem] border border-white/40 bg-white/90 px-3.5 py-3 shadow-[0_14px_32px_rgba(24,24,27,0.16)] backdrop-blur">
+            {salon.location ? (
+              <p className="line-clamp-1 text-xs font-semibold text-zinc-950">
+                {salon.location}
+              </p>
+            ) : null}
+            {serviceSummary ? (
+              <p className="mt-1 line-clamp-1 text-xs text-zinc-600">
+                {serviceSummary}
+              </p>
+            ) : null}
+          </div>
+        ) : null}
       </div>
     </div>
   );
@@ -251,21 +270,21 @@ function buildTrustPoints(salon: Salon, serviceSummary: string) {
 
   if (salon.location) {
     points.push({
-      label: salon.language === "pt-BR" ? "Localizacao" : "Location",
+      label: salon.language === "pt-BR" ? "Localização" : "Location",
       value: salon.location,
     });
   }
 
   if (serviceSummary) {
     points.push({
-      label: salon.language === "pt-BR" ? "Servicos" : "Services",
+      label: salon.language === "pt-BR" ? "Serviços" : "Services",
       value: serviceSummary,
     });
   }
 
   if (salon.businessHours) {
     points.push({
-      label: salon.language === "pt-BR" ? "Horarios" : "Hours",
+      label: salon.language === "pt-BR" ? "Horários" : "Hours",
       value: salon.businessHours,
     });
   }

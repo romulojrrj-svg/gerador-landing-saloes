@@ -125,10 +125,10 @@ function getCompactServiceDescription(
   ) {
     return getLocalizedCompactDescription(
       language,
-      "Atendimentos voltados para estilo, finalizacao e cuidado com o visual.",
+      "Atendimentos voltados para estilo, finalização e cuidado com o visual.",
       "Appointments focused on styling, finishing, and everyday beauty care.",
       "Atenciones enfocadas en estilo, acabado y cuidado del look.",
-      "Behandlinger med fokus pa styling, finish og pleie av looken.",
+      "Behandlinger med fokus på styling, finish og pleie av looken.",
     );
   }
 
@@ -139,10 +139,10 @@ function getCompactServiceDescription(
   ) {
     return getLocalizedCompactDescription(
       language,
-      "Cuidados para maos e pes com acabamento delicado e atencao aos detalhes.",
+      "Cuidados para mãos e pés com acabamento delicado e atenção aos detalhes.",
       "Care for hands and feet with a polished finish and attention to detail.",
-      "Cuidados para manos y pies con acabado delicado y atencion al detalle.",
-      "Pleie for hender og fotter med fint resultat og fokus pa detaljer.",
+      "Cuidados para manos y pies con acabado delicado y atención al detalle.",
+      "Pleie for hender og føtter med fint resultat og fokus på detaljer.",
     );
   }
 
@@ -153,7 +153,7 @@ function getCompactServiceDescription(
   ) {
     return getLocalizedCompactDescription(
       language,
-      "Producoes pensadas para eventos, fotos e momentos especiais.",
+      "Produções pensadas para eventos, fotos e momentos especiais.",
       "Looks prepared for events, photos, and special occasions.",
       "Looks pensados para eventos, fotos y ocasiones especiales.",
       "Looks til arrangementer, bilder og spesielle anledninger.",
@@ -162,10 +162,10 @@ function getCompactServiceDescription(
 
   return getLocalizedCompactDescription(
     language,
-    "Atendimento disponivel para quem busca cuidado, praticidade e boa apresentacao.",
+    "Atendimento disponível para quem busca cuidado, praticidade e boa apresentação.",
     "Available appointments for clients looking for care, convenience, and a polished result.",
-    "Atencion disponible para quienes buscan cuidado, practicidad y una buena presentacion.",
-    "Tilgjengelige behandlinger for deg som onsker pleie, enkelhet og et pent resultat.",
+    "Atención disponible para quienes buscan cuidado, practicidad y una buena presentación.",
+    "Tilgjengelige behandlinger for deg som ønsker pleie, enkelhet og et pent resultat.",
   );
 }
 

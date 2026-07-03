@@ -127,7 +127,7 @@ const testSalonPreset = {
   city: "Rio de Janeiro",
   country: "Brasil",
   address: "Rua Conde de Bonfim, 255 - Loja 125",
-  businessHours: "Terca a sabado, de 10:00 as 19:00",
+  businessHours: "Terça à sábado, de 10:00 às 19:00",
   observedServices: "cabelo, unhas, maquiagem",
   services: ["Cabelo", "Unhas", "Maquiagem"],
   differentiators:
@@ -551,14 +551,56 @@ export function SalonForm({
     fillCheckboxGroup("services", testSalonPreset.services);
     const nextImages = mergePresetImages(realImages, testSalonImages);
     const nextReviews = mergePresetReviews(realReviews, testSalonReviews);
+    const nextLayoutImagePlan = buildTestSalonLayoutImagePlan(layoutImagePlan);
+    const nextImageSelectionSummary =
+      buildTestSalonImageSelectionSummary(imageSelectionSummary);
 
     setRealImages(nextImages);
     setRealReviews(nextReviews);
+    setLayoutImagePlan(nextLayoutImagePlan);
+    setImageSelectionSummary(nextImageSelectionSummary);
 
     if (mode === "create") {
-      submitCurrentForm({
+      onSubmit({
+        name: testSalonPreset.name,
+        location: testSalonPreset.location,
+        city: testSalonPreset.city,
+        country: testSalonPreset.country,
+        status: "published",
+        language: "pt-BR",
+        positioningLine: testSalonPreset.positioningLine,
+        description: testSalonPreset.description,
+        visualStyle: initialSalon?.visualStyle ?? "Luxo suave",
+        brandTone: initialSalon?.brandTone ?? "Comercial e acolhedor",
+        instagramUrl: testSalonPreset.instagramUrl,
+        googleMapsUrl: testSalonPreset.googleMapsUrl,
+        websiteUrl: testSalonPreset.websiteUrl,
+        bookingUrl: testSalonPreset.bookingUrl,
+        whatsapp: testSalonPreset.whatsapp,
+        phone: testSalonPreset.phone,
+        selectedServices: [...testSalonPreset.services],
         galleryImages: nextImages,
+        imageCandidates,
+        imageSelectionSummary: nextImageSelectionSummary,
+        layoutImagePlan: nextLayoutImagePlan,
         testimonials: nextReviews,
+        businessHours: testSalonPreset.businessHours,
+        address: testSalonPreset.address,
+        extractedBusinessInfo: {
+          businessHours: testSalonPreset.businessHours,
+          address: testSalonPreset.address,
+          observedServices: testSalonPreset.observedServices,
+          differentiators: testSalonPreset.differentiators,
+          visualNotes: testSalonPreset.visualNotes,
+        },
+        sourceMaterials: buildSourceMaterials(nextImages, nextReviews),
+        manualAssistantNotes: testSalonPreset.manualAssistantNotes,
+        notes: testSalonPreset.notes,
+        copySuggestions: copySuggestion,
+        generatedCopy: appliedCopy,
+        copyHistory,
+        lastGeneratedAt: copySuggestion?.generatedAt,
+        lastAppliedAt: appliedCopy?.appliedAt,
       });
     }
   }
@@ -3393,6 +3435,62 @@ function mergePresetReviews(
   }
 
   return merged;
+}
+
+function buildTestSalonLayoutImagePlan(
+  currentPlan?: SalonLayoutImagePlan,
+): SalonLayoutImagePlan {
+  const basePlan = createSimpleImagePlan(currentPlan);
+
+  return syncLegacyImagePlan({
+    ...basePlan,
+    mode: "local_auto",
+    logoImageId: "dev-logo-365-divas",
+    topImageIds: uniqueIds([
+      "dev-hero-365-divas",
+      ...(basePlan.topImageIds ?? []),
+    ]),
+    galleryImageIds: uniqueIds([
+      "dev-gallery-365-divas",
+      "dev-result-365-divas",
+      ...basePlan.galleryImageIds,
+    ]),
+    spaceEnabled: true,
+    spaceTitle: basePlan.spaceTitle || "Nosso Espaço",
+    spaceDescription:
+      basePlan.spaceDescription ||
+      "Conheça um pouco do ambiente e dos detalhes do salão.",
+    spaceImageIds: uniqueIds([
+      "dev-interior-365-divas",
+      ...(basePlan.spaceImageIds ?? []),
+    ]),
+    summary: basePlan.summary || "Plano de imagens de teste para desenvolvimento.",
+    warnings: basePlan.warnings ?? [],
+    generatedAt: basePlan.generatedAt ?? new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  });
+}
+
+function buildTestSalonImageSelectionSummary(
+  current?: SalonImageSelectionSummary,
+): SalonImageSelectionSummary {
+  return {
+    logoId: current?.logoId ?? "dev-logo-365-divas",
+    heroId: current?.heroId ?? "dev-hero-365-divas",
+    interiorIds: uniqueIds([
+      ...(current?.interiorIds ?? []),
+      "dev-interior-365-divas",
+    ]),
+    resultIds: current?.resultIds ?? [],
+    galleryIds: uniqueIds([
+      ...(current?.galleryIds ?? []),
+      "dev-gallery-365-divas",
+      "dev-result-365-divas",
+    ]),
+    ignoredIds: current?.ignoredIds ?? [],
+    selectedAt: current?.selectedAt ?? new Date().toISOString(),
+    appliedAt: current?.appliedAt,
+  };
 }
 
 function buildSourceMaterials(

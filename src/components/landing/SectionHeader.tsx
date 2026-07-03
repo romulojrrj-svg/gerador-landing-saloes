@@ -20,11 +20,11 @@ export function SectionHeader({
       }
     >
       {eyebrow ? (
-        <p className="inline-flex items-center rounded-full border border-[#d8c6af] bg-[#fff9f2] px-3 py-1 text-[0.68rem] font-semibold uppercase tracking-[0.24em] text-[#9a6b3d]">
+        <p className="inline-flex items-center rounded-full border border-[#d8c6af] bg-[#fff9f2] px-3 py-1 text-[0.68rem] font-semibold uppercase tracking-normal text-[#9a6b3d]">
           {eyebrow}
         </p>
       ) : null}
-      <h2 className="mt-3.5 font-serif text-[1.75rem] font-semibold leading-tight text-zinc-950 sm:text-4xl lg:text-[2.8rem]">
+      <h2 className="mt-3.5 font-serif text-[1.72rem] font-semibold leading-tight text-zinc-950 sm:text-4xl lg:text-[2.75rem]">
         {title}
       </h2>
       <p className="mt-2.5 text-[0.95rem] leading-7 text-zinc-600 sm:text-lg sm:leading-8">

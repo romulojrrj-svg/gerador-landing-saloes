@@ -34,6 +34,11 @@ export function Testimonials({
     ? getPublicReviewMetrics(salon)
     : { averageRating: 0, reviewCount: 0 };
   const featuredReviews = visibleReviews.slice(0, 3);
+  const hasAverageRating =
+    typeof reviewMetrics.averageRating === "number" &&
+    Number.isFinite(reviewMetrics.averageRating) &&
+    reviewMetrics.averageRating > 0;
+  const reviewCount = reviewMetrics.reviewCount || featuredReviews.length;
 
   if (!visibleReviews.length) {
     return <WhyChooseSalon language={language} salon={salon} />;
@@ -50,32 +55,35 @@ export function Testimonials({
               description={copy.reviewsDescription}
             />
             <div className="rounded-[1.4rem] border border-[#eadfce] bg-white p-4 shadow-[0_14px_34px_rgba(83,57,33,0.07)] sm:rounded-[1.8rem] sm:p-5">
-              <p className="text-[0.72rem] font-semibold uppercase tracking-[0.24em] text-[#9a6b3d]">
-                {language === "pt-BR" ? "Avaliacao geral" : "Overall rating"}
+              <p className="text-[0.72rem] font-semibold uppercase tracking-normal text-[#9a6b3d]">
+                {hasAverageRating
+                  ? getOverallRatingLabel(language)
+                  : getRealReviewsLabel(language)}
               </p>
               <div className="mt-3 flex items-end gap-3">
                 <span className="font-serif text-4xl font-semibold text-zinc-950 sm:text-5xl">
-                  {reviewMetrics.averageRating
+                  {hasAverageRating && reviewMetrics.averageRating
                     ? reviewMetrics.averageRating.toFixed(1)
-                    : "5.0"}
+                    : reviewCount}
                 </span>
                 <div className="pb-1">
-                  <div className="flex items-center gap-1">
-                    {Array.from({ length: 5 }).map((_, index) => (
-                      <Star
-                        key={index}
-                        className="h-4 w-4 fill-[#f4b84f] text-[#f4b84f]"
-                      />
-                    ))}
-                  </div>
+                  {hasAverageRating ? (
+                    <div className="flex items-center gap-1">
+                      {Array.from({ length: 5 }).map((_, index) => (
+                        <Star
+                          key={index}
+                          className="h-4 w-4 fill-[#f4b84f] text-[#f4b84f]"
+                        />
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="inline-flex items-center gap-2 rounded-full border border-[#eadfce] bg-[#fffaf3] px-3 py-1.5 text-xs font-semibold text-zinc-800">
+                      <Quote className="h-3.5 w-3.5 text-[#9a6b3d]" />
+                      {getReviewCountText(reviewCount, language)}
+                    </div>
+                  )}
                   <p className="mt-2 text-sm text-zinc-500">
-                    {language === "pt-BR"
-                      ? "Bem avaliado por clientes"
-                      : language === "es"
-                        ? "Bien valorado por clientes"
-                        : language === "no"
-                          ? "Godt vurdert av kunder"
-                          : "Well rated by clients"}
+                    {getReviewContextText(hasAverageRating, language)}
                   </p>
                 </div>
               </div>
@@ -108,7 +116,7 @@ export function Testimonials({
                   </p>
                   <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-zinc-500">
                     {testimonial.source === "google" ? (
-                      <span className="rounded-full border border-[#eadfce] bg-[#fdf8f1] px-2.5 py-1 text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-[#8d6239]">
+                      <span className="rounded-full border border-[#eadfce] bg-[#fdf8f1] px-2.5 py-1 text-[0.72rem] font-semibold uppercase tracking-normal text-[#8d6239]">
                         Google
                       </span>
                     ) : null}
@@ -185,18 +193,98 @@ function getCompactBenefitsTitle(language: SalonLanguage) {
 
 function getCompactBenefitsDescription(language: SalonLanguage) {
   if (language === "pt-BR") {
-    return "Alguns pontos simples para planejar sua visita com mais seguranca.";
+    return "Alguns pontos simples para planejar sua visita com mais segurança.";
   }
 
   if (language === "es") {
-    return "Algunos detalles simples para planificar tu visita con mas confianza.";
+    return "Algunos detalles simples para planificar tu visita con más confianza.";
   }
 
   if (language === "no") {
-    return "Noen enkle detaljer som gjor det lettere a planlegge besoket.";
+    return "Noen enkle detaljer som gjør det lettere å planlegge besøket.";
   }
 
   return "A few simple details to help you plan your visit with confidence.";
+}
+
+function getOverallRatingLabel(language: SalonLanguage) {
+  if (language === "pt-BR") {
+    return "Avaliação geral";
+  }
+
+  if (language === "es") {
+    return "Valoración general";
+  }
+
+  if (language === "no") {
+    return "Samlet vurdering";
+  }
+
+  return "Overall rating";
+}
+
+function getRealReviewsLabel(language: SalonLanguage) {
+  if (language === "pt-BR") {
+    return "Avaliações reais";
+  }
+
+  if (language === "es") {
+    return "Reseñas reales";
+  }
+
+  if (language === "no") {
+    return "Ekte omtaler";
+  }
+
+  return "Real reviews";
+}
+
+function getReviewCountText(count: number, language: SalonLanguage) {
+  if (language === "pt-BR") {
+    return count === 1 ? "1 avaliação" : `${count} avaliações`;
+  }
+
+  if (language === "es") {
+    return count === 1 ? "1 reseña" : `${count} reseñas`;
+  }
+
+  if (language === "no") {
+    return count === 1 ? "1 omtale" : `${count} omtaler`;
+  }
+
+  return count === 1 ? "1 review" : `${count} reviews`;
+}
+
+function getReviewContextText(hasAverageRating: boolean, language: SalonLanguage) {
+  if (hasAverageRating) {
+    if (language === "pt-BR") {
+      return "Nota baseada nas avaliações exibidas";
+    }
+
+    if (language === "es") {
+      return "Puntuación basada en las reseñas mostradas";
+    }
+
+    if (language === "no") {
+      return "Vurdering basert på omtalene som vises";
+    }
+
+    return "Rating based on the reviews shown";
+  }
+
+  if (language === "pt-BR") {
+    return "Comentários selecionados do salão";
+  }
+
+  if (language === "es") {
+    return "Comentarios seleccionados del salón";
+  }
+
+  if (language === "no") {
+    return "Utvalgte kommentarer fra salongen";
+  }
+
+  return "Selected client comments";
 }
 
 function formatReviewDate(reviewDate: string | undefined, language: SalonLanguage) {
