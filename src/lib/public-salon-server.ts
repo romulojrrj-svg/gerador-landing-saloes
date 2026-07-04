@@ -32,13 +32,6 @@ export async function getPublicSalonBySlugServer(slug: string) {
 
   const salon = mapSupabaseRowToSalon(data as SupabaseSalonRow);
 
-  if (salon.status !== "published") {
-    return {
-      checked: true,
-      salon: null,
-    };
-  }
-
   return {
     checked: true,
     salon: salon satisfies Salon,

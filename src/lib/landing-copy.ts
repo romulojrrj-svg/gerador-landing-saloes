@@ -108,9 +108,8 @@ const copy: Record<SalonLanguage, LandingCopy> = {
     landingLanguage: "Idioma da landing",
     visualDirection: "Direção visual",
     clientRating: "Avaliação de clientes",
-    publicNotFoundTitle: "Landing não encontrada",
-    publicNotFoundText:
-      "Esta página ainda não foi publicada ou está disponível apenas no navegador em que o cadastro foi criado.",
+    publicNotFoundTitle: "Página não encontrada",
+    publicNotFoundText: "Esta página não está disponível.",
     backToPanel: "Voltar ao painel",
     loadingTitle: "Preparando a landing",
     loadingText: "Carregando a página salva neste navegador.",
@@ -171,8 +170,7 @@ const copy: Record<SalonLanguage, LandingCopy> = {
     visualDirection: "Visual direction",
     clientRating: "Client rating",
     publicNotFoundTitle: "Page not found",
-    publicNotFoundText:
-      "This landing has not been published yet, or it is only available in the browser where it was created.",
+    publicNotFoundText: "This page is not available.",
     backToPanel: "Back to dashboard",
     loadingTitle: "Preparing the landing",
     loadingText: "Loading the page saved in this browser.",

@@ -322,9 +322,7 @@ export async function getPublicSalonBySlug(slug: string) {
     isProductionEnvironment() ||
     getSalonRepositoryStatus().activeSource === "supabase"
   ) {
-    const supabaseResult = await tryGetSupabaseSalonBySlug(slug, {
-      publishedOnly: true,
-    });
+    const supabaseResult = await tryGetSupabaseSalonBySlug(slug);
 
     if (supabaseResult.ok && supabaseResult.salon) {
       return {
@@ -997,7 +995,6 @@ async function tryListSupabaseSalons(): Promise<SalonRepositoryListResult> {
 
 async function tryGetSupabaseSalonBySlug(
   slug: string,
-  options?: { publishedOnly?: boolean },
 ): Promise<
   | { ok: true; salon: Salon | null }
   | { ok: false; error: string; salon?: null }
@@ -1009,13 +1006,11 @@ async function tryGetSupabaseSalonBySlug(
   }
 
   try {
-    let query = client.from("salons").select("*").eq("slug", slug);
-
-    if (options?.publishedOnly) {
-      query = query.eq("status", "published");
-    }
-
-    const { data, error } = await query.maybeSingle();
+    const { data, error } = await client
+      .from("salons")
+      .select("*")
+      .eq("slug", slug)
+      .maybeSingle();
 
     if (error) {
       return { ok: false, error: error.message };
