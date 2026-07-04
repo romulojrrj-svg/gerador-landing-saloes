@@ -727,6 +727,10 @@ function dataToPartialSalon(data: SalonFormInput): Partial<Salon> {
   const location =
     clean(data.location) || formatLocation(data.city, data.country) || "";
   const landingCopy = getLandingCopy(data.language);
+  const commercialStatus =
+    data.commercialStatus !== undefined
+      ? normalizeCommercialStatus(data.commercialStatus)
+      : undefined;
 
   return {
     name: data.name,
@@ -735,7 +739,7 @@ function dataToPartialSalon(data: SalonFormInput): Partial<Salon> {
     country: data.country,
     language: data.language,
     landingLanguage: data.language,
-    commercialStatus: normalizeCommercialStatus(data.commercialStatus),
+    ...(commercialStatus !== undefined ? { commercialStatus } : {}),
     positioningLine: data.positioningLine,
     description: data.description,
     visualStyle: data.visualStyle,
@@ -1210,7 +1214,13 @@ function normalizeSalonStatus(status: string | null | undefined): SalonStatus {
   return "draft";
 }
 
-function getCommercialStatus(formData: FormData): SalonCommercialStatus {
+function getCommercialStatus(
+  formData: FormData,
+): SalonCommercialStatus | undefined {
+  if (!formData.has("commercialStatus")) {
+    return undefined;
+  }
+
   return normalizeCommercialStatus(formData.get("commercialStatus")?.toString());
 }
 
