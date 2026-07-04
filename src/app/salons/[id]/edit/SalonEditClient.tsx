@@ -116,7 +116,7 @@ export function SalonEditClient({ slug }: SalonEditClientProps) {
         </div>
       </header>
 
-      <section className="mx-auto grid max-w-7xl gap-10 px-6 py-10 sm:px-8 lg:grid-cols-[0.75fr_1.25fr] lg:px-10 lg:py-14">
+      <section className="mx-auto grid max-w-[96rem] gap-10 px-6 py-10 sm:px-8 lg:grid-cols-[minmax(18rem,0.62fr)_minmax(0,1.38fr)] lg:px-10 lg:py-14 2xl:max-w-[104rem]">
         <aside className="lg:sticky lg:top-8 lg:h-fit">
           <div className="rounded-[2rem] bg-zinc-950 p-7 text-white shadow-2xl shadow-zinc-950/20">
             <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white/10">

@@ -2899,10 +2899,10 @@ function RealImagesSection({
         </div>
       ) : null}
 
-      <div className="mt-6">
+      <div className="mt-6 xl:-mx-8 2xl:-mx-12">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <p className="text-sm font-semibold text-zinc-950">
+            <p className="text-sm font-semibold text-zinc-950 xl:text-base">
               Organizador de fotos da landing
             </p>
             <p className="mt-1 text-xs leading-5 text-zinc-500">
@@ -2923,7 +2923,7 @@ function RealImagesSection({
         ) : null}
 
         {images.length ? (
-          <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-6">
+          <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
             {IMAGE_SECTION_ORDER.map((destination) => {
               const sectionImages = imagesByDestination[destination];
 
@@ -2949,7 +2949,7 @@ function RealImagesSection({
         ) : null}
 
         {images.length ? (
-          <div className="mt-6 space-y-5">
+          <div className="mt-6 space-y-5 xl:space-y-6">
             {IMAGE_SECTION_ORDER.map((destination) => {
               const sectionImages = imagesByDestination[destination];
               const isDropTarget =
@@ -2962,7 +2962,7 @@ function RealImagesSection({
                   onDragOver={handleDragOverDestination}
                   onDragEnter={() => handleDragEnterDestination(destination)}
                   onDrop={(event) => handleDropOnDestination(event, destination)}
-                  className={`rounded-[1.75rem] border p-5 transition ${
+                  className={`rounded-[1.75rem] border p-5 transition xl:p-6 2xl:p-7 ${
                     isDropTarget
                       ? "border-teal-400 bg-teal-50/80 shadow-lg shadow-teal-100"
                       : "border-zinc-200 bg-zinc-50"
@@ -3002,7 +3002,7 @@ function RealImagesSection({
                   </div>
 
                   {sectionImages.length ? (
-                    <div className="grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6">
+                    <div className="grid gap-4 [grid-template-columns:repeat(auto-fill,minmax(10.75rem,1fr))] lg:[grid-template-columns:repeat(auto-fill,minmax(12rem,1fr))] xl:[grid-template-columns:repeat(auto-fill,minmax(13.5rem,1fr))] 2xl:[grid-template-columns:repeat(auto-fill,minmax(15rem,1fr))]">
                       {sectionImages.map((image, index) => {
                         const destinationValue = getImageDestination(
                           image,
@@ -3037,18 +3037,18 @@ function RealImagesSection({
                                 image.id,
                               )
                             }
-                            className={`group rounded-[1.35rem] border bg-white p-3 shadow-sm transition ${
+                            className={`group rounded-[1.35rem] border bg-white p-3 shadow-sm transition xl:p-3.5 ${
                               isCardDropTarget
                                 ? "border-teal-400 shadow-lg shadow-teal-100"
-                                : "border-zinc-200"
+                                : "border-zinc-200 hover:border-zinc-300 hover:shadow-md"
                             }`}
                           >
-                            <div className="relative aspect-[4/5] overflow-hidden rounded-[1.1rem] bg-zinc-200">
+                            <div className="relative aspect-[4/4.9] overflow-hidden rounded-[1.1rem] bg-zinc-200 xl:aspect-[4/4.7]">
                               <Image
                                 src={image.src}
                                 alt={image.alt}
                                 fill
-                                sizes="(max-width: 1024px) 45vw, 18rem"
+                                sizes="(max-width: 1024px) 45vw, (max-width: 1536px) 18rem, 16rem"
                                 className="object-cover transition duration-200 group-hover:scale-[1.02]"
                               />
                               <div className="absolute inset-x-0 top-0 flex items-start justify-between gap-2 p-2">
