@@ -568,9 +568,7 @@ function reorderPlanIds(ids: string[], imageId: string, targetIndex: number) {
   }
 
   const [movedId] = nextIds.splice(currentIndex, 1);
-  const boundedTargetIndex = Math.max(0, Math.min(targetIndex, nextIds.length));
-  const insertionIndex =
-    currentIndex < boundedTargetIndex ? boundedTargetIndex - 1 : boundedTargetIndex;
+  const insertionIndex = Math.max(0, Math.min(targetIndex, nextIds.length));
 
   nextIds.splice(insertionIndex, 0, movedId);
   return nextIds;

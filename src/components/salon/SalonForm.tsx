@@ -4055,6 +4055,23 @@ function getDestinationSectionDescription(destination: ImageDestination) {
   }
 }
 
+function imageMatchesOrganizerPlanId(imageId: string, planId: string) {
+  return imageId === planId || imageId === `image-${planId}` || imageId.endsWith(planId);
+}
+
+function resolveOrganizerImageFromPlanId(
+  images: SalonGalleryImage[],
+  planId: string | null | undefined,
+) {
+  if (!planId) {
+    return null;
+  }
+
+  return (
+    images.find((image) => imageMatchesOrganizerPlanId(image.id, planId)) ?? null
+  );
+}
+
 function groupImagesByDestination(
   images: SalonGalleryImage[],
   plan?: SalonLayoutImagePlan,
@@ -4068,8 +4085,53 @@ function groupImagesByDestination(
     ignore: [],
   };
 
+  if (!plan) {
+    for (const image of images) {
+      groups[getImageDestination(image, plan)].push(image);
+    }
+
+    return groups;
+  }
+
+  const assignedImageIds = new Set<string>();
+  const pushResolvedImage = (
+    destination: Exclude<ImageDestination, "bank">,
+    planId: string | null | undefined,
+  ) => {
+    const image = resolveOrganizerImageFromPlanId(images, planId);
+
+    if (!image || assignedImageIds.has(image.id)) {
+      return;
+    }
+
+    groups[destination].push(image);
+    assignedImageIds.add(image.id);
+  };
+
+  pushResolvedImage("logo", plan.logoImageId);
+
+  for (const planId of plan.topImageIds ?? []) {
+    pushResolvedImage("top", planId);
+  }
+
+  for (const planId of plan.spaceImageIds ?? []) {
+    pushResolvedImage("space", planId);
+  }
+
+  for (const planId of plan.galleryImageIds ?? []) {
+    pushResolvedImage("gallery", planId);
+  }
+
+  for (const planId of plan.ignoredImageIds ?? []) {
+    pushResolvedImage("ignore", planId);
+  }
+
   for (const image of images) {
-    groups[getImageDestination(image, plan)].push(image);
+    if (assignedImageIds.has(image.id)) {
+      continue;
+    }
+
+    groups.bank.push(image);
   }
 
   return groups;
