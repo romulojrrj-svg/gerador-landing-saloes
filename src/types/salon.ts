@@ -311,6 +311,8 @@ export type Salon = {
   bookingUrl?: string;
   whatsapp?: string;
   phone?: string;
+  googleRating?: number;
+  googleReviewCount?: number;
 
   services: SalonService[];
   selectedServices: string[];

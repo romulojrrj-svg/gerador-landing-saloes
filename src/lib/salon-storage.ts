@@ -577,6 +577,18 @@ function buildCompleteSalon(partialSalon: Partial<Salon>): Salon {
   const bookingUrl = clean(partialSalon.bookingUrl);
   const whatsapp = clean(partialSalon.whatsapp);
   const phone = clean(partialSalon.phone);
+  const notes = partialSalon.notes;
+  const manualAssistantNotes = hasOwnKey(partialSalon, "manualAssistantNotes")
+    ? clean(partialSalon.manualAssistantNotes)
+    : clean(partialSalon.notes);
+  const googleRating =
+    normalizeOptionalNumber(partialSalon.googleRating) ??
+    extractGoogleRating(notes) ??
+    extractGoogleRating(manualAssistantNotes);
+  const googleReviewCount =
+    normalizeOptionalInteger(partialSalon.googleReviewCount) ??
+    extractGoogleReviewCount(notes) ??
+    extractGoogleReviewCount(manualAssistantNotes);
 
   return {
     id: clean(partialSalon.id) || createId(),
@@ -599,6 +611,8 @@ function buildCompleteSalon(partialSalon: Partial<Salon>): Salon {
     bookingUrl,
     whatsapp,
     phone,
+    googleRating,
+    googleReviewCount,
     services,
     selectedServices,
     serviceCategories,
@@ -648,7 +662,7 @@ function buildCompleteSalon(partialSalon: Partial<Salon>): Salon {
     hasRealImages,
     hasRealReviews,
     generatedCopyStatus: partialSalon.generatedCopyStatus ?? "not_started",
-    notes: partialSalon.notes,
+    notes,
     lastGeneratedAt: partialSalon.lastGeneratedAt ?? generatedCopy?.generatedAt,
     lastAppliedAt: partialSalon.lastAppliedAt ?? generatedCopy?.appliedAt,
     sourceSummary: partialSalon.sourceSummary,
@@ -702,9 +716,7 @@ function buildCompleteSalon(partialSalon: Partial<Salon>): Salon {
     copyHistory,
     aiBrief: partialSalon.aiBrief,
     promptMetadata: partialSalon.promptMetadata,
-    manualAssistantNotes: hasOwnKey(partialSalon, "manualAssistantNotes")
-      ? clean(partialSalon.manualAssistantNotes)
-      : clean(partialSalon.notes),
+    manualAssistantNotes,
     eyebrow: clean(partialSalon.eyebrow) || location || visualStyle,
     tagline: subheadline,
     summary: aboutText,
@@ -1264,6 +1276,52 @@ function buildTestimonials() {
 
 function clean(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
+}
+
+function normalizeOptionalNumber(value: unknown) {
+  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+}
+
+function normalizeOptionalInteger(value: unknown) {
+  return typeof value === "number" && Number.isFinite(value)
+    ? Math.max(0, Math.round(value))
+    : undefined;
+}
+
+function extractGoogleRating(value: unknown) {
+  const text = clean(value);
+
+  if (!text) {
+    return undefined;
+  }
+
+  const match = text.match(/nota do google:\s*([0-9]+(?:[.,][0-9]+)?)/i);
+
+  if (!match) {
+    return undefined;
+  }
+
+  const rating = Number(match[1].replace(",", "."));
+
+  return Number.isFinite(rating) ? rating : undefined;
+}
+
+function extractGoogleReviewCount(value: unknown) {
+  const text = clean(value);
+
+  if (!text) {
+    return undefined;
+  }
+
+  const match = text.match(/quantidade de avalia[cç][õo]es:\s*([0-9][0-9.,]*)/i);
+
+  if (!match) {
+    return undefined;
+  }
+
+  const count = Number(match[1].replace(/[^\d]/g, ""));
+
+  return Number.isFinite(count) ? count : undefined;
 }
 
 function removeUndefinedValues(value: Partial<Salon>) {

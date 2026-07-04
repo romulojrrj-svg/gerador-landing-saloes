@@ -32,7 +32,7 @@ export function Testimonials({
   );
   const reviewMetrics = salon
     ? getPublicReviewMetrics(salon)
-    : { averageRating: 0, reviewCount: 0 };
+    : { averageRating: 0, reviewCount: 0, source: "none" as const };
   const featuredReviews = visibleReviews.slice(0, 3);
   const hasAverageRating =
     typeof reviewMetrics.averageRating === "number" &&
@@ -83,7 +83,11 @@ export function Testimonials({
                     </div>
                   )}
                   <p className="mt-2 text-sm text-zinc-500">
-                    {getReviewContextText(hasAverageRating, language)}
+                    {getReviewContextText(
+                      reviewMetrics.source,
+                      hasAverageRating,
+                      language,
+                    )}
                   </p>
                 </div>
               </div>
@@ -255,8 +259,27 @@ function getReviewCountText(count: number, language: SalonLanguage) {
   return count === 1 ? "1 review" : `${count} reviews`;
 }
 
-function getReviewContextText(hasAverageRating: boolean, language: SalonLanguage) {
+function getReviewContextText(
+  source: "google" | "testimonials" | "none",
+  hasAverageRating: boolean,
+  language: SalonLanguage,
+) {
   if (hasAverageRating) {
+    if (source === "google") {
+      if (language === "pt-BR") {
+        return "Nota baseada nas avaliações do Google";
+      }
+
+      if (language === "es") {
+        return "Puntuación basada en reseñas de Google";
+      }
+
+      if (language === "no") {
+        return "Vurdering basert på Google-anmeldelser";
+      }
+
+      return "Rating based on Google reviews";
+    }
     if (language === "pt-BR") {
       return "Nota baseada nas avaliações exibidas";
     }

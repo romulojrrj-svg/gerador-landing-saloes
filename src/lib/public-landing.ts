@@ -55,6 +55,7 @@ export type PublicContactLink = {
 export type PublicReviewMetrics = {
   averageRating?: number;
   reviewCount: number;
+  source: "google" | "testimonials" | "none";
 };
 
 export type PublicBenefit = {
@@ -1300,6 +1301,24 @@ export function getRealReviews(salon: Salon): SalonTestimonial[] {
 
 export function getPublicReviewMetrics(salon: Salon): PublicReviewMetrics {
   const reviews = getRealReviews(salon);
+  const googleRating =
+    typeof salon.googleRating === "number" && Number.isFinite(salon.googleRating)
+      ? salon.googleRating
+      : undefined;
+  const googleReviewCount =
+    typeof salon.googleReviewCount === "number" &&
+    Number.isFinite(salon.googleReviewCount)
+      ? salon.googleReviewCount
+      : undefined;
+
+  if (googleRating !== undefined) {
+    return {
+      averageRating: googleRating,
+      reviewCount: googleReviewCount ?? reviews.length,
+      source: "google",
+    };
+  }
+
   const ratings = reviews
     .map((review) => review.rating)
     .filter((rating): rating is number => Number.isFinite(rating));
@@ -1307,6 +1326,7 @@ export function getPublicReviewMetrics(salon: Salon): PublicReviewMetrics {
   if (!ratings.length) {
     return {
       reviewCount: reviews.length,
+      source: "none",
     };
   }
 
@@ -1316,6 +1336,7 @@ export function getPublicReviewMetrics(salon: Salon): PublicReviewMetrics {
   return {
     averageRating,
     reviewCount: reviews.length,
+    source: "testimonials",
   };
 }
 

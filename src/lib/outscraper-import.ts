@@ -388,6 +388,8 @@ export function buildSalonForOutscraperImport(
       mapped.bookingUrl || mapped.bookingAppointmentUrl || firstUrl(mapped.reservationLinks),
     phone: mapped.phone,
     whatsapp: mapped.whatsapp,
+    googleRating: parseOptionalRating(mapped.rating),
+    googleReviewCount: parseOptionalCount(mapped.reviewsCount),
     selectedServices: mapped.selectedServices,
     galleryImages: mapped.galleryImages,
     testimonials: mapped.testimonials,
@@ -713,6 +715,20 @@ function normalizeHeader(value: string) {
 
 function cleanValue(value: string) {
   return String(value ?? "").trim();
+}
+
+function parseOptionalRating(value: string) {
+  const normalizedValue = value.trim().replace(",", ".");
+  const rating = Number(normalizedValue);
+
+  return Number.isFinite(rating) ? rating : undefined;
+}
+
+function parseOptionalCount(value: string) {
+  const normalizedValue = value.replace(/[^\d]/g, "");
+  const count = Number(normalizedValue);
+
+  return Number.isFinite(count) ? count : undefined;
 }
 
 function parseServices(value: string) {
