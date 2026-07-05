@@ -1700,24 +1700,35 @@ function RealImagesSection({
     );
   }
 
-  async function handleFileSelected(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.currentTarget.files?.[0];
+  async function handleFilesSelected(event: ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(event.currentTarget.files ?? []);
 
-    if (!file) {
+    if (!files.length) {
       return;
     }
 
     const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
-    const maxBytes = 2 * 1024 * 1024;
+    const maxBytes = 5 * 1024 * 1024;
+    const maxFiles = 10;
 
-    if (!allowedTypes.includes(file.type)) {
-      setMessage("Envie um arquivo jpg, jpeg, png ou webp.");
+    if (files.length > maxFiles) {
+      setMessage(`Selecione até ${maxFiles} arquivos por vez.`);
       event.currentTarget.value = "";
       return;
     }
 
-    if (file.size > maxBytes) {
-      setMessage("O arquivo excede o limite de 2 MB para armazenamento local.");
+    const invalidFiles = files.filter((file) => !allowedTypes.includes(file.type));
+
+    if (invalidFiles.length) {
+      setMessage("Envie arquivos jpg, jpeg, png ou webp.");
+      event.currentTarget.value = "";
+      return;
+    }
+
+    const oversizedFiles = files.filter((file) => file.size > maxBytes);
+
+    if (oversizedFiles.length) {
+      setMessage("Um ou mais arquivos excedem o limite de 5 MB para upload local.");
       event.currentTarget.value = "";
       return;
     }
@@ -1726,45 +1737,55 @@ function RealImagesSection({
     setMessage("");
 
     try {
-      const dataUrl = await readFileAsDataUrl(file);
-      const image: SalonGalleryImage = {
-        id: createLocalId("image"),
-        url: dataUrl,
-        src: dataUrl,
-        alt:
-          draft.alt.trim() ||
-          `${salonName || "Salao"} - ${draft.type === "logo" ? "logo" : "foto real"}`,
-        type: draft.type,
-        source: "manual",
-        sourceUrl: undefined,
-        originalPostUrl: undefined,
-        isReal: true,
-        selectedForLanding: draft.type === "hero" ? true : draft.selectedForLanding,
-        createdAt: new Date().toISOString(),
-      };
+      const createdImages: SalonGalleryImage[] = [];
+      let nextPlan: SalonLayoutImagePlan | undefined = effectiveLayoutImagePlan;
+      let nextImages = [...images];
 
-      const destination =
-        draft.selectedForLanding || draft.type === "hero"
-          ? imageTypeToDestination(draft.type)
-          : "ignore";
-      const moveResult = moveImageToDestination(
-        effectiveLayoutImagePlan,
-        image.id,
-        destination,
-        {
-          availableImageIds: [...images.map((currentImage) => currentImage.id), image.id],
-        },
-      );
+      for (const file of files) {
+        const dataUrl = await compressImageToDataUrl(file);
+        const image: SalonGalleryImage = {
+          id: createLocalId("image"),
+          url: dataUrl,
+          src: dataUrl,
+          alt:
+            draft.alt.trim() ||
+            `${salonName || "Salao"} - ${draft.type === "logo" ? "logo" : "foto real"}`,
+          type: draft.type,
+          source: "manual",
+          sourceUrl: undefined,
+          originalPostUrl: undefined,
+          isReal: true,
+          selectedForLanding: draft.type === "hero" ? true : draft.selectedForLanding,
+          createdAt: new Date().toISOString(),
+        };
 
-      if (moveResult.blockedReason) {
-        setMessage(moveResult.blockedReason);
-        return;
+        const destination =
+          draft.selectedForLanding || draft.type === "hero"
+            ? imageTypeToDestination(draft.type)
+            : "ignore";
+        const moveResult = moveImageToDestination(
+          nextPlan,
+          image.id,
+          destination,
+          {
+            availableImageIds: [...nextImages.map((currentImage) => currentImage.id), image.id],
+          },
+        );
+
+        if (moveResult.blockedReason) {
+          setMessage(moveResult.blockedReason);
+          return;
+        }
+
+        createdImages.push(image);
+        nextPlan = moveResult.plan;
+        nextImages = syncImagesWithPlan([...nextImages, image], nextPlan);
       }
 
-      onChange((current) => syncImagesWithPlan([...current, image], moveResult.plan));
-      onLayoutPlanChange(() => moveResult.plan);
+      onChange((current) => syncImagesWithPlan([...current, ...createdImages], nextPlan));
+      onLayoutPlanChange(() => nextPlan);
       setMessage(
-        "Upload local concluido. A imagem foi salva neste navegador. Salve as alteracoes para gravar.",
+        `${createdImages.length} arquivo(s) adicionado(s) localmente. Salve as alteracoes para gravar.`,
       );
       setDraft((current) => ({
         ...current,
@@ -1772,7 +1793,7 @@ function RealImagesSection({
         source: "manual",
       }));
     } catch {
-      setMessage("Nao foi possivel processar o arquivo enviado.");
+      setMessage("Nao foi possivel processar os arquivos enviados.");
     } finally {
       setUploadingFile(false);
       event.currentTarget.value = "";
@@ -2386,19 +2407,19 @@ function RealImagesSection({
           </p>
           <label className="mt-4 grid gap-2">
             <span className="text-sm font-semibold text-zinc-800">
-              Arquivo local
+              Arquivos locais
             </span>
             <input
               type="file"
+              multiple
               accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
-              onChange={(event) => void handleFileSelected(event)}
+              onChange={(event) => void handleFilesSelected(event)}
               disabled={uploadingFile}
               className="rounded-2xl border border-zinc-200 bg-white px-4 py-3 text-sm text-zinc-700 outline-none transition file:mr-3 file:rounded-full file:border-0 file:bg-zinc-100 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-zinc-800 hover:file:bg-zinc-200"
             />
           </label>
           <p className="mt-3 text-xs leading-5 text-zinc-500">
-            Limite local: 2 MB. Use o campo de URL se quiser evitar base64 no
-            armazenamento local.
+            Você pode enviar até 10 arquivos por vez. As imagens sao compactadas antes de entrar no payload do formulario para evitar erros de limite de tamanho.
           </p>
 
           <div className="my-5 h-px bg-zinc-200" />
@@ -4321,5 +4342,40 @@ function readFileAsDataUrl(file: File) {
 
     reader.readAsDataURL(file);
   });
+}
+
+async function compressImageToDataUrl(file: File) {
+  const dataUrl = await readFileAsDataUrl(file);
+  const image = await new Promise<HTMLImageElement>((resolve, reject) => {
+    const img = window.document.createElement("img");
+
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error("Falha ao carregar imagem."));
+    img.src = dataUrl;
+  });
+
+  const maxWidth = 1600;
+  const scale = Math.min(
+    1,
+    maxWidth / Math.max(image.naturalWidth, image.naturalHeight),
+  );
+  const width = Math.max(1, Math.round(image.naturalWidth * scale));
+  const height = Math.max(1, Math.round(image.naturalHeight * scale));
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+
+  const context = canvas.getContext("2d");
+
+  if (!context) {
+    throw new Error("Canvas indisponivel.");
+  }
+
+  context.drawImage(image, 0, 0, width, height);
+
+  const outputType = file.type === "image/png" ? "image/webp" : "image/jpeg";
+  const quality = outputType === "image/webp" ? 0.82 : 0.8;
+
+  return canvas.toDataURL(outputType, quality);
 }
 
