@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   ArrowLeft,
   Clipboard,
@@ -61,6 +61,7 @@ export function SalonsDashboardClient() {
     repositoryStatus.activeSource,
   );
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
   const [message, setMessage] = useState("");
   const [isCreatingTestSalon, setIsCreatingTestSalon] = useState(false);
   const [pendingDeleteSalon, setPendingDeleteSalon] = useState<Salon | null>(
@@ -82,57 +83,82 @@ export function SalonsDashboardClient() {
     string | null
   >(null);
 
-  async function loadDashboard() {
-    setIsLoading(true);
+  const fetchDashboardSnapshot = useCallback(async () => {
     const result = await listSalons();
     const nextLocalCount = getLocalSalonCount();
-    const nextSupabaseCount = await getSupabaseSalonCount();
+    const nextSupabaseCount =
+      result.source === "supabase"
+        ? result.ok
+          ? result.salons.length
+          : null
+        : await getSupabaseSalonCount();
 
     console.debug?.("[salons-dashboard]", {
       storageMode: requestedStorageMode,
       repositorySource: result.source,
       salonsLoaded: result.salons.length,
+      ok: result.ok,
+      error: result.ok ? undefined : result.error,
     });
 
+    return {
+      result,
+      nextLocalCount,
+      nextSupabaseCount,
+    };
+  }, [requestedStorageMode]);
+
+  const loadDashboard = useCallback(async () => {
+    setIsLoading(true);
+    const { result, nextLocalCount, nextSupabaseCount } =
+      await fetchDashboardSnapshot();
+
     if (result.ok) {
+      setLoadError("");
       setSalons(result.salons);
       setSource(result.source);
       if (result.warning) {
         setMessage(`Aviso: ${result.warning}`);
       }
     } else {
-      setSalons(result.salons);
+      setLoadError(result.error);
       setSource(result.source);
-      setMessage(result.error);
+      console.error?.("[salons-dashboard] load failed", {
+        source: result.source,
+        error: result.error,
+      });
     }
 
     setLocalCount(nextLocalCount);
     setSupabaseCount(nextSupabaseCount);
     setIsLoading(false);
-  }
+  }, [fetchDashboardSnapshot]);
 
   useEffect(() => {
     let isActive = true;
 
     async function loadDashboardSafe() {
-      const result = await listSalons();
-      const nextLocalCount = getLocalSalonCount();
-      const nextSupabaseCount = await getSupabaseSalonCount();
+      const { result, nextLocalCount, nextSupabaseCount } =
+        await fetchDashboardSnapshot();
 
       if (!isActive) {
         return;
       }
 
       if (result.ok) {
+        setLoadError("");
         setSalons(result.salons);
         setSource(result.source);
         if (result.warning) {
           setMessage(`Aviso: ${result.warning}`);
         }
       } else {
-        setSalons(result.salons);
+        setLoadError(result.error);
         setSource(result.source);
-        setMessage(result.error);
+        console.error?.("[salons-dashboard] load failed", {
+          source: result.source,
+          error: result.error,
+        });
       }
 
       setLocalCount(nextLocalCount);
@@ -149,7 +175,7 @@ export function SalonsDashboardClient() {
       isActive = false;
       unsubscribe();
     };
-  }, []);
+  }, [fetchDashboardSnapshot]);
 
   async function handleDuplicate(slug: string) {
     setMessage("");
@@ -404,6 +430,14 @@ export function SalonsDashboardClient() {
           </p>
         ) : null}
 
+        {loadError ? (
+          <LoadErrorState
+            message={loadError}
+            hasCachedSalons={salons.length > 0}
+            onRetry={() => void loadDashboard()}
+          />
+        ) : null}
+
         <DatabasePanel
           localCount={localCount}
           supabaseCount={supabaseCount}
@@ -509,7 +543,14 @@ export function SalonsDashboardClient() {
 
         <div className="mt-8 grid gap-4">
           {isLoading ? (
-            <EmptyState title="Carregando salões..." />
+            <DashboardEmptyState title="Carregando salões..." />
+          ) : loadError && !salons.length ? (
+            <DashboardEmptyState
+              title="Nao foi possivel carregar os saloes."
+              description="Houve um problema ao buscar os dados do painel. Tente novamente."
+              actionLabel="Tentar novamente"
+              onAction={() => void loadDashboard()}
+            />
           ) : filteredSalons.length ? (
             filteredSalons.map((salon) => (
               <SalonRow
@@ -522,7 +563,7 @@ export function SalonsDashboardClient() {
               />
             ))
           ) : (
-            <EmptyState
+            <DashboardEmptyState
               title={
                 salons.length
                   ? "Nenhum salao encontrado com os filtros atuais."
@@ -1048,7 +1089,76 @@ function isReadyToPublish(salon: Salon) {
   );
 }
 
-function EmptyState({ title }: { title: string }) {
+function LoadErrorState({
+  message,
+  hasCachedSalons,
+  onRetry,
+}: {
+  message: string;
+  hasCachedSalons: boolean;
+  onRetry: () => void;
+}) {
+  return (
+    <div
+      className={`mt-6 rounded-[1.6rem] border px-4 py-3 ${
+        hasCachedSalons
+          ? "border-amber-200 bg-amber-50 text-amber-950"
+          : "border-rose-200 bg-rose-50 text-rose-950"
+      }`}
+    >
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p className="text-sm font-semibold">
+            Nao foi possivel atualizar a lista de saloes.
+          </p>
+          <p className="mt-1 text-sm leading-6">{message}</p>
+        </div>
+        <button
+          type="button"
+          onClick={onRetry}
+          className="btn btn-secondary min-h-10 px-4 py-2"
+        >
+          <RefreshCw className="h-4 w-4" />
+          Tentar novamente
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function DashboardEmptyState({
+  title,
+  description = "Crie um cadastro para comecar a gerar previas.",
+  actionLabel = "Criar landing para prospeccao",
+  onAction,
+}: {
+  title: string;
+  description?: string;
+  actionLabel?: string;
+  onAction?: () => void;
+}) {
+  return (
+    <div className="rounded-[2rem] border border-dashed border-zinc-300 bg-white p-8 text-center">
+      <p className="text-lg font-semibold text-zinc-950">{title}</p>
+      <p className="mt-2 text-sm leading-6 text-zinc-500">{description}</p>
+      {onAction ? (
+        <button
+          type="button"
+          onClick={onAction}
+          className="btn btn-primary mt-5 px-5 py-3"
+        >
+          {actionLabel}
+        </button>
+      ) : (
+        <Link href="/salons/new" className="btn btn-primary mt-5 px-5 py-3">
+          {actionLabel}
+        </Link>
+      )}
+    </div>
+  );
+}
+
+function LegacyUnusedEmptyState({ title }: { title: string }) {
   return (
     <div className="rounded-[2rem] border border-dashed border-zinc-300 bg-white p-8 text-center">
       <p className="text-lg font-semibold text-zinc-950">{title}</p>
@@ -1061,6 +1171,8 @@ function EmptyState({ title }: { title: string }) {
     </div>
   );
 }
+
+void LegacyUnusedEmptyState;
 
 function formatDate(value: string) {
   const date = new Date(value);

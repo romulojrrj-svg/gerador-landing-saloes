@@ -3913,16 +3913,20 @@ function buildAiImagePlanFromResponse(
     (payload.ignoredImageIds ?? []).filter((imageId) => availableImageIds.includes(imageId)),
   );
   const fallbackHeroId =
-    heroImageIds.length > 0
-      ? heroImageIds[0]
-      : images.find(
+    heroImageIds.length === 0
+      ? images.find(
           (image) =>
             image.id !== logoImageId &&
             !spaceImageIds.includes(image.id) &&
             !galleryImageIds.includes(image.id) &&
             !ignoredImageIds.includes(image.id),
-        )?.id ?? null;
-  const topImageIds = fallbackHeroId ? [fallbackHeroId] : heroImageIds;
+        )?.id ?? null
+      : null;
+  const topImageIds = heroImageIds.length
+    ? heroImageIds
+    : fallbackHeroId
+      ? [fallbackHeroId]
+      : [];
   const activeIds = new Set([
     ...(logoImageId ? [logoImageId] : []),
     ...topImageIds,
@@ -4555,4 +4559,3 @@ async function compressImageToDataUrl(file: File) {
 
   return canvas.toDataURL(outputType, quality);
 }
-

@@ -45,6 +45,7 @@ export function PublicLandingClient({
   skipClientLoad = false,
 }: PublicLandingClientProps) {
   const [salon, setSalon] = useState<Salon | null>(initialSalon);
+  const [loadError, setLoadError] = useState("");
   const [hasCheckedStorage, setHasCheckedStorage] = useState(
     Boolean(initialSalon) || skipClientLoad,
   );
@@ -65,6 +66,7 @@ export function PublicLandingClient({
       }
 
       setSalon(result.ok ? result.salon : null);
+      setLoadError(result.ok ? "" : result.error);
       setHasCheckedStorage(true);
     }
 
@@ -81,6 +83,10 @@ export function PublicLandingClient({
 
   if (!hasCheckedStorage) {
     return <PublicLoading />;
+  }
+
+  if (!salon && loadError) {
+    return <PublicLoadError message={loadError} slug={slug} />;
   }
 
   if (!salon) {
@@ -454,6 +460,40 @@ function PublicLoading() {
               ))}
             </div>
           </div>
+        </div>
+      </div>
+    </main>
+  );
+}
+
+function PublicLoadError({
+  message,
+  slug,
+}: {
+  message: string;
+  slug: string;
+}) {
+  return (
+    <main className="flex min-h-screen items-center justify-center bg-[#fcfaf7] px-6 py-16">
+      <div className="w-full max-w-xl rounded-[2rem] border border-amber-200 bg-white p-8 text-center shadow-[0_20px_52px_rgba(83,57,33,0.08)]">
+        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-amber-50 text-amber-700">
+          <FileWarning className="h-6 w-6" />
+        </div>
+        <h1 className="mt-5 font-serif text-3xl font-semibold text-zinc-950">
+          Nao foi possivel carregar esta landing agora.
+        </h1>
+        <p className="mt-3 text-sm leading-7 text-zinc-600">{message}</p>
+        <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-center">
+          <button
+            type="button"
+            onClick={() => window.location.reload()}
+            className="btn btn-primary min-h-11 px-5 py-3"
+          >
+            Tentar novamente
+          </button>
+          <Link href={`/p/${slug}`} className="btn btn-secondary min-h-11 px-5 py-3">
+            Reabrir landing
+          </Link>
         </div>
       </div>
     </main>
