@@ -1428,6 +1428,7 @@ function RealImagesSection({
   const [importMessage, setImportMessage] = useState("");
   const [collectorDebug, setCollectorDebug] = useState<string[]>([]);
   const [uploadingFile, setUploadingFile] = useState(false);
+  const [curatingImagesWithAi, setCuratingImagesWithAi] = useState(false);
   const [loadingSource, setLoadingSource] = useState<string | null>(null);
   const [chatGptPrompt, setChatGptPrompt] = useState("");
   const [chatGptJson, setChatGptJson] = useState("");
@@ -2227,6 +2228,88 @@ function RealImagesSection({
     }
   }
 
+  async function handleCurateImagesWithAi() {
+    const availableImages = [...images]
+      .filter((image) => image.isReal && image.url?.trim())
+      .sort((first, second) => {
+        const firstRank = first.selectedForLanding ? 1 : 0;
+        const secondRank = second.selectedForLanding ? 1 : 0;
+        return secondRank - firstRank;
+      })
+      .slice(0, 20);
+
+    if (!availableImages.length) {
+      setMessage("Adicione pelo menos uma imagem antes de curar com IA.");
+      return;
+    }
+
+    setCuratingImagesWithAi(true);
+    setMessage("");
+
+    try {
+      const response = await fetch("/api/ai/curate-images", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          salonId: undefined,
+          salonName: salonName || getFieldValue("name") || "Salao",
+          businessType: "salão de beleza",
+          language: getFieldValue("language") || "pt-BR",
+          services: [],
+          images: availableImages.map((image) => ({
+            id: image.id,
+            url: image.src || image.url,
+            source: image.source,
+            caption: image.alt || image.title,
+            score: image.type === "logo" ? 82 : image.selectedForLanding ? 70 : 56,
+            currentType: image.type,
+          })),
+        }),
+      });
+      const payload = (await response.json()) as {
+        success?: boolean;
+        error?: string;
+        data?: {
+          logoImageId?: string | null;
+          heroImageIds?: string[];
+          spaceImageIds?: string[];
+          galleryImageIds?: string[];
+          ignoredImageIds?: string[];
+          notes?: {
+            hero?: string;
+            space?: string;
+            gallery?: string;
+            ignored?: string;
+          };
+        };
+      };
+
+      if (!response.ok || !payload.success || !payload.data) {
+        throw new Error(payload.error || "Falha ao curar imagens com Gemini.");
+      }
+
+      const nextPlan = buildAiImagePlanFromResponse(
+        payload.data,
+        availableImages,
+        effectiveLayoutImagePlan,
+      );
+
+      onChange((current) => syncImagesWithPlan(current, nextPlan));
+      onLayoutPlanChange(() => nextPlan);
+      setMessage("Sugestão aplicada. Revise antes de salvar.");
+    } catch (error) {
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : "Nao foi possivel aplicar a curadoria com IA.",
+      );
+    } finally {
+      setCuratingImagesWithAi(false);
+    }
+  }
+
   function handleExportPrompt() {
     if (!candidates.length) {
       setImportMessage("Colete imagens antes de exportar a curadoria para o ChatGPT.");
@@ -2558,6 +2641,19 @@ function RealImagesSection({
             automatica nao encontrar fotos boas o suficiente.
           </p>
           <div className="mt-4 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => void handleCurateImagesWithAi()}
+              disabled={!images.length || curatingImagesWithAi}
+              className="btn btn-primary px-4 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {curatingImagesWithAi ? (
+                <LoaderCircle className="h-4 w-4 animate-spin" />
+              ) : (
+                <Sparkles className="h-4 w-4" />
+              )}
+              Curadoria automática com IA
+            </button>
             <button
               type="button"
               onClick={generateLocalAutomaticPreview}
@@ -3775,6 +3871,87 @@ function buildEffectiveLayoutImagePlan(
       galleryImageIds,
       spaceImageIds,
       ignoredImageIds,
+    },
+    {
+      availableImageIds,
+    },
+  );
+}
+
+function buildAiImagePlanFromResponse(
+  payload: {
+    logoImageId?: string | null;
+    heroImageIds?: string[];
+    spaceImageIds?: string[];
+    galleryImageIds?: string[];
+    ignoredImageIds?: string[];
+    notes?: {
+      hero?: string;
+      space?: string;
+      gallery?: string;
+      ignored?: string;
+    };
+  },
+  images: SalonGalleryImage[],
+  currentPlan?: SalonLayoutImagePlan,
+) {
+  const availableImageIds = images.map((image) => image.id);
+  const logoImageId =
+    payload.logoImageId && availableImageIds.includes(payload.logoImageId)
+      ? payload.logoImageId
+      : null;
+  const heroImageIds = uniqueIds(
+    (payload.heroImageIds ?? []).filter((imageId) => availableImageIds.includes(imageId)),
+  ).slice(0, 3);
+  const spaceImageIds = uniqueIds(
+    (payload.spaceImageIds ?? []).filter((imageId) => availableImageIds.includes(imageId)),
+  );
+  const galleryImageIds = uniqueIds(
+    (payload.galleryImageIds ?? []).filter((imageId) => availableImageIds.includes(imageId)),
+  );
+  const ignoredImageIds = uniqueIds(
+    (payload.ignoredImageIds ?? []).filter((imageId) => availableImageIds.includes(imageId)),
+  );
+  const fallbackHeroId =
+    heroImageIds.length > 0
+      ? heroImageIds[0]
+      : images.find(
+          (image) =>
+            image.id !== logoImageId &&
+            !spaceImageIds.includes(image.id) &&
+            !galleryImageIds.includes(image.id) &&
+            !ignoredImageIds.includes(image.id),
+        )?.id ?? null;
+  const topImageIds = fallbackHeroId ? [fallbackHeroId] : heroImageIds;
+  const activeIds = new Set([
+    ...(logoImageId ? [logoImageId] : []),
+    ...topImageIds,
+    ...galleryImageIds,
+    ...spaceImageIds,
+  ]);
+  const dedupedHeroIds = uniqueIds(topImageIds.filter((imageId) => activeIds.has(imageId)));
+
+  return normalizeSalonLayoutImagePlan(
+    {
+      mode: "chatgpt_manual" as const,
+      logoImageId,
+      topImageIds: dedupedHeroIds,
+      heroImageId: dedupedHeroIds.length === 1 ? dedupedHeroIds[0] : null,
+      heroMosaicImageIds: dedupedHeroIds.length > 1 ? dedupedHeroIds : [],
+      galleryImageIds,
+      spaceEnabled: spaceImageIds.length > 0,
+      spaceTitle: currentPlan?.spaceTitle ?? "Nosso Espaço",
+      spaceDescription: currentPlan?.spaceDescription ?? "Conheça um pouco do ambiente e dos detalhes do salão.",
+      spaceImageIds,
+      experienceImageIds: spaceImageIds,
+      resultImageIds: [],
+      ignoredImageIds,
+      summary: [payload.notes?.hero, payload.notes?.space, payload.notes?.gallery, payload.notes?.ignored]
+        .filter(Boolean)
+        .join(" | "),
+      warnings: [],
+      generatedAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
     },
     {
       availableImageIds,

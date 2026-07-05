@@ -34,6 +34,7 @@ import {
   upsertSalon,
 } from "@/lib/salon-repository";
 import { landingLanguageLabels } from "@/lib/salon-storage";
+import { normalizeSalonLayoutImagePlan } from "@/lib/salon-image-plan";
 import type { Salon, SalonLanguage } from "@/types/salon";
 
 const supportedExtensions = [".csv", ".xlsx", ".xls"];
@@ -53,6 +54,10 @@ export function SalonsImportClient() {
   const [isImporting, setIsImporting] = useState(false);
   const [importProgress, setImportProgress] = useState("");
   const [enrichInstagramImages, setEnrichInstagramImages] = useState(true);
+  const [applyAiCurationOnImport, setApplyAiCurationOnImport] = useState(
+    process.env.NEXT_PUBLIC_AI_CURATE_ON_IMPORT === "true" ||
+    process.env.AI_CURATE_ON_IMPORT === "true",
+  );
   const [report, setReport] = useState<OutscraperImportReport | null>(null);
 
   const refreshExistingSalons = useCallback(async () => {
@@ -312,6 +317,95 @@ export function SalonsImportClient() {
             };
           }
 
+          if (applyAiCurationOnImport && salon.galleryImages?.length) {
+            setImportProgress(`Curando imagens com IA (${index + 1}/${rowsToImport.length}): ${salon.name}`);
+
+            try {
+              const curated = await fetch("/api/ai/curate-images", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  salonId: salon.id,
+                  salonName: salon.name,
+                  businessType: salon.extractedBusinessInfo?.observedServices || "salão de beleza",
+                  language: salon.language,
+                  services: salon.services?.map((service) => service.title) ?? [],
+                  images: (salon.galleryImages ?? [])
+                    .filter((image) => image.isReal && image.url?.trim())
+                    .slice(0, 20)
+                    .map((image) => ({
+                      id: image.id,
+                      url: image.src || image.url,
+                      source: image.source,
+                      caption: image.alt || image.title,
+                      currentType: image.type,
+                    })),
+                }),
+              });
+              const curatedPayload = (await curated.json()) as {
+                success?: boolean;
+                error?: string;
+                data?: {
+                  logoImageId?: string | null;
+                  heroImageIds?: string[];
+                  spaceImageIds?: string[];
+                  galleryImageIds?: string[];
+                  ignoredImageIds?: string[];
+                };
+              };
+
+              if (curated.ok && curatedPayload.success && curatedPayload.data) {
+                const plan = normalizeSalonLayoutImagePlan({
+                  mode: "chatgpt_manual",
+                  logoImageId: curatedPayload.data.logoImageId ?? null,
+                  topImageIds: curatedPayload.data.heroImageIds ?? [],
+                  heroImageId: (curatedPayload.data.heroImageIds?.length ?? 0) === 1 ? curatedPayload.data.heroImageIds?.[0] ?? null : null,
+                  heroMosaicImageIds: (curatedPayload.data.heroImageIds?.length ?? 0) > 1 ? curatedPayload.data.heroImageIds ?? [] : [],
+                  galleryImageIds: curatedPayload.data.galleryImageIds ?? [],
+                  spaceEnabled: Boolean(curatedPayload.data.spaceImageIds?.length),
+                  spaceImageIds: curatedPayload.data.spaceImageIds ?? [],
+                  experienceImageIds: curatedPayload.data.spaceImageIds ?? [],
+                  resultImageIds: [],
+                  ignoredImageIds: curatedPayload.data.ignoredImageIds ?? [],
+                  warnings: [],
+                  generatedAt: new Date().toISOString(),
+                  updatedAt: new Date().toISOString(),
+                });
+
+                salon = {
+                  ...salon,
+                  layoutImagePlan: plan,
+                  imageSelectionSummary: {
+                    logoId: plan?.logoImageId ?? undefined,
+                    heroId: plan?.topImageIds?.[0] ?? undefined,
+                    interiorIds: plan?.spaceImageIds ?? [],
+                    resultIds: [],
+                    galleryIds: plan?.galleryImageIds ?? [],
+                    ignoredIds: plan?.ignoredImageIds ?? [],
+                    selectedAt: new Date().toISOString(),
+                    appliedAt: new Date().toISOString(),
+                  },
+                };
+                logImportDebug("ai-curation-applied", {
+                  name: salon.name,
+                  slug: salon.slug,
+                });
+              } else {
+                logImportDebug("ai-curation-failed", {
+                  name: salon.name,
+                  slug: salon.slug,
+                  error: curatedPayload.error,
+                });
+              }
+            } catch (error) {
+              logImportDebug("ai-curation-exception", {
+                name: salon.name,
+                slug: salon.slug,
+                error: error instanceof Error ? error.message : "Erro inesperado",
+              });
+            }
+          }
+
           const result = await upsertSalon(salon);
 
           if (!result.ok) {
@@ -528,6 +622,22 @@ export function SalonsImportClient() {
                   <span className="mt-1 block text-xs leading-5 text-zinc-500">
                     Usa o navegador local logado para tentar coletar varias imagens por salao.
                     Se o Instagram bloquear, o relatorio mostra o motivo por salao.
+                  </span>
+                </span>
+              </label>
+              <label className="mt-4 flex items-start gap-3 rounded-2xl border border-zinc-200 bg-white p-3 text-sm text-zinc-700">
+                <input
+                  type="checkbox"
+                  checked={applyAiCurationOnImport}
+                  onChange={(event) => setApplyAiCurationOnImport(event.currentTarget.checked)}
+                  className="mt-1 h-4 w-4 accent-teal-700"
+                />
+                <span>
+                  <span className="block font-semibold text-zinc-950">
+                    Aplicar curadoria automática com IA após coletar fotos
+                  </span>
+                  <span className="mt-1 block text-xs leading-5 text-zinc-500">
+                    Usa o Gemini 2.5 Flash no servidor para organizar logo, destaque, nosso espaço, galeria e ignoradas. Se falhar, o salão salva normalmente com as imagens no banco de fotos.
                   </span>
                 </span>
               </label>

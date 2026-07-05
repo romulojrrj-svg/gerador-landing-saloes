@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Gerador de Landing Pages para Salões",
+  title: "Páginas profissionais para salões e negócios locais",
   description:
-    "Crie prévias premium de landing pages para salões de beleza internacionais.",
+    "Prévia personalizada de páginas profissionais para salões, barbearias, spas e negócios locais.",
 };
 
 export default function RootLayout({
