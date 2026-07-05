@@ -14,58 +14,58 @@ import {
 import { PUBLIC_SERVICE_WHATSAPP_URL } from "@/lib/public-site-config";
 
 const deliveryItems = [
-  "Página profissional em um único link",
-  "Fotos, serviços e diferenciais organizados",
-  "Localização, rota e botão de contato direto",
+  "Pagina profissional em um unico link",
+  "Fotos, servicos e diferenciais organizados",
+  "Localizacao, rota e botao de contato direto",
   "Visual pensado para bio do Instagram e WhatsApp",
-  "Experiência otimizada para celular",
-  "Prévia personalizada antes de fechar",
+  "Experiencia otimizada para celular",
+  "Previa personalizada antes de fechar",
 ];
 
 const audienceItems = [
-  "Salões de beleza",
+  "Saloes de beleza",
   "Barbearias",
   "Spas e massagens",
-  "Clínicas de estética",
+  "Clinicas de estetica",
   "Nail designers",
-  "Negócios locais que atendem por WhatsApp ou Instagram",
+  "Negocios locais que atendem por WhatsApp ou Instagram",
 ];
 
 const flowItems = [
-  "Você envia o Instagram ou as informações do negócio",
-  "Nós montamos uma prévia visual sem compromisso",
+  "Voce envia o Instagram ou as informacoes do negocio",
+  "Nos montamos uma previa visual sem compromisso",
   "Ajustamos fotos, textos e detalhes importantes",
-  "Sua página fica pronta para compartilhar",
+  "Sua pagina fica pronta para compartilhar",
 ];
 
 const exampleCards = [
   {
     title: "Beauty salon",
     label: "Visual elegante",
-    description: "Fotos, serviços, localização e agendamento em um layout premium.",
+    description: "Fotos, servicos, localizacao e agendamento em um layout premium.",
   },
   {
     title: "Barber shop",
-    label: "Presença forte",
-    description: "Página rápida para apresentar ambiente, estilo e botão direto para contato.",
+    label: "Presenca forte",
+    description: "Pagina rapida para apresentar ambiente, estilo e botao direto para contato.",
   },
   {
     title: "Massage & Spa",
-    label: "Experiência calma",
-    description: "Uma apresentação clara para reforçar cuidado, confiança e bem-estar.",
+    label: "Experiencia calma",
+    description: "Uma apresentacao clara para reforcar cuidado, confianca e bem-estar.",
   },
   {
     title: "Nails studio",
-    label: "Fácil de compartilhar",
-    description: "Ideal para concentrar portfólio, mapa, horários e chamada para WhatsApp.",
+    label: "Facil de compartilhar",
+    description: "Ideal para concentrar portfolio, mapa, horarios e chamada para WhatsApp.",
   },
 ];
 
 const trustPoints = [
-  "Feito para negócios que vendem pelo WhatsApp e Instagram",
+  "Feito para negocios que vendem pelo WhatsApp e Instagram",
   "Visual responsivo para celular",
-  "Página rápida, clara e profissional",
-  "Prévia personalizada antes de fechar",
+  "Pagina rapida, clara e profissional",
+  "Previa personalizada antes de fechar",
 ];
 
 export function PublicHome() {
@@ -86,18 +86,18 @@ function HeroSection() {
   return (
     <section className="relative overflow-hidden border-b border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(45,212,191,0.18),transparent_28rem),radial-gradient(circle_at_80%_20%,rgba(244,114,182,0.16),transparent_20rem),linear-gradient(180deg,#07111f_0%,#0b1730_42%,#101c39_100%)]">
       <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,0.05),transparent_34%,rgba(255,255,255,0.02)_68%,transparent)]" />
-      <div className="relative mx-auto max-w-7xl px-6 pb-16 pt-6 sm:px-8 sm:pb-20 lg:px-10 lg:pb-24 lg:pt-8">
-        <div className="flex items-center justify-between gap-4">
-          <Link href="/" className="flex items-center gap-3">
-            <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/10 text-teal-200 ring-1 ring-white/15 backdrop-blur">
+      <div className="relative mx-auto max-w-7xl px-4 pb-14 pt-5 sm:px-8 sm:pb-20 lg:px-10 lg:pb-24 lg:pt-8">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <Link href="/" className="min-w-0 flex items-center gap-3 pr-2">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-white/10 text-teal-200 ring-1 ring-white/15 backdrop-blur sm:h-11 sm:w-11">
               <Sparkles className="h-5 w-5" />
             </span>
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.26em] text-teal-200/90">
+            <div className="min-w-0">
+              <p className="text-[0.65rem] font-semibold uppercase tracking-[0.22em] text-teal-200/90 sm:text-xs sm:tracking-[0.26em]">
                 Studio preview
               </p>
-              <p className="text-sm font-semibold text-white">
-                Páginas profissionais para negócios locais
+              <p className="text-xs font-semibold text-white sm:text-sm">
+                Paginas profissionais para negocios locais
               </p>
             </div>
           </Link>
@@ -105,24 +105,24 @@ function HeroSection() {
             href={PUBLIC_SERVICE_WHATSAPP_URL}
             target="_blank"
             rel="noreferrer"
-            className="btn btn-on-dark min-h-11 px-5 py-2.5"
+            className="btn btn-on-dark min-h-10 w-full shrink-0 px-4 py-2 text-sm sm:min-h-11 sm:w-auto sm:px-5 sm:py-2.5"
           >
-            Solicitar prévia
+            Solicitar previa
           </a>
         </div>
 
-        <div className="mt-12 grid gap-10 lg:grid-cols-[1fr_0.92fr] lg:items-center lg:gap-14">
+        <div className="mt-8 grid gap-7 lg:grid-cols-[1fr_0.92fr] lg:items-center lg:gap-14">
           <div className="max-w-3xl">
-            <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/7 px-4 py-2 text-xs font-semibold uppercase tracking-[0.22em] text-teal-100 backdrop-blur">
+            <div className="inline-flex max-w-full items-center gap-2 rounded-full border border-white/15 bg-white/7 px-3 py-2 text-[0.68rem] font-semibold uppercase tracking-[0.16em] text-teal-100 backdrop-blur sm:px-4 sm:text-xs sm:tracking-[0.22em]">
               <Star className="h-4 w-4 text-amber-300" />
-              Prévia personalizada sem compromisso
+              Previa personalizada sem compromisso
             </div>
-            <h1 className="mt-6 max-w-5xl text-4xl font-semibold leading-[1.02] text-white sm:text-5xl lg:text-7xl">
-              Uma página profissional para seu negócio vender mais confiança em um único link
+            <h1 className="mt-5 max-w-5xl text-[2.4rem] font-semibold leading-[0.96] text-white sm:text-5xl sm:leading-[1.02] lg:text-7xl">
+              Uma pagina profissional para seu negocio vender mais confianca em um unico link
             </h1>
-            <p className="mt-6 max-w-2xl text-base leading-8 text-slate-300 sm:text-lg">
-              Criamos uma prévia personalizada para salões, barbearias, spas e
-              negócios locais, reunindo fotos, serviços, localização e botão
+            <p className="mt-5 max-w-2xl text-sm leading-7 text-slate-300 sm:text-lg sm:leading-8">
+              Criamos uma previa personalizada para saloes, barbearias, spas e
+              negocios locais, reunindo fotos, servicos, localizacao e botao
               direto para contato.
             </p>
 
@@ -131,23 +131,23 @@ function HeroSection() {
                 href={PUBLIC_SERVICE_WHATSAPP_URL}
                 target="_blank"
                 rel="noreferrer"
-                className="btn btn-light min-h-12 px-6 py-3 text-base"
+                className="btn btn-light min-h-12 w-full px-6 py-3 text-base sm:w-auto"
               >
-                Solicitar prévia sem compromisso
+                Solicitar previa sem compromisso
                 <ArrowRight className="h-4 w-4" />
               </a>
               <a
                 href="#como-funciona"
-                className="btn btn-on-dark min-h-12 px-6 py-3 text-base"
+                className="btn btn-on-dark min-h-12 w-full px-6 py-3 text-base sm:w-auto"
               >
                 Ver como funciona
               </a>
             </div>
 
-            <div className="mt-8 grid gap-3 text-sm text-slate-300 sm:grid-cols-3">
+            <div className="mt-7 grid gap-3 text-sm text-slate-300 sm:grid-cols-3">
               {[
                 "Tudo pronto para compartilhar no celular",
-                "Organização clara de fotos, serviços e mapa",
+                "Organizacao clara de fotos, servicos e mapa",
                 "WhatsApp ou agendamento em destaque",
               ].map((item) => (
                 <div
@@ -160,9 +160,12 @@ function HeroSection() {
             </div>
           </div>
 
-          <div className="relative min-h-[30rem]">
+          <div className="relative min-h-[11rem] sm:min-h-[30rem]">
             <div className="absolute inset-0 rounded-[2.75rem] bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.22),transparent_42%),linear-gradient(160deg,rgba(255,255,255,0.18),rgba(255,255,255,0.04))] blur-3xl" />
-            <div className="relative mx-auto flex max-w-[34rem] justify-center gap-4">
+            <div className="relative sm:hidden">
+              <CompactPreviewCard />
+            </div>
+            <div className="relative mx-auto hidden max-w-[34rem] justify-center gap-4 sm:flex">
               <PhoneMockup variant="primary" />
               <PhoneMockup variant="secondary" />
             </div>
@@ -173,16 +176,45 @@ function HeroSection() {
   );
 }
 
+function CompactPreviewCard() {
+  return (
+    <div className="rounded-[2rem] border border-white/12 bg-white/10 p-4 shadow-[0_22px_60px_rgba(4,12,24,0.28)] backdrop-blur">
+      <div className="rounded-[1.5rem] border border-white/12 bg-[#f8f2ea] p-4 text-zinc-950">
+        <div className="flex items-center gap-3">
+          <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#e7f7f4] text-teal-700">
+            <LayoutPanelTop className="h-5 w-5" />
+          </span>
+          <div>
+            <p className="text-sm font-semibold">Previa pronta para compartilhar</p>
+            <p className="text-xs text-zinc-500">Fotos, mapa e contato em um unico link</p>
+          </div>
+        </div>
+        <div className="mt-4 h-28 rounded-[1.25rem] bg-[linear-gradient(135deg,#fde68a_0%,#fb7185_100%)]" />
+        <div className="mt-4 grid gap-2">
+          <PhoneListItem
+            icon={<MapPin className="h-4 w-4" />}
+            label="Localizacao e rota"
+          />
+          <PhoneListItem
+            icon={<MessageCircle className="h-4 w-4" />}
+            label="CTA direto para WhatsApp"
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function DeliverablesSection() {
   return (
-    <section className="bg-[#f8fafc] px-6 py-16 text-zinc-950 sm:px-8 lg:px-10 lg:py-20">
+    <section className="bg-[#f8fafc] px-4 py-14 text-zinc-950 sm:px-8 sm:py-16 lg:px-10 lg:py-20">
       <div className="mx-auto max-w-7xl">
         <SectionHeader
           eyebrow="O que entregamos"
-          title="Uma página enxuta, bonita e pronta para passar confiança"
-          description="Tudo o que o cliente precisa ver em poucos segundos, com visual profissional e foco em conversão por WhatsApp, Instagram ou agendamento."
+          title="Uma pagina enxuta, bonita e pronta para passar confianca"
+          description="Tudo o que o cliente precisa ver em poucos segundos, com visual profissional e foco em conversao por WhatsApp, Instagram ou agendamento."
         />
-        <div className="mt-10 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <div className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {deliveryItems.map((item) => (
             <article
               key={item}
@@ -204,18 +236,18 @@ function DeliverablesSection() {
 
 function BeforeAfterSection() {
   return (
-    <section className="bg-white px-6 py-16 text-zinc-950 sm:px-8 lg:px-10 lg:py-20">
-      <div className="mx-auto grid max-w-7xl gap-6 lg:grid-cols-2">
+    <section className="bg-white px-4 py-14 text-zinc-950 sm:px-8 sm:py-16 lg:px-10 lg:py-20">
+      <div className="mx-auto grid max-w-7xl gap-4 lg:grid-cols-2 lg:gap-6">
         <div className="rounded-[2rem] border border-slate-200 bg-[#fff7f1] p-6 shadow-[0_18px_44px_rgba(15,23,42,0.05)]">
           <p className="text-xs font-semibold uppercase tracking-[0.22em] text-rose-500">
             Antes
           </p>
           <h2 className="mt-4 text-2xl font-semibold text-zinc-950">
-            Informações espalhadas no Instagram
+            Informacoes espalhadas no Instagram
           </h2>
           <ul className="mt-6 grid gap-3 text-sm leading-7 text-zinc-600">
-            <li>Fotos sem contexto comercial em sequência</li>
-            <li>Serviços, localização e horários dispersos</li>
+            <li>Fotos sem contexto comercial em sequencia</li>
+            <li>Servicos, localizacao e horarios dispersos</li>
             <li>Cliente precisa perguntar tudo no direct</li>
           </ul>
         </div>
@@ -224,12 +256,12 @@ function BeforeAfterSection() {
             Depois
           </p>
           <h2 className="mt-4 text-2xl font-semibold text-zinc-950">
-            Tudo organizado em uma página profissional
+            Tudo organizado em uma pagina profissional
           </h2>
           <ul className="mt-6 grid gap-3 text-sm leading-7 text-zinc-600">
-            <li>Visual mais confiável para compartilhar em bio e WhatsApp</li>
-            <li>Fotos, serviços, mapa e contato no mesmo link</li>
-            <li>Mais clareza para quem está decidindo agendar</li>
+            <li>Visual mais confiavel para compartilhar em bio e WhatsApp</li>
+            <li>Fotos, servicos, mapa e contato no mesmo link</li>
+            <li>Mais clareza para quem esta decidindo agendar</li>
           </ul>
         </div>
       </div>
@@ -241,14 +273,14 @@ function AudienceAndFlowSection() {
   return (
     <section
       id="como-funciona"
-      className="bg-[linear-gradient(180deg,#f8fafc_0%,#eef4ff_100%)] px-6 py-16 text-zinc-950 sm:px-8 lg:px-10 lg:py-20"
+      className="bg-[linear-gradient(180deg,#f8fafc_0%,#eef4ff_100%)] px-4 py-14 text-zinc-950 sm:px-8 sm:py-16 lg:px-10 lg:py-20"
     >
-      <div className="mx-auto grid max-w-7xl gap-8 xl:grid-cols-[0.92fr_1.08fr]">
+      <div className="mx-auto grid max-w-7xl gap-6 xl:grid-cols-[0.92fr_1.08fr] xl:gap-8">
         <div className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-[0_18px_44px_rgba(15,23,42,0.05)]">
           <SectionHeader
-            eyebrow="Para quem é"
-            title="Negócios locais que precisam parecer mais organizados e profissionais"
-            description="Especialmente para marcas que já atendem bem, mas ainda dependem de Instagram, direct e conversa manual para explicar tudo."
+            eyebrow="Para quem e"
+            title="Negocios locais que precisam parecer mais organizados e profissionais"
+            description="Especialmente para marcas que ja atendem bem, mas ainda dependem de Instagram, direct e conversa manual para explicar tudo."
             compact
           />
           <div className="mt-6 grid gap-3">
@@ -267,8 +299,8 @@ function AudienceAndFlowSection() {
         <div className="rounded-[2rem] border border-slate-200 bg-[#0d172b] p-6 text-white shadow-[0_20px_48px_rgba(15,23,42,0.18)]">
           <SectionHeader
             eyebrow="Como funciona"
-            title="Uma prévia rápida, clara e fácil de aprovar"
-            description="O processo foi pensado para apresentar o negócio com agilidade, sem transformar tudo em projeto longo ou complexo."
+            title="Uma previa rapida, clara e facil de aprovar"
+            description="O processo foi pensado para apresentar o negocio com agilidade, sem transformar tudo em projeto longo ou complexo."
             compact
             dark
           />
@@ -293,14 +325,14 @@ function AudienceAndFlowSection() {
 
 function ExamplesSection() {
   return (
-    <section className="bg-white px-6 py-16 text-zinc-950 sm:px-8 lg:px-10 lg:py-20">
+    <section className="bg-white px-4 py-14 text-zinc-950 sm:px-8 sm:py-16 lg:px-10 lg:py-20">
       <div className="mx-auto max-w-7xl">
         <SectionHeader
           eyebrow="Projetos / exemplos"
-          title="Exemplos de presença digital pensados para negócios locais"
-          description="Uma apresentação bonita, clara e compatível com diferentes estilos de atendimento."
+          title="Exemplos de presenca digital pensados para negocios locais"
+          description="Uma apresentacao bonita, clara e compativel com diferentes estilos de atendimento."
         />
-        <div className="mt-10 grid gap-4 lg:grid-cols-2 xl:grid-cols-4">
+        <div className="mt-8 grid gap-4 lg:grid-cols-2 xl:grid-cols-4">
           {exampleCards.map((card, index) => (
             <article
               key={card.title}
@@ -339,12 +371,12 @@ function ExamplesSection() {
 
 function TrustSection() {
   return (
-    <section className="bg-[linear-gradient(180deg,#f7f9fc_0%,#ffffff_100%)] px-6 py-16 text-zinc-950 sm:px-8 lg:px-10 lg:py-18">
-      <div className="mx-auto max-w-7xl rounded-[2.2rem] border border-slate-200 bg-white px-6 py-8 shadow-[0_20px_52px_rgba(15,23,42,0.06)] sm:px-8">
+    <section className="bg-[linear-gradient(180deg,#f7f9fc_0%,#ffffff_100%)] px-4 py-14 text-zinc-950 sm:px-8 sm:py-16 lg:px-10 lg:py-18">
+      <div className="mx-auto max-w-7xl rounded-[2.2rem] border border-slate-200 bg-white px-5 py-8 shadow-[0_20px_52px_rgba(15,23,42,0.06)] sm:px-8">
         <SectionHeader
-          eyebrow="Confiança"
-          title="Uma presença digital mais clara para negócios que atendem rápido e bem"
-          description="Sem promessas exageradas. A proposta é apresentar melhor o negócio e facilitar o próximo passo do cliente."
+          eyebrow="Confianca"
+          title="Uma presenca digital mais clara para negocios que atendem rapido e bem"
+          description="Sem promessas exageradas. A proposta e apresentar melhor o negocio e facilitar o proximo passo do cliente."
           compact
         />
         <div className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -364,27 +396,27 @@ function TrustSection() {
 
 function FinalCtaSection() {
   return (
-    <section className="border-t border-white/10 bg-[linear-gradient(180deg,#0b1730_0%,#07111f_100%)] px-6 py-16 text-white sm:px-8 lg:px-10 lg:py-20">
+    <section className="border-t border-white/10 bg-[linear-gradient(180deg,#0b1730_0%,#07111f_100%)] px-4 py-14 text-white sm:px-8 sm:py-16 lg:px-10 lg:py-20">
       <div className="mx-auto max-w-5xl text-center">
         <div className="inline-flex items-center gap-2 rounded-full border border-white/12 bg-white/7 px-4 py-2 text-xs font-semibold uppercase tracking-[0.22em] text-teal-100">
           <MessageCircle className="h-4 w-4" />
           Atendimento por WhatsApp
         </div>
-        <h2 className="mt-6 text-4xl font-semibold leading-tight sm:text-5xl">
-          Quer ver como a página do seu negócio pode ficar?
+        <h2 className="mt-6 text-3xl font-semibold leading-tight sm:text-5xl">
+          Quer ver como a pagina do seu negocio pode ficar?
         </h2>
         <p className="mx-auto mt-5 max-w-2xl text-base leading-8 text-slate-300">
-          Envie o Instagram ou as informações principais do negócio e receba
-          uma prévia visual para avaliar com calma.
+          Envie o Instagram ou as informacoes principais do negocio e receba
+          uma previa visual para avaliar com calma.
         </p>
         <div className="mt-8 flex justify-center">
           <a
             href={PUBLIC_SERVICE_WHATSAPP_URL}
             target="_blank"
             rel="noreferrer"
-            className="btn btn-light min-h-12 px-7 py-3 text-base"
+            className="btn btn-light min-h-12 w-full px-7 py-3 text-base sm:w-auto"
           >
-            Solicitar prévia no WhatsApp
+            Solicitar previa no WhatsApp
             <ChevronRight className="h-4 w-4" />
           </a>
         </div>
@@ -398,16 +430,16 @@ function PhoneMockup({ variant }: { variant: "primary" | "secondary" }) {
 
   return (
     <div
-      className={`relative mt-10 h-[32rem] w-[15rem] rounded-[2.5rem] border border-white/15 p-3 shadow-[0_26px_70px_rgba(4,12,24,0.42)] backdrop-blur sm:h-[35rem] sm:w-[16.5rem] ${
+      className={`relative mt-2 h-[24.5rem] w-full max-w-[16.5rem] rounded-[2.2rem] border border-white/15 p-3 shadow-[0_26px_70px_rgba(4,12,24,0.42)] backdrop-blur sm:mt-10 sm:h-[35rem] sm:w-[16.5rem] sm:max-w-none sm:rounded-[2.5rem] ${
         isPrimary
           ? "bg-[linear-gradient(180deg,rgba(255,255,255,0.16),rgba(255,255,255,0.06))]"
-          : "translate-y-8 bg-[linear-gradient(180deg,rgba(255,255,255,0.1),rgba(255,255,255,0.03))]"
+          : "hidden translate-y-8 bg-[linear-gradient(180deg,rgba(255,255,255,0.1),rgba(255,255,255,0.03))] sm:block"
       }`}
     >
       <div className="absolute left-1/2 top-3 h-1.5 w-20 -translate-x-1/2 rounded-full bg-white/35" />
       <div className="flex h-full flex-col overflow-hidden rounded-[2rem] bg-[#f8f2ea]">
         <div
-          className={`h-36 ${
+          className={`h-28 sm:h-36 ${
             isPrimary
               ? "bg-[linear-gradient(140deg,#0f172a_0%,#0f766e_55%,#fbcfe8_100%)]"
               : "bg-[linear-gradient(140deg,#111827_0%,#312e81_58%,#67e8f9_100%)]"
@@ -421,7 +453,7 @@ function PhoneMockup({ variant }: { variant: "primary" | "secondary" }) {
               </span>
               <div>
                 <p className="text-sm font-semibold text-zinc-950">
-                  Página pronta para compartilhar
+                  Pagina pronta para compartilhar
                 </p>
                 <p className="text-xs text-zinc-500">Fotos, mapa e CTA no mesmo link</p>
               </div>
@@ -429,20 +461,20 @@ function PhoneMockup({ variant }: { variant: "primary" | "secondary" }) {
 
             <div className="mt-4 space-y-3">
               <div className="rounded-2xl bg-[#f5f7fb] p-3">
-                <div className="h-24 rounded-[1rem] bg-[linear-gradient(135deg,#fde68a_0%,#fb7185_100%)]" />
-                <p className="mt-3 text-sm font-semibold text-zinc-900">Prévia visual do negócio</p>
+                <div className="h-20 rounded-[1rem] bg-[linear-gradient(135deg,#fde68a_0%,#fb7185_100%)] sm:h-24" />
+                <p className="mt-3 text-sm font-semibold text-zinc-900">Previa visual do negocio</p>
                 <p className="mt-1 text-xs leading-5 text-zinc-500">
-                  Apresentação clara, profissional e compatível com celular.
+                  Apresentacao clara, profissional e compativel com celular.
                 </p>
               </div>
               <div className="grid gap-2">
                 <PhoneListItem
                   icon={<MapPin className="h-4 w-4" />}
-                  label="Localização e rota"
+                  label="Localizacao e rota"
                 />
                 <PhoneListItem
                   icon={<MessageCircle className="h-4 w-4" />}
-                  label="Botão direto para contato"
+                  label="Botao direto para contato"
                 />
                 <PhoneListItem
                   icon={<Smartphone className="h-4 w-4" />}
@@ -496,7 +528,7 @@ function SectionHeader({
       </p>
       <h2
         className={`mt-4 font-semibold leading-tight ${
-          compact ? "text-3xl sm:text-4xl" : "text-3xl sm:text-5xl"
+          compact ? "text-2xl sm:text-4xl" : "text-2xl sm:text-5xl"
         } ${dark ? "text-white" : "text-zinc-950"}`}
       >
         {title}
