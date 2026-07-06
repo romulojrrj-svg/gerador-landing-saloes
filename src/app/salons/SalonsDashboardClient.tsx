@@ -12,6 +12,7 @@ import {
   Eye,
   Globe2,
   MapPin,
+  Phone,
   Plus,
   RefreshCw,
   Search,
@@ -796,6 +797,12 @@ function SalonRow({
   const publicUrl = getAbsoluteAppUrl(publicPath);
   const approachMessage = getApproachMessage(salon);
   const readinessLabel = getCommercialReadinessLabel(salon);
+  const whatsappNumber =
+    salon.whatsapp?.trim() ||
+    salon.socialLinks?.whatsapp?.trim() ||
+    salon.phone?.trim() ||
+    salon.socialLinks?.phone?.trim() ||
+    "";
 
   async function handleCopyPublicLink() {
     const copied = await copyTextToClipboard(publicUrl);
@@ -810,6 +817,20 @@ function SalonRow({
       copied
         ? "Mensagem de abordagem copiada."
         : "Não foi possível copiar a mensagem de abordagem.",
+    );
+  }
+
+  async function handleCopyWhatsappNumber() {
+    if (!whatsappNumber) {
+      setFeedback("Este salao ainda nao tem WhatsApp salvo.");
+      return;
+    }
+
+    const copied = await copyTextToClipboard(whatsappNumber);
+    setFeedback(
+      copied
+        ? "Numero de WhatsApp copiado."
+        : "Nao foi possivel copiar o numero de WhatsApp.",
     );
   }
 
@@ -1005,6 +1026,15 @@ function SalonRow({
           >
             <Clipboard className="h-4 w-4" />
             Copiar mensagem
+          </button>
+          <button
+            type="button"
+            onClick={handleCopyWhatsappNumber}
+            disabled={!whatsappNumber}
+            className="btn btn-secondary min-h-10 px-4 py-2 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <Phone className="h-4 w-4" />
+            Copiar número de WhatsApp
           </button>
           <button
             type="button"

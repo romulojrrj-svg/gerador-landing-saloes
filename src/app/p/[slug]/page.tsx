@@ -15,10 +15,32 @@ export async function generateMetadata({
   params,
 }: PublicPageProps): Promise<Metadata> {
   const { slug } = await params;
+  const result = await getPublicSalonBySlugServer(slug);
+  const salon = result.salon;
+
+  if (!salon) {
+    return {
+      title: "Landing do salao",
+      description: `Landing publica preparada para ${slug}.`,
+    };
+  }
+
+  const title = salon.name;
+  const description =
+    salon.description?.trim() ||
+    `Landing publica preparada para ${salon.name}.`;
 
   return {
-    title: "Landing do salão",
-    description: `Landing pública preparada para ${slug}.`,
+    title,
+    description,
+    openGraph: {
+      title,
+      description,
+    },
+    twitter: {
+      title,
+      description,
+    },
   };
 }
 
