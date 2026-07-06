@@ -140,8 +140,10 @@ export function analyzeImageCandidates(
         ])
       ) {
         if (containsAny(titleText, ["logo"])) {
-          suggestedUse = "logo";
-          reasons.add("Possivel logo ou marca do salao.");
+          suggestedUse = "ignore";
+          shouldReject = true;
+          score = Math.min(score, 12);
+          reasons.add("Logo ou identidade visual deve ser escolhida manualmente, nao pela curadoria automatica.");
         } else if (!shouldReject) {
           score -= 22;
           warnings.add("Parece elemento de perfil, destaque ou asset de interface.");
@@ -227,45 +229,17 @@ export function createLocalImagePlan(
   );
   const usedIds = new Set<string>();
 
-  const logoCandidate = pickFirst(
-    eligible,
-    usedIds,
-    (candidate) =>
-      candidate.suggestedUse === "logo" &&
-      candidate.score >= 48,
-  );
-
   const topCandidates = pickMany(
     eligible,
     usedIds,
-    (candidate) =>
-      candidate.suggestedUse === "top" &&
-      candidate.score >= 56 &&
-      candidate.collectorOrigin !== "highlight" &&
-      candidate.collectorOrigin !== "avatar",
+    isStrongTopCandidate,
     3,
   );
-
-  if (topCandidates.length < 2) {
-    const fallbackTopCandidates = pickMany(
-      eligible,
-      usedIds,
-      (candidate) =>
-        candidate.suggestedUse === "gallery" &&
-        candidate.score >= 62 &&
-        candidate.collectorOrigin !== "highlight" &&
-        candidate.collectorOrigin !== "avatar",
-      3 - topCandidates.length,
-    );
-    topCandidates.push(...fallbackTopCandidates);
-  }
 
   const spaceCandidates = pickMany(
     eligible,
     usedIds,
-    (candidate) =>
-      candidate.suggestedUse === "space" &&
-      candidate.score >= 44,
+    isClearlySpaceCandidate,
     3,
   );
 
@@ -273,7 +247,8 @@ export function createLocalImagePlan(
     eligible,
     usedIds,
     (candidate) =>
-      candidate.suggestedUse === "gallery" || candidate.suggestedUse === "top",
+      isUsableGalleryCandidate(candidate) ||
+      (candidate.suggestedUse === "top" && candidate.score >= 60),
     8,
   );
 
@@ -297,7 +272,7 @@ export function createLocalImagePlan(
 
   const plan = normalizeSalonLayoutImagePlan({
     mode: "local_auto",
-    logoImageId: logoCandidate?.id ?? null,
+    logoImageId: null,
     topImageIds: topCandidates.map((candidate) => candidate.id),
     heroImageId: topCandidates.length === 1 ? topCandidates[0].id : null,
     heroMosaicImageIds:
@@ -311,7 +286,7 @@ export function createLocalImagePlan(
     resultImageIds: [],
     ignoredImageIds,
     summary:
-      "Plano local simplificado: logo, destaque inicial, galeria e Nosso Espaço quando houver fotos adequadas.",
+      "Plano local simplificado: destaque inicial, galeria e Nosso Espaco quando houver fotos adequadas. Logo deve ser escolhida manualmente.",
     warnings,
     generatedAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
@@ -322,7 +297,7 @@ export function createLocalImagePlan(
     plan,
     selectionSummary: {
       heroId: topCandidates[0]?.id,
-      logoId: logoCandidate?.id,
+      logoId: undefined,
       interiorIds: spaceCandidates.map((candidate) => candidate.id),
       resultIds: [],
       galleryIds: galleryCandidates.map((candidate) => candidate.id),
@@ -369,13 +344,17 @@ export function buildChatGptCurationPrompt(
   return [
     "Voce e um especialista em landing pages para saloes de beleza.",
     "Analise estas imagens e monte um plano de uso para a landing.",
-    "Escolha apenas logoImageId, topImageIds, galleryImageIds, spaceImageIds e ignoredImageIds.",
+    "Escolha apenas topImageIds, galleryImageIds, spaceImageIds e ignoredImageIds. logoImageId deve ser sempre null.",
     "Responda apenas JSON valido.",
     "",
     "REGRAS:",
+    "- nunca escolha logo automaticamente; use logoImageId null;",
     "- use ate 3 imagens em topImageIds para o destaque inicial;",
+    "- topImageIds deve receber somente imagens fortes, nitidas, bem enquadradas e com boa resolucao;",
+    "- se nao houver imagem forte para topImageIds, deixe vazio;",
     "- use no maximo 8 imagens na galeria;",
-    "- use spaceImageIds apenas para fotos claras de ambiente, espaco fisico ou detalhes do salao;",
+    "- use spaceImageIds apenas para fotos claras em que o ambiente fisico seja o assunto principal;",
+    "- nao use em spaceImageIds close de cabelo, unha, procedimento, pessoa ou resultado com o salao apenas ao fundo;",
     "- se nao houver fotos claras do espaco, use spaceEnabled false;",
     "- nao use highlight/story/avatar;",
     "- nao use logo no destaque inicial, galeria ou Nosso Espaco;",
@@ -386,7 +365,7 @@ export function buildChatGptCurationPrompt(
     "",
     "JSON esperado:",
 `{
-  "logoImageId": "id-ou-null",
+  "logoImageId": null,
   "topImageIds": ["id1", "id2", "id3"],
   "galleryImageIds": ["id1", "id2"],
   "spaceEnabled": true,
@@ -439,10 +418,7 @@ export function validateChatGptCurationJson(
   const payload = parsed as ChatGptPlanPayload;
   const analyzed = analyzeImageCandidates(candidates);
   const candidateMap = new Map(analyzed.map((candidate) => [candidate.id, candidate]));
-  const logoImageId =
-    payload.logoImageId === null || payload.logoImageId === undefined
-      ? null
-      : String(payload.logoImageId);
+  const logoImageId = null;
   const legacyHeroImageId =
     payload.heroImageId === null || payload.heroImageId === undefined
       ? null
@@ -490,6 +466,42 @@ export function validateChatGptCurationJson(
     return {
       ok: false,
       error: "Use no maximo 3 imagens em topImageIds.",
+    };
+  }
+
+  const weakTopIds = topImageIds.filter((id) => {
+    const candidate = candidateMap.get(id);
+    return !candidate || !isStrongTopCandidate(candidate);
+  });
+
+  if (weakTopIds.length) {
+    return {
+      ok: false,
+      error: `Top/destaque inicial aceita apenas imagens fortes. Revise: ${weakTopIds.join(", ")}.`,
+    };
+  }
+
+  const invalidSpaceIds = (spaceEnabled ? spaceImageIds : []).filter((id) => {
+    const candidate = candidateMap.get(id);
+    return !candidate || !isClearlySpaceCandidate(candidate);
+  });
+
+  if (invalidSpaceIds.length) {
+    return {
+      ok: false,
+      error: `Nosso Espaco aceita apenas fotos reais do ambiente. Revise: ${invalidSpaceIds.join(", ")}.`,
+    };
+  }
+
+  const invalidGalleryIds = galleryImageIds.filter((id) => {
+    const candidate = candidateMap.get(id);
+    return !candidate || !isUsableGalleryCandidate(candidate);
+  });
+
+  if (invalidGalleryIds.length) {
+    return {
+      ok: false,
+      error: `Galeria aceita apenas imagens boas e uteis para a landing. Revise: ${invalidGalleryIds.join(", ")}.`,
     };
   }
 
@@ -579,7 +591,7 @@ export function validateChatGptCurationJson(
     ok: true,
     plan,
     summary: {
-      logo: logoImageId,
+      logo: null,
       topCount: topImageIds.length,
       galleryCount: galleryImageIds.length,
       spaceCount: spaceEnabled ? spaceImageIds.length : 0,
@@ -724,20 +736,41 @@ function resolveImageTypeFromPlan(
   return mapSuggestedUseToImageType(candidate.suggestedUse, candidate.id);
 }
 
-function pickFirst(
-  candidates: SalonImageCandidate[],
-  usedIds: Set<string>,
-  predicate: (candidate: SalonImageCandidate) => boolean,
-) {
-  const candidate = candidates.find(
-    (item) => !usedIds.has(item.id) && predicate(item),
+function isStrongTopCandidate(candidate: SalonImageCandidate) {
+  return (
+    candidate.suggestedUse === "top" &&
+    candidate.score >= 70 &&
+    candidate.collectorOrigin !== "highlight" &&
+    candidate.collectorOrigin !== "avatar" &&
+    !candidate.shouldReject &&
+    !containsAny(candidateQualityText(candidate), weakTopTerms)
   );
+}
 
-  if (candidate) {
-    usedIds.add(candidate.id);
-  }
+function isClearlySpaceCandidate(candidate: SalonImageCandidate) {
+  const text = candidateQualityText(candidate);
 
-  return candidate;
+  return (
+    candidate.suggestedUse === "space" &&
+    candidate.score >= 64 &&
+    candidate.collectorOrigin !== "highlight" &&
+    candidate.collectorOrigin !== "avatar" &&
+    !candidate.shouldReject &&
+    (candidate.detectedType === "interior" ||
+      (countMatches(text, spaceTerms) >= 2 &&
+        !containsAny(text, serviceCloseupTerms)))
+  );
+}
+
+function isUsableGalleryCandidate(candidate: SalonImageCandidate) {
+  return (
+    candidate.suggestedUse === "gallery" &&
+    candidate.score >= 52 &&
+    candidate.collectorOrigin !== "highlight" &&
+    candidate.collectorOrigin !== "avatar" &&
+    !candidate.shouldReject &&
+    !containsAny(candidateQualityText(candidate), invalidImageTerms)
+  );
 }
 
 function pickMany(
@@ -780,8 +813,22 @@ function clampScore(value: number) {
   return Math.max(0, Math.min(100, Math.round(value)));
 }
 
-function containsAny(value: string, needles: string[]) {
+function candidateQualityText(candidate: SalonImageCandidate) {
+  return `${candidate.id} ${candidate.imageUrl} ${candidate.source} ${
+    candidate.collectorOrigin ?? ""
+  } ${candidate.collectorContext ?? ""} ${candidate.sourceUrl ?? ""} ${
+    candidate.title ?? ""
+  } ${candidate.alt ?? ""} ${candidate.detectedType ?? ""} ${
+    candidate.suggestedUse ?? ""
+  }`.toLowerCase();
+}
+
+function containsAny(value: string, needles: readonly string[]) {
   return needles.some((needle) => value.includes(needle));
+}
+
+function countMatches(value: string, needles: readonly string[]) {
+  return needles.reduce((count, needle) => (value.includes(needle) ? count + 1 : count), 0);
 }
 
 function simplifySuggestedUse(value: SalonImageSuggestedUse): SalonImageSuggestedUse {
@@ -829,6 +876,84 @@ function getOrientation(width?: number, height?: number) {
 function cleanString(value: unknown) {
   return typeof value === "string" && value.trim() ? value.trim() : undefined;
 }
+
+const invalidImageTerms = [
+  "logo",
+  "avatar",
+  "profile",
+  "perfil",
+  "highlight",
+  "story",
+  "stories",
+  "destaque",
+  "print",
+  "screenshot",
+  "thumbnail",
+  "icon",
+  "placeholder",
+  "promo",
+  "flyer",
+  "poster",
+  "sale",
+  "offer",
+  "desconto",
+  "blur",
+  "blurry",
+  "pixel",
+] as const;
+
+const weakTopTerms = [
+  ...invalidImageTerms,
+  "close-up",
+  "closeup",
+  "close up",
+  "crop",
+  "cropped",
+  "cortada",
+] as const;
+
+const spaceTerms = [
+  "interior",
+  "inside",
+  "space",
+  "espaco",
+  "ambiente",
+  "reception",
+  "recepcao",
+  "chair",
+  "cadeira",
+  "mirror",
+  "espelho",
+  "station",
+  "bancada",
+  "decor",
+  "decoracao",
+  "room",
+  "sala",
+  "fachada",
+] as const;
+
+const serviceCloseupTerms = [
+  "hair",
+  "cabelo",
+  "nail",
+  "unha",
+  "brow",
+  "sobrancelha",
+  "lash",
+  "cilios",
+  "makeup",
+  "maquiagem",
+  "procedure",
+  "procedimento",
+  "resultado",
+  "result",
+  "before",
+  "after",
+  "antes",
+  "depois",
+  "close",
+] as const;
 
 function toStringArray(value: unknown) {
   return Array.isArray(value)

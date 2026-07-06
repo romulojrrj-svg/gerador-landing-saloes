@@ -2269,7 +2269,7 @@ function RealImagesSection({
             url: image.src || image.url,
             source: image.source,
             caption: image.alt || image.title,
-            score: image.type === "logo" ? 82 : image.selectedForLanding ? 70 : 56,
+            score: getAiCurationScore(image),
             currentType: image.type,
           })),
         }),
@@ -3902,44 +3902,49 @@ function buildAiImagePlanFromResponse(
   currentPlan?: SalonLayoutImagePlan,
 ) {
   const availableImageIds = images.map((image) => image.id);
-  const logoImageId =
-    payload.logoImageId && availableImageIds.includes(payload.logoImageId)
-      ? payload.logoImageId
-      : null;
+  const imageById = new Map(images.map((image) => [image.id, image]));
+  const forcedIgnoredImageIds = images
+    .filter((image) => isAiInvalidImage(image))
+    .map((image) => image.id);
+  const usedImageIds = new Set<string>();
+  const logoImageId = null;
   const heroImageIds = uniqueIds(
-    (payload.heroImageIds ?? []).filter((imageId) => availableImageIds.includes(imageId)),
+    (payload.heroImageIds ?? []).filter((imageId) => {
+      const image = imageById.get(imageId);
+      return image ? isAiStrongTopImage(image) : false;
+    }),
   ).slice(0, 3);
+  heroImageIds.forEach((imageId) => usedImageIds.add(imageId));
   const spaceImageIds = uniqueIds(
-    (payload.spaceImageIds ?? []).filter((imageId) => availableImageIds.includes(imageId)),
+    (payload.spaceImageIds ?? []).filter((imageId) => {
+      const image = imageById.get(imageId);
+      return image ? !usedImageIds.has(imageId) && isAiRealSpaceImage(image) : false;
+    }),
   );
+  spaceImageIds.forEach((imageId) => usedImageIds.add(imageId));
   const galleryImageIds = uniqueIds(
-    (payload.galleryImageIds ?? []).filter((imageId) => availableImageIds.includes(imageId)),
+    (payload.galleryImageIds ?? []).filter((imageId) => {
+      const image = imageById.get(imageId);
+      return image ? !usedImageIds.has(imageId) && isAiUsableGalleryImage(image) : false;
+    }),
   );
+  galleryImageIds.forEach((imageId) => usedImageIds.add(imageId));
   const ignoredImageIds = uniqueIds(
-    (payload.ignoredImageIds ?? []).filter((imageId) => availableImageIds.includes(imageId)),
+    [...forcedIgnoredImageIds, ...(payload.ignoredImageIds ?? [])].filter(
+      (imageId) => availableImageIds.includes(imageId) && !usedImageIds.has(imageId),
+    ),
   );
-  const fallbackHeroId =
-    heroImageIds.length === 0
-      ? images.find(
-          (image) =>
-            image.id !== logoImageId &&
-            !spaceImageIds.includes(image.id) &&
-            !galleryImageIds.includes(image.id) &&
-            !ignoredImageIds.includes(image.id),
-        )?.id ?? null
-      : null;
-  const topImageIds = heroImageIds.length
-    ? heroImageIds
-    : fallbackHeroId
-      ? [fallbackHeroId]
-      : [];
-  const activeIds = new Set([
-    ...(logoImageId ? [logoImageId] : []),
-    ...topImageIds,
-    ...galleryImageIds,
-    ...spaceImageIds,
-  ]);
-  const dedupedHeroIds = uniqueIds(topImageIds.filter((imageId) => activeIds.has(imageId)));
+  const topImageIds = heroImageIds;
+  const dedupedHeroIds = uniqueIds(topImageIds);
+  const warnings = [
+    "A curadoria automatica nao escolhe logo. Defina a logo manualmente se necessario.",
+    ...(dedupedHeroIds.length === 0
+      ? ["Nenhuma imagem forte o suficiente foi aplicada ao destaque inicial."]
+      : []),
+    ...(spaceImageIds.length === 0
+      ? ["Nenhuma foto claramente focada no ambiente foi aplicada em Nosso Espaco."]
+      : []),
+  ];
 
   return normalizeSalonLayoutImagePlan(
     {
@@ -3959,7 +3964,7 @@ function buildAiImagePlanFromResponse(
       summary: [payload.notes?.hero, payload.notes?.space, payload.notes?.gallery, payload.notes?.ignored]
         .filter(Boolean)
         .join(" | "),
-      warnings: [],
+      warnings,
       generatedAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     },
@@ -3968,6 +3973,149 @@ function buildAiImagePlanFromResponse(
     },
   );
 }
+
+function getAiCurationScore(image: SalonGalleryImage) {
+  if (image.type === "logo") {
+    return 5;
+  }
+
+  const baseScoreByType: Record<SalonImageType, number> = {
+    logo: 5,
+    hero: 76,
+    interior: 74,
+    service: 68,
+    result: 70,
+    gallery: 68,
+  };
+
+  return Math.max(baseScoreByType[image.type] ?? 64, image.selectedForLanding ? 72 : 0);
+}
+
+function isAiStrongTopImage(image: SalonGalleryImage) {
+  const text = aiImageText(image);
+
+  return (
+    !isAiInvalidImage(image) &&
+    image.type !== "logo" &&
+    !containsAnyText(text, aiWeakTopTerms)
+  );
+}
+
+function isAiRealSpaceImage(image: SalonGalleryImage) {
+  const text = aiImageText(image);
+
+  return (
+    !isAiInvalidImage(image) &&
+    image.type !== "logo" &&
+    (image.type === "interior" ||
+      (countTextMatches(text, aiSpaceTerms) >= 2 &&
+        !containsAnyText(text, aiServiceCloseupTerms)))
+  );
+}
+
+function isAiUsableGalleryImage(image: SalonGalleryImage) {
+  return !isAiInvalidImage(image) && image.type !== "logo";
+}
+
+function isAiInvalidImage(image: SalonGalleryImage) {
+  const text = aiImageText(image);
+
+  return image.type === "logo" || containsAnyText(text, aiInvalidTerms);
+}
+
+function aiImageText(image: SalonGalleryImage) {
+  return `${image.id} ${image.src} ${image.url} ${image.alt} ${image.title ?? ""} ${
+    image.type
+  } ${image.source} ${image.sourceUrl ?? ""} ${image.originalPostUrl ?? ""}`.toLowerCase();
+}
+
+function containsAnyText(value: string, terms: readonly string[]) {
+  return terms.some((term) => value.includes(term));
+}
+
+function countTextMatches(value: string, terms: readonly string[]) {
+  return terms.reduce((count, term) => (value.includes(term) ? count + 1 : count), 0);
+}
+
+const aiInvalidTerms = [
+  "logo",
+  "avatar",
+  "profile",
+  "perfil",
+  "highlight",
+  "story",
+  "stories",
+  "destaque",
+  "print",
+  "screenshot",
+  "reel",
+  "thumbnail",
+  "icon",
+  "placeholder",
+  "promo",
+  "flyer",
+  "poster",
+  "sale",
+  "offer",
+  "desconto",
+  "blur",
+  "blurry",
+  "pixel",
+] as const;
+
+const aiWeakTopTerms = [
+  ...aiInvalidTerms,
+  "close-up",
+  "closeup",
+  "close up",
+  "crop",
+  "cropped",
+  "cortada",
+] as const;
+
+const aiSpaceTerms = [
+  "interior",
+  "inside",
+  "space",
+  "espaco",
+  "ambiente",
+  "reception",
+  "recepcao",
+  "chair",
+  "cadeira",
+  "mirror",
+  "espelho",
+  "station",
+  "bancada",
+  "decor",
+  "decoracao",
+  "room",
+  "sala",
+  "fachada",
+  "salon interior",
+] as const;
+
+const aiServiceCloseupTerms = [
+  "hair",
+  "cabelo",
+  "nail",
+  "unha",
+  "brow",
+  "sobrancelha",
+  "lash",
+  "cilios",
+  "makeup",
+  "maquiagem",
+  "procedure",
+  "procedimento",
+  "resultado",
+  "result",
+  "before",
+  "after",
+  "antes",
+  "depois",
+  "close",
+] as const;
 
 function normalizeHeroImages(images: SalonGalleryImage[]) {
   let hasHeroImage = false;
