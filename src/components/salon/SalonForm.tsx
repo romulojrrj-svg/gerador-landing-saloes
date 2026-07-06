@@ -424,20 +424,26 @@ export function SalonForm({
     const nextCopySuggestion = overrides?.copySuggestion ?? copySuggestion;
     const nextAppliedCopy = overrides?.appliedCopy ?? appliedCopy;
     const nextCopyHistory = overrides?.copyHistory ?? copyHistory;
+    const nextLayoutImagePlan = buildEffectiveLayoutImagePlan(
+      overrides?.galleryImages ?? realImages,
+      layoutImagePlan,
+    );
+    const nextGalleryImages = syncImagesWithPlan(
+      overrides?.galleryImages ?? realImages,
+      nextLayoutImagePlan,
+    );
+    const nextTestimonials = overrides?.testimonials ?? realReviews;
 
     onSubmit({
       ...input,
-      galleryImages: overrides?.galleryImages ?? realImages,
+      galleryImages: nextGalleryImages,
       imageCandidates,
       imageSelectionSummary,
-      layoutImagePlan: buildEffectiveLayoutImagePlan(
-        overrides?.galleryImages ?? realImages,
-        effectiveLayoutImagePlan,
-      ),
-      testimonials: overrides?.testimonials ?? realReviews,
+      layoutImagePlan: nextLayoutImagePlan,
+      testimonials: nextTestimonials,
       sourceMaterials: buildSourceMaterials(
-        overrides?.galleryImages ?? realImages,
-        overrides?.testimonials ?? realReviews,
+        nextGalleryImages,
+        nextTestimonials,
       ),
       copySuggestions: nextCopySuggestion,
       generatedCopy: nextAppliedCopy,
@@ -482,13 +488,13 @@ export function SalonForm({
         input.selectedServices,
         input.language,
       ),
-      galleryImages: realImages.length ? realImages : initialSalon?.galleryImages,
+      galleryImages:
+        realImages.length
+          ? syncImagesWithPlan(realImages, effectiveLayoutImagePlan)
+          : initialSalon?.galleryImages,
       imageCandidates,
       imageSelectionSummary,
-      layoutImagePlan: buildEffectiveLayoutImagePlan(
-        realImages,
-        effectiveLayoutImagePlan,
-      ),
+      layoutImagePlan: effectiveLayoutImagePlan,
       testimonials: realReviews,
       businessHours: input.businessHours,
       address: input.address,

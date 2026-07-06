@@ -158,6 +158,14 @@ export function mapSupabaseRowToSalon(row: SupabaseSalonRow): Salon {
   const metadataSalon = asRecord(metadata?.salon) as Partial<Salon> | undefined;
   const sourceProfile = asRecord(row.source_profile) as SalonSourceProfile | undefined;
   const cta = asRecord(row.cta);
+  const rowGalleryImages = asArray<SalonGalleryImage>(
+    row.real_images,
+    metadataSalon?.galleryImages,
+  );
+  const rowTestimonials = asArray<SalonTestimonial>(
+    row.real_reviews,
+    metadataSalon?.testimonials,
+  );
 
   return ensureCompleteSalon({
     ...(metadataSalon ?? {}),
@@ -193,12 +201,8 @@ export function mapSupabaseRowToSalon(row: SupabaseSalonRow): Salon {
     selectedServices:
       metadataSalon?.selectedServices ??
       asArray<SalonService>(row.services).map((service) => service.title),
-    galleryImages:
-      metadataSalon?.galleryImages ??
-      asArray<SalonGalleryImage>(row.real_images, metadataSalon?.galleryImages),
-    testimonials:
-      metadataSalon?.testimonials ??
-      asArray<SalonTestimonial>(row.real_reviews, metadataSalon?.testimonials),
+    galleryImages: rowGalleryImages,
+    testimonials: rowTestimonials,
     copySuggestions:
       asObject<SalonCopySuggestion>(row.copy_suggestions) ??
       metadataSalon?.copySuggestions,
