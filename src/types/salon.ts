@@ -300,6 +300,8 @@ export type Salon = {
   landingLanguage: SalonLanguage;
   positioningLine: string;
   description: string;
+  heroOverlayTitle?: string;
+  heroOverlaySubtitle?: string;
   visualStyle: string;
   brandTone: string;
 
@@ -392,6 +394,8 @@ export type SalonFormInput = {
   language: SalonLanguage;
   positioningLine: string;
   description: string;
+  heroOverlayTitle?: string;
+  heroOverlaySubtitle?: string;
   visualStyle: string;
   brandTone: string;
   instagramUrl?: string;

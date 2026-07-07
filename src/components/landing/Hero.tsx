@@ -1,7 +1,6 @@
 import Image from "next/image";
 import {
   ArrowRight,
-  CalendarDays,
   MapPin,
   Sparkles,
   Star,
@@ -15,8 +14,8 @@ import {
   getPublicHeroHeadline,
   getPublicHeroImage,
   getPublicHeroMosaicImages,
+  getPublicHeroOverlay,
   getPublicReviewMetrics,
-  getPublicServiceSummary,
   getPublicText,
   shouldShowPublicServices,
 } from "@/lib/public-landing";
@@ -39,14 +38,13 @@ export function Hero({ salon, mode = "public" }: HeroProps) {
   const primaryCtaLabel = getPublicHeroCtaLabel(salon);
   const showServicesCta = mode === "preview" || shouldShowPublicServices(salon);
   const reviewMetrics = getPublicReviewMetrics(salon);
-  const serviceSummary = getPublicServiceSummary(salon.services, salon.language);
   const contactLinks = getPublicContactLinks(salon);
   const secondaryAction = contactLinks.find(
     (link) =>
       !link.primary &&
       (link.id === "google" || link.id === "instagram" || link.id === "whatsapp"),
   );
-  const trustPoints = buildTrustPoints(salon, serviceSummary);
+  const trustPoints = buildTrustPoints(salon);
 
   return (
     <section className="relative overflow-hidden border-b border-[#eadfce]/70 bg-[linear-gradient(180deg,#fbf5ed_0%,#fcfaf7_42%,#ffffff_100%)]">
@@ -94,12 +92,6 @@ export function Hero({ salon, mode = "public" }: HeroProps) {
                 <div className="inline-flex items-center gap-2 rounded-full border border-[#e7dbc9] bg-white px-3 py-1.5 text-xs font-medium text-zinc-700 shadow-sm transition-transform duration-200 hover:-translate-y-0.5 sm:px-3.5 sm:py-2 sm:text-sm">
                   <Sparkles className="h-4 w-4 text-[#9a6b3d]" />
                   {salon.city}
-                </div>
-              ) : null}
-              {serviceSummary ? (
-                <div className="inline-flex items-center gap-2 rounded-full border border-[#e7dbc9] bg-white px-3 py-1.5 text-xs font-medium text-zinc-700 shadow-sm transition-transform duration-200 hover:-translate-y-0.5 sm:px-3.5 sm:py-2 sm:text-sm">
-                  <CalendarDays className="h-4 w-4 text-[#9a6b3d]" />
-                  {serviceSummary}
                 </div>
               ) : null}
             </div>
@@ -177,7 +169,8 @@ function HeroImageCard({
   heroImage: string;
   salon: Salon;
 }) {
-  const serviceSummary = getPublicServiceSummary(salon.services, salon.language);
+  const overlay = getPublicHeroOverlay(salon);
+  const hasOverlay = Boolean(overlay.title || overlay.subtitle);
 
   return (
     <div className="relative overflow-hidden rounded-[1.6rem] border border-white/60 bg-[#efe4d5] p-2 shadow-[0_20px_50px_rgba(83,57,33,0.13)] sm:rounded-[2.4rem] sm:p-3 sm:shadow-[0_32px_80px_rgba(83,57,33,0.16)]">
@@ -203,16 +196,16 @@ function HeroImageCard({
           </div>
         )}
         <div className="absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-black/30 to-transparent" />
-        {salon.location || serviceSummary ? (
+        {hasOverlay ? (
           <div className="absolute inset-x-3 bottom-3 rounded-[1rem] border border-white/40 bg-white/90 px-3.5 py-3 shadow-[0_14px_32px_rgba(24,24,27,0.16)] backdrop-blur">
-            {salon.location ? (
+            {overlay.title ? (
               <p className="line-clamp-1 text-xs font-semibold text-zinc-950">
-                {salon.location}
+                {overlay.title}
               </p>
             ) : null}
-            {serviceSummary ? (
+            {overlay.subtitle ? (
               <p className="mt-1 line-clamp-1 text-xs text-zinc-600">
-                {serviceSummary}
+                {overlay.subtitle}
               </p>
             ) : null}
           </div>
@@ -265,20 +258,13 @@ function HeroMosaic({
   );
 }
 
-function buildTrustPoints(salon: Salon, serviceSummary: string) {
+function buildTrustPoints(salon: Salon) {
   const points: Array<{ label: string; value: string }> = [];
 
   if (salon.location) {
     points.push({
       label: salon.language === "pt-BR" ? "Localização" : "Location",
       value: salon.location,
-    });
-  }
-
-  if (serviceSummary) {
-    points.push({
-      label: salon.language === "pt-BR" ? "Serviços" : "Services",
-      value: serviceSummary,
     });
   }
 
@@ -291,3 +277,4 @@ function buildTrustPoints(salon: Salon, serviceSummary: string) {
 
   return points.slice(0, 3);
 }
+

@@ -428,23 +428,8 @@ export function applyCopySuggestionToServices(
   services: SalonService[],
   suggestion: SalonCopySuggestion,
 ) {
-  return services.map((service) => {
-    const serviceCopy = suggestion.serviceDescriptions.find(
-      (copy) =>
-        copy.serviceId === service.id ||
-        normalizeText(copy.originalTitle) === normalizeText(service.title),
-    );
-
-    if (!serviceCopy) {
-      return service;
-    }
-
-    return {
-      ...service,
-      title: service.title ?? serviceCopy.title,
-      description: service.description ?? serviceCopy.description,
-    };
-  });
+  void suggestion;
+  return services;
 }
 
 function buildServiceCopies(
