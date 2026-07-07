@@ -61,8 +61,12 @@ export type SupabaseSalonWrite = Partial<SupabaseSalonRow> & {
   name: string;
 };
 
-export function mapSalonToSupabaseRow(salon: Salon): SupabaseSalonWrite {
+export function mapSalonToSupabaseRow(
+  salon: Salon,
+  options?: { compact?: boolean },
+): SupabaseSalonWrite {
   const completeSalon = ensureCompleteSalon(salon);
+  const compact = options?.compact === true;
   const readiness = calculateLandingReadiness(completeSalon);
   const realImages = completeSalon.galleryImages.filter((image) => image.isReal);
   const realReviews = completeSalon.testimonials.filter((review) => review.isReal);
@@ -140,22 +144,45 @@ export function mapSalonToSupabaseRow(salon: Salon): SupabaseSalonWrite {
       description: completeSalon.generatedCopy?.seoDescription,
       promptMetadata: completeSalon.promptMetadata,
     } as unknown as Json,
-    metadata: {
-      salon: completeSalon as unknown as Json,
-      visualStyle: completeSalon.visualStyle,
-      brandTone: completeSalon.brandTone,
-      sourceMode: completeSalon.sourceMode,
-      generationStatus: completeSalon.generationStatus,
-      generatedCopyStatus: completeSalon.generatedCopyStatus,
-      aiBrief: completeSalon.aiBrief,
-      promptMetadata: completeSalon.promptMetadata as unknown as Json | undefined,
-    } as unknown as Json,
+    metadata: compact
+      ? ({
+          visualStyle: completeSalon.visualStyle,
+          brandTone: completeSalon.brandTone,
+          sourceMode: completeSalon.sourceMode,
+          generationStatus: completeSalon.generationStatus,
+          generatedCopyStatus: completeSalon.generatedCopyStatus,
+          aiBrief: completeSalon.aiBrief,
+          promptMetadata: completeSalon.promptMetadata as unknown as Json | undefined,
+          layoutImagePlan: completeSalon.layoutImagePlan,
+          imageSelectionSummary: completeSalon.imageSelectionSummary,
+          manualAssistantNotes: completeSalon.manualAssistantNotes,
+          googleRating: completeSalon.googleRating,
+          googleReviewCount: completeSalon.googleReviewCount,
+          extractedBusinessInfo: completeSalon.extractedBusinessInfo,
+        } as unknown as Json)
+      : ({
+          salon: completeSalon as unknown as Json,
+          visualStyle: completeSalon.visualStyle,
+          brandTone: completeSalon.brandTone,
+          sourceMode: completeSalon.sourceMode,
+          generationStatus: completeSalon.generationStatus,
+          generatedCopyStatus: completeSalon.generatedCopyStatus,
+          aiBrief: completeSalon.aiBrief,
+          promptMetadata: completeSalon.promptMetadata as unknown as Json | undefined,
+          layoutImagePlan: completeSalon.layoutImagePlan,
+          imageSelectionSummary: completeSalon.imageSelectionSummary,
+          manualAssistantNotes: completeSalon.manualAssistantNotes,
+          googleRating: completeSalon.googleRating,
+          googleReviewCount: completeSalon.googleReviewCount,
+          extractedBusinessInfo: completeSalon.extractedBusinessInfo,
+        } as unknown as Json),
   };
 }
 
 export function mapSupabaseRowToSalon(row: SupabaseSalonRow): Salon {
   const metadata = asRecord(row.metadata);
   const metadataSalon = asRecord(metadata?.salon) as Partial<Salon> | undefined;
+  const metadataFallback = metadata as Partial<Salon> | undefined;
   const sourceProfile = asRecord(row.source_profile) as SalonSourceProfile | undefined;
   const cta = asRecord(row.cta);
   const rowGalleryImages = asArray<SalonGalleryImage>(
@@ -168,7 +195,7 @@ export function mapSupabaseRowToSalon(row: SupabaseSalonRow): Salon {
   );
 
   return ensureCompleteSalon({
-    ...(metadataSalon ?? {}),
+    ...(metadataSalon ?? metadataFallback ?? {}),
     id: row.id,
     slug: row.slug,
     name: row.name,

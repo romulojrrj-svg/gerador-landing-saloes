@@ -13,6 +13,7 @@ import {
   normalizeSlug,
   salonFormInputToPartialSalon,
 } from "@/lib/salon-storage";
+import { estimatePayloadSize, logPerfEvent } from "@/lib/perf-logs";
 import type { Salon, SalonFormInput } from "@/types/salon";
 
 type AdminSalonResult =
@@ -34,12 +35,21 @@ export async function listAdminSalons(): Promise<AdminSalonListResult> {
     };
   }
 
+  const startedAt = Date.now();
   const { data, error } = await client.client
     .from("salons")
     .select(
-      "id,slug,name,status,commercial_status,language,country,city,address,description,headline,subheadline,booking_url,whatsapp,phone,website_url,instagram_url,google_maps_url,business_hours,created_at,updated_at,services,real_images,real_reviews,copy_suggestions,generated_copy,social_links",
+      "id,slug,name,status,commercial_status,language,country,city,address,description,headline,subheadline,booking_url,whatsapp,phone,website_url,instagram_url,google_maps_url,business_hours,created_at,updated_at,services,copy_suggestions,generated_copy,source_profile,social_links,cta,seo,metadata",
     )
     .order("updated_at", { ascending: false });
+
+  logPerfEvent({
+    route: "/salons",
+    step: "listAdminSalons",
+    ms: Date.now() - startedAt,
+    count: data?.length ?? 0,
+    source: "supabase-admin",
+  });
 
   if (error) {
     debugAdminSalons("list-failed", { error: error.message });
@@ -66,11 +76,22 @@ export async function getAdminSalonBySlug(slug: string): Promise<AdminSalonResul
     };
   }
 
+  const startedAt = Date.now();
   const { data, error } = await client.client
     .from("salons")
-    .select("*")
+    .select(
+      "id,slug,name,status,commercial_status,language,country,city,address,description,headline,subheadline,booking_url,whatsapp,phone,website_url,instagram_url,google_maps_url,business_hours,notes,readiness_score,created_at,updated_at,services,real_images,real_reviews,copy_suggestions,copy_history,generated_copy,source_profile,social_links,cta,seo,metadata",
+    )
     .eq("slug", slug)
     .maybeSingle();
+
+  logPerfEvent({
+    route: "/salons/[id]/edit",
+    step: "getAdminSalonBySlug",
+    ms: Date.now() - startedAt,
+    slug,
+    source: "supabase-admin",
+  });
 
   if (error) {
     debugAdminSalons("get-failed", { slug, error: error.message });
@@ -212,11 +233,36 @@ async function saveAdminSalon(salon: Salon): Promise<AdminSalonResult> {
     };
   }
 
+  const startedAt = Date.now();
   const payload = ensureCompleteSalon({
     ...salon,
     updatedAt: new Date().toISOString(),
   });
-  const row = mapSalonToSupabaseRow(payload);
+  const row = mapSalonToSupabaseRow(payload, { compact: true });
+  const payloadKb = estimatePayloadSize(row);
+  debugAdminSalons("save-start", {
+    slug: payload.slug,
+    name: payload.name,
+    status: payload.status,
+    commercialStatus: payload.commercialStatus,
+    hasInstagram: Boolean(payload.instagramUrl),
+    hasGoogleMaps: Boolean(payload.googleMapsUrl),
+    servicesCount: payload.services?.length ?? 0,
+    imagesCount: payload.galleryImages?.length ?? 0,
+    reviewsCount: payload.testimonials?.length ?? 0,
+    writeMode: process.env.NEXT_PUBLIC_SUPABASE_WRITE_MODE ?? "disabled",
+    payloadKb,
+  });
+  logPerfEvent({
+    route: "/salons/[id]/edit",
+    step: "buildPayload",
+    id: payload.id,
+    slug: payload.slug,
+    payloadKb,
+    imagesCount: payload.galleryImages?.filter((image) => image.isReal).length ?? 0,
+    servicesCount: payload.services?.length ?? 0,
+    source: "supabase-admin",
+  });
   debugAdminSalons("save-start", {
     slug: payload.slug,
     name: payload.name,
@@ -232,8 +278,8 @@ async function saveAdminSalon(salon: Salon): Promise<AdminSalonResult> {
   let { data, error } = await writeAccess.client
     .from("salons")
     .upsert(row, { onConflict: "slug" })
-    .select("*")
-    .single();
+    .select("id,slug,updated_at")
+    .maybeSingle();
 
   if (error && shouldRetryWithoutCommercialStatus(error)) {
     debugAdminSalons("save-retry-without-commercial-status", {
@@ -243,8 +289,8 @@ async function saveAdminSalon(salon: Salon): Promise<AdminSalonResult> {
     ({ data, error } = await writeAccess.client
       .from("salons")
       .upsert(stripCommercialStatus(row), { onConflict: "slug" })
-      .select("*")
-      .single());
+      .select("id,slug,updated_at")
+      .maybeSingle());
   }
 
   if (error) {
@@ -262,6 +308,18 @@ async function saveAdminSalon(salon: Salon): Promise<AdminSalonResult> {
     };
   }
 
+  logPerfEvent({
+    route: "/salons/[id]/edit",
+    step: "supabaseUpsert",
+    id: payload.id,
+    slug: payload.slug,
+    ms: Date.now() - startedAt,
+    payloadKb,
+    imagesCount: payload.galleryImages?.filter((image) => image.isReal).length ?? 0,
+    servicesCount: payload.services?.length ?? 0,
+    source: "supabase-admin",
+  });
+
   debugAdminSalons("save-success", {
     slug: payload.slug,
     returnedId: (data as SupabaseSalonRow | null)?.id ?? null,
@@ -269,7 +327,7 @@ async function saveAdminSalon(salon: Salon): Promise<AdminSalonResult> {
 
   return {
     ok: true,
-    salon: mapSupabaseRowToSalon(data as SupabaseSalonRow),
+    salon: payload,
   };
 }
 

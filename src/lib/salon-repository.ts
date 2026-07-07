@@ -12,6 +12,7 @@ import {
   salonFormInputToPartialSalon,
   saveSalon as saveLocalSalon,
 } from "@/lib/salon-storage";
+import { estimatePayloadSize, logPerfEvent } from "@/lib/perf-logs";
 import {
   getSupabaseClient,
   isSupabaseConfigured,
@@ -964,10 +965,21 @@ async function tryListSupabaseSalons(): Promise<SalonRepositoryListResult> {
   }
 
   try {
+    const startedAt = Date.now();
     const { data, error } = await client
       .from("salons")
-      .select("*")
+      .select(
+        "id,slug,name,status,commercial_status,language,country,city,address,description,headline,subheadline,booking_url,whatsapp,phone,website_url,instagram_url,google_maps_url,business_hours,notes,readiness_score,created_at,updated_at,services,copy_suggestions,generated_copy,source_profile,social_links,cta,seo,metadata",
+      )
       .order("updated_at", { ascending: false });
+
+    logPerfEvent({
+      route: "/salons",
+      step: "listSupabaseSalons",
+      ms: Date.now() - startedAt,
+      count: data?.length ?? 0,
+      source: "supabase",
+    });
 
     if (error) {
       return {
@@ -1006,11 +1018,22 @@ async function tryGetSupabaseSalonBySlug(
   }
 
   try {
+    const startedAt = Date.now();
     const { data, error } = await client
       .from("salons")
-      .select("*")
+      .select(
+        "id,slug,name,status,commercial_status,language,country,city,address,description,headline,subheadline,booking_url,whatsapp,phone,website_url,instagram_url,google_maps_url,business_hours,notes,readiness_score,created_at,updated_at,services,real_images,real_reviews,copy_suggestions,copy_history,generated_copy,source_profile,social_links,cta,seo,metadata",
+      )
       .eq("slug", slug)
       .maybeSingle();
+
+    logPerfEvent({
+      route: "/salons/[id]/edit",
+      step: "getSupabaseSalonBySlug",
+      ms: Date.now() - startedAt,
+      slug,
+      source: "supabase",
+    });
 
     if (error) {
       return { ok: false, error: error.message };
@@ -1035,11 +1058,24 @@ async function insertSupabaseSalon(salon: Salon): Promise<SalonRepositoryResult>
     return { ok: false, error: "Supabase não configurado.", source: "supabase" };
   }
 
+  const startedAt = Date.now();
   const { data, error } = await client
     .from("salons")
-    .insert(mapSalonToSupabaseRow(salon))
-    .select("*")
-    .single();
+    .insert(mapSalonToSupabaseRow(salon, { compact: true }))
+    .select("id,slug,updated_at")
+    .maybeSingle();
+
+  logPerfEvent({
+    route: "/salons/[id]/edit",
+    step: "insertSupabaseSalon",
+    ms: Date.now() - startedAt,
+    id: salon.id,
+    slug: salon.slug,
+    payloadKb: estimatePayloadSize(mapSalonToSupabaseRow(salon, { compact: true })),
+    imagesCount: salon.galleryImages?.filter((image) => image.isReal).length ?? 0,
+    servicesCount: salon.services?.length ?? 0,
+    source: "supabase",
+  });
 
   if (error) {
     return { ok: false, error: error.message, source: "supabase" };
@@ -1062,12 +1098,25 @@ async function updateSupabaseSalon(
     return { ok: false, error: "Supabase não configurado.", source: "supabase" };
   }
 
+  const startedAt = Date.now();
   const { data, error } = await client
     .from("salons")
-    .update(mapSalonToSupabaseRow(salon))
+    .update(mapSalonToSupabaseRow(salon, { compact: true }))
     .eq("slug", slug)
-    .select("*")
+    .select("id,slug,updated_at")
     .maybeSingle();
+
+  logPerfEvent({
+    route: "/salons/[id]/edit",
+    step: "updateSupabaseSalon",
+    ms: Date.now() - startedAt,
+    id: salon.id,
+    slug,
+    payloadKb: estimatePayloadSize(mapSalonToSupabaseRow(salon, { compact: true })),
+    imagesCount: salon.galleryImages?.filter((image) => image.isReal).length ?? 0,
+    servicesCount: salon.services?.length ?? 0,
+    source: "supabase",
+  });
 
   if (error) {
     return { ok: false, error: error.message, source: "supabase" };
@@ -1088,11 +1137,24 @@ async function upsertSupabaseSalon(salon: Salon): Promise<SalonRepositoryResult>
   }
 
   try {
+    const startedAt = Date.now();
     const { data, error } = await client
       .from("salons")
-      .upsert(mapSalonToSupabaseRow(salon), { onConflict: "slug" })
-      .select("*")
-      .single();
+      .upsert(mapSalonToSupabaseRow(salon, { compact: true }), { onConflict: "slug" })
+      .select("id,slug,updated_at")
+      .maybeSingle();
+
+    logPerfEvent({
+      route: "/salons/[id]/edit",
+      step: "upsertSupabaseSalon",
+      ms: Date.now() - startedAt,
+      id: salon.id,
+      slug: salon.slug,
+      payloadKb: estimatePayloadSize(mapSalonToSupabaseRow(salon, { compact: true })),
+      imagesCount: salon.galleryImages?.filter((image) => image.isReal).length ?? 0,
+      servicesCount: salon.services?.length ?? 0,
+      source: "supabase",
+    });
 
     if (error) {
       return { ok: false, error: error.message, source: "supabase" };

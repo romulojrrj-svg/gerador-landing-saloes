@@ -69,6 +69,7 @@ import {
   getPublicLandingPath,
 } from "@/lib/mvp-commercial";
 import { getSalonRepositoryStatus } from "@/lib/salon-repository";
+import { estimatePayloadSize, logPerfEvent } from "@/lib/perf-logs";
 import {
   calculateLandingReadiness,
   generateAssistedCopy,
@@ -418,7 +419,25 @@ export function SalonForm({
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const startedAt = Date.now();
+    logPerfEvent({
+      route: "/salons/[id]/edit",
+      step: "handleSubmit",
+      id: initialSalon?.id,
+      slug: initialSalon?.slug,
+      imagesCount: realImages?.filter((image) => image.isReal).length ?? 0,
+      servicesCount: selectedServices?.length ?? 0,
+      source: repositoryStatus.activeSource,
+    });
     submitCurrentForm();
+    logPerfEvent({
+      route: "/salons/[id]/edit",
+      step: "submitCurrentForm",
+      id: initialSalon?.id,
+      slug: initialSalon?.slug,
+      ms: Date.now() - startedAt,
+      source: repositoryStatus.activeSource,
+    });
   }
 
   function submitCurrentForm(overrides?: {
@@ -435,7 +454,15 @@ export function SalonForm({
     }
 
     const formData = new FormData(currentForm);
+    const startedAt = Date.now();
     const input = formDataToInput(formData);
+    const payloadSize = estimatePayloadSize({
+      ...input,
+      galleryImages: overrides?.galleryImages ?? realImages,
+      layoutImagePlan: layoutImagePlan,
+      testimonials: overrides?.testimonials ?? realReviews,
+      services: input.services,
+    });
     const nextCopySuggestion = overrides?.copySuggestion ?? copySuggestion;
     const nextAppliedCopy = overrides?.appliedCopy ?? appliedCopy;
     const nextCopyHistory = overrides?.copyHistory ?? copyHistory;
@@ -448,6 +475,18 @@ export function SalonForm({
       nextLayoutImagePlan,
     );
     const nextTestimonials = overrides?.testimonials ?? realReviews;
+
+    logPerfEvent({
+      route: "/salons/[id]/edit",
+      step: "buildPayload",
+      id: initialSalon?.id,
+      slug: initialSalon?.slug,
+      payloadKb: payloadSize,
+      imagesCount: (overrides?.galleryImages ?? realImages)?.filter((image) => image.isReal).length ?? 0,
+      servicesCount: input.services?.length ?? 0,
+      source: repositoryStatus.activeSource,
+      ms: Date.now() - startedAt,
+    });
 
     onSubmit({
       ...input,
