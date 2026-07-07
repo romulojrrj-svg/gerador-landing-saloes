@@ -832,15 +832,45 @@ function normalizeServices(
   services: SalonService[] | undefined,
   selectedServices: string[],
   language: SalonLanguage,
-) {
+): SalonService[] {
   if (services?.length) {
-    return services.map((service) => ({
-      ...service,
-      id: service.id || normalizeSlug(service.title),
-      description: clean(service.description) || "",
-      category: service.category || inferServiceCategory(service.title),
-      featured: service.featured ?? selectedServices.includes(service.title),
-    }));
+    const normalizedServices = services
+      .map<SalonService | null>((service) => {
+        if (typeof service === "string") {
+          const title = clean(service);
+
+          if (!title) {
+            return null;
+          }
+
+          return {
+            id: normalizeSlug(title),
+            title,
+            description: "",
+            price: getServicePriceLabel(language),
+            category: inferServiceCategory(title),
+            featured: selectedServices.includes(title),
+          } satisfies SalonService;
+        }
+
+        const title = clean(service.title);
+
+        if (!title) {
+          return null;
+        }
+
+        return {
+          ...service,
+          id: service.id || normalizeSlug(title),
+          title,
+          description: clean(service.description) || "",
+          category: service.category || inferServiceCategory(title),
+          featured: service.featured ?? selectedServices.includes(title),
+        };
+      })
+      .filter((service): service is SalonService => Boolean(service));
+
+    return normalizedServices;
   }
 
   return selectedServicesToSalonServices(selectedServices, language);
@@ -855,7 +885,11 @@ function normalizeSelectedServices(
   }
 
   if (services?.length) {
-    return services.map((service) => service.title);
+    return services
+      .map((service) =>
+        typeof service === "string" ? clean(service) : clean(service.title),
+      )
+      .filter(Boolean);
   }
 
   return [];

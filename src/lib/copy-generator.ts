@@ -441,8 +441,8 @@ export function applyCopySuggestionToServices(
 
     return {
       ...service,
-      title: serviceCopy.title,
-      description: serviceCopy.description,
+      title: service.title ?? serviceCopy.title,
+      description: service.description ?? serviceCopy.description,
     };
   });
 }

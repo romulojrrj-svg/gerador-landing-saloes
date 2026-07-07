@@ -1438,6 +1438,10 @@ export function getPublicContactLabel(
 }
 
 export function shouldShowPublicServices(salon: Salon) {
+  if (salon.services.some((service) => clean(service.title))) {
+    return true;
+  }
+
   const observedServices = clean(salon.extractedBusinessInfo?.observedServices)
     ?.split(",")
     .map((item) => item.trim())
@@ -1447,9 +1451,7 @@ export function shouldShowPublicServices(salon: Salon) {
     return observedServices.some(hasMeaningfulPublicServiceLabel);
   }
 
-  return salon.services.some((service) =>
-    hasMeaningfulPublicServiceLabel(service.title),
-  );
+  return false;
 }
 
 const genericPublicServiceTitles = new Set([
