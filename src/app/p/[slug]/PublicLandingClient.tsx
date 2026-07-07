@@ -17,12 +17,9 @@ import { Gallery, Hero, Services, Testimonials } from "@/components/landing";
 import { detectBrowserLanguage, getLandingCopy } from "@/lib/landing-copy";
 import {
   getAppliedCopy,
-  getPrimaryContactAction,
   getPublicAboutText,
   getPublicContactLinks,
-  getPublicCta,
   getPublicGalleryImages,
-  getPublicLogoImage,
   getPublicSpaceImages,
   getPublicSpaceSectionCopy,
   getPublicText,
@@ -94,8 +91,7 @@ export function PublicLandingClient({
   }
 
   return (
-    <main className="bg-[#fcfaf7] pb-24 sm:pb-0">
-      <PublicStickyBar salon={salon} />
+    <main className="bg-[#fcfaf7]">
       <Hero salon={salon} mode="public" />
       <PublicAbout salon={salon} />
       <Services services={salon.services} language={salon.language} salon={salon} />
@@ -115,7 +111,6 @@ export function PublicLandingClient({
         mode="public"
       />
       <PublicContactSection salon={salon} />
-      <PublicMobileCta salon={salon} />
     </main>
   );
 }
@@ -141,9 +136,11 @@ function PublicSpaceSection({ salon }: { salon: Salon }) {
           <h2 className="mt-4 font-serif text-[1.9rem] font-semibold leading-tight text-zinc-950 sm:text-4xl">
             {title}
           </h2>
-          <p className="mt-3 text-sm leading-7 text-zinc-600 sm:text-base sm:leading-8">
-            {description}
-          </p>
+          {description ? (
+            <p className="mt-3 text-sm leading-7 text-zinc-600 sm:text-base sm:leading-8">
+              {description}
+            </p>
+          ) : null}
         </div>
         <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
           {images.slice(0, 3).map((image, index) => (
@@ -168,49 +165,6 @@ function PublicSpaceSection({ salon }: { salon: Salon }) {
         </div>
       </div>
     </section>
-  );
-}
-
-function PublicStickyBar({ salon }: { salon: Salon }) {
-  const logoImage = getPublicLogoImage(salon);
-  const cta = getPublicCta(salon);
-
-  return (
-    <div className="sticky top-0 z-40 border-b border-[#eadfce]/90 bg-white/88 backdrop-blur-xl">
-      <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-2.5 sm:px-8 lg:px-10">
-        <div className="flex min-w-0 items-center gap-3">
-          {logoImage ? (
-            <div className="relative h-10 w-16 shrink-0 overflow-hidden rounded-[1rem] border border-[#eadfce] bg-white shadow-sm">
-              <Image
-                src={logoImage.src}
-                alt={logoImage.alt || `${salon.name} logo`}
-                fill
-                sizes="5rem"
-                className="object-contain p-2"
-              />
-            </div>
-          ) : null}
-          <div className="min-w-0">
-            <p className="truncate font-serif text-base font-semibold text-zinc-950">
-              {salon.name}
-            </p>
-            {salon.location ? (
-              <p className="truncate text-xs text-zinc-500">{salon.location}</p>
-            ) : null}
-          </div>
-        </div>
-        {cta.href ? (
-          <a
-            href={cta.href}
-            target={cta.external ? "_blank" : undefined}
-            rel={cta.external ? "noreferrer" : undefined}
-            className="btn btn-primary hidden min-h-10 px-4 py-2 text-sm sm:inline-flex"
-          >
-            {cta.label}
-          </a>
-        ) : null}
-      </div>
-    </div>
   );
 }
 
@@ -386,28 +340,6 @@ function PublicContactSection({ salon }: { salon: Salon }) {
         </div>
       </div>
     </section>
-  );
-}
-
-function PublicMobileCta({ salon }: { salon: Salon }) {
-  const action = getPrimaryContactAction(salon);
-  const cta = getPublicCta(salon);
-
-  if (!action.href) {
-    return null;
-  }
-
-  return (
-    <div className="fixed inset-x-3 bottom-[calc(0.75rem_+_env(safe-area-inset-bottom))] z-50 rounded-full border border-[#eadfce] bg-white/94 p-1.5 shadow-[0_18px_50px_rgba(24,24,27,0.18)] backdrop-blur sm:hidden">
-      <a
-        href={action.href}
-        target={action.external ? "_blank" : undefined}
-        rel={action.external ? "noreferrer" : undefined}
-        className="btn btn-primary w-full min-h-12 rounded-full px-5 py-3 text-sm active:scale-[0.99]"
-      >
-        {cta.label}
-      </a>
-    </div>
   );
 }
 

@@ -391,9 +391,24 @@ export function SalonForm({
     [realImages, layoutImagePlan],
   );
   const availableServices = Array.from(
-    new Set([...serviceOptions, ...(initialSalon?.selectedServices ?? [])]),
+    new Set([
+      ...serviceOptions,
+      ...(initialSalon?.selectedServices ?? []),
+      ...((initialSalon?.services ?? []).map((service) => service.title)),
+    ]),
   );
-  const selectedServices = initialSalon?.selectedServices ?? [];
+  const [selectedServices, setSelectedServices] = useState<string[]>(
+    initialSalon?.selectedServices ?? [],
+  );
+  const [serviceDescriptions, setServiceDescriptions] = useState<Record<string, string>>(
+    () =>
+      Object.fromEntries(
+        (initialSalon?.services ?? []).map((service) => [
+          service.title,
+          service.description ?? "",
+        ]),
+      ),
+  );
   const selectedVibe = initialSalon?.visualStyle ?? "Luxo suave";
   const readinessSalon = useMemo(
     () => ensureCompleteSalon(initialSalon ?? {}),
@@ -484,10 +499,9 @@ export function SalonForm({
       whatsapp: input.whatsapp,
       phone: input.phone,
       selectedServices: input.selectedServices,
-      services: selectedServicesToSalonServices(
-        input.selectedServices,
-        input.language,
-      ),
+      services:
+        input.services ??
+        selectedServicesToSalonServices(input.selectedServices, input.language),
       galleryImages:
         realImages.length
           ? syncImagesWithPlan(realImages, effectiveLayoutImagePlan)
@@ -522,24 +536,6 @@ export function SalonForm({
       field.dispatchEvent(new Event("input", { bubbles: true }));
       field.dispatchEvent(new Event("change", { bubbles: true }));
     }
-  }
-
-  function fillCheckboxGroup(name: string, values: readonly string[]) {
-    const currentForm = formRef.current;
-
-    if (!currentForm) {
-      return;
-    }
-
-    const checkboxes = currentForm.querySelectorAll<HTMLInputElement>(
-      `input[type="checkbox"][name="${name}"]`,
-    );
-
-    checkboxes.forEach((checkbox) => {
-      checkbox.checked = values.includes(checkbox.value);
-      checkbox.dispatchEvent(new Event("change", { bubbles: true }));
-      checkbox.dispatchEvent(new Event("input", { bubbles: true }));
-    });
   }
 
   function getFormFieldValue(name: string) {
@@ -584,7 +580,8 @@ export function SalonForm({
     fillFormField("visualNotes", testSalonPreset.visualNotes);
     fillFormField("manualAssistantNotes", testSalonPreset.manualAssistantNotes);
     fillFormField("notes", testSalonPreset.notes);
-    fillCheckboxGroup("services", testSalonPreset.services);
+    setSelectedServices([...testSalonPreset.services]);
+    setServiceDescriptions({});
     const nextImages = mergePresetImages(realImages, testSalonImages);
     const nextReviews = mergePresetReviews(realReviews, testSalonReviews);
     const nextLayoutImagePlan = buildTestSalonLayoutImagePlan(
@@ -617,6 +614,10 @@ export function SalonForm({
         whatsapp: testSalonPreset.whatsapp,
         phone: testSalonPreset.phone,
         selectedServices: [...testSalonPreset.services],
+        services: selectedServicesToSalonServices(
+          [...testSalonPreset.services],
+          "pt-BR",
+        ),
         galleryImages: nextImages,
         imageCandidates,
         imageSelectionSummary: nextImageSelectionSummary,
@@ -705,6 +706,9 @@ export function SalonForm({
         availableServices={availableServices}
         initialSalon={initialSalon}
         selectedServices={selectedServices}
+        serviceDescriptions={serviceDescriptions}
+        onSelectedServicesChange={setSelectedServices}
+        onServiceDescriptionsChange={setServiceDescriptions}
       />
 
       {mode === "edit" || isDevelopment ? (
@@ -974,11 +978,27 @@ function ServicesSection({
   availableServices,
   initialSalon,
   selectedServices,
+  serviceDescriptions,
+  onSelectedServicesChange,
+  onServiceDescriptionsChange,
 }: {
   availableServices: string[];
   initialSalon?: Salon;
   selectedServices: string[];
+  serviceDescriptions: Record<string, string>;
+  onSelectedServicesChange: Dispatch<SetStateAction<string[]>>;
+  onServiceDescriptionsChange: Dispatch<SetStateAction<Record<string, string>>>;
 }) {
+  function toggleService(service: string, checked: boolean) {
+    onSelectedServicesChange((current) => {
+      if (checked) {
+        return current.includes(service) ? current : [...current, service];
+      }
+
+      return current.filter((currentService) => currentService !== service);
+    });
+  }
+
   return (
     <section className="rounded-[2rem] border border-zinc-200 bg-white p-6 shadow-xl shadow-zinc-950/5">
       <div className="flex items-start gap-4">
@@ -1023,7 +1043,10 @@ function ServicesSection({
                   type="checkbox"
                   name="services"
                   value={service}
-                  defaultChecked={selectedServices.includes(service)}
+                  checked={selectedServices.includes(service)}
+                  onChange={(event) =>
+                    toggleService(service, event.currentTarget.checked)
+                  }
                   className="h-4 w-4 accent-teal-700"
                 />
                 {service}
@@ -1031,6 +1054,38 @@ function ServicesSection({
             ))}
           </div>
         </div>
+
+        {selectedServices.length ? (
+          <div className="grid gap-3">
+            <p className="text-sm font-semibold text-zinc-800">
+              Descricao opcional por servico
+            </p>
+            <div className="grid gap-3">
+              {selectedServices.map((service) => (
+                <label key={service} className="grid gap-2">
+                  <span className="text-sm font-medium text-zinc-700">
+                    {service}
+                  </span>
+                  <textarea
+                    name={`serviceDescription::${service}`}
+                    rows={2}
+                    value={serviceDescriptions[service] ?? ""}
+                    onChange={(event) => {
+                      const nextValue = event.currentTarget.value;
+
+                      onServiceDescriptionsChange((current) => ({
+                        ...current,
+                        [service]: nextValue,
+                      }));
+                    }}
+                    placeholder="Deixe em branco para mostrar apenas o nome do servico."
+                    className="resize-none rounded-2xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm leading-6 text-zinc-950 outline-none transition focus:border-teal-700 focus:bg-white"
+                  />
+                </label>
+              ))}
+            </div>
+          </div>
+        ) : null}
       </div>
     </section>
   );
@@ -2729,8 +2784,7 @@ function RealImagesSection({
               <TextInput
                 label="Descrição curta"
                 value={
-                  effectiveLayoutImagePlan?.spaceDescription ??
-                  "Conheça um pouco do ambiente e dos detalhes do salão."
+                  effectiveLayoutImagePlan?.spaceDescription ?? ""
                 }
                 onChange={(value) =>
                   updateSpaceSettings({
@@ -3868,7 +3922,7 @@ function buildEffectiveLayoutImagePlan(
       heroMosaicImageIds: [],
       spaceEnabled: false,
       spaceTitle: "Nosso Espaco",
-      spaceDescription: "Conheca um pouco do ambiente e dos detalhes do salao.",
+      spaceDescription: "",
       experienceImageIds: [],
       resultImageIds: [],
       warnings: [],
@@ -3956,7 +4010,7 @@ function buildAiImagePlanFromResponse(
       galleryImageIds,
       spaceEnabled: spaceImageIds.length > 0,
       spaceTitle: currentPlan?.spaceTitle ?? "Nosso Espaço",
-      spaceDescription: currentPlan?.spaceDescription ?? "Conheça um pouco do ambiente e dos detalhes do salão.",
+      spaceDescription: currentPlan?.spaceDescription ?? "",
       spaceImageIds,
       experienceImageIds: spaceImageIds,
       resultImageIds: [],
@@ -4191,7 +4245,7 @@ function buildTestSalonLayoutImagePlan(
       galleryImageIds: [],
       spaceEnabled: false,
       spaceTitle: "Nosso Espaco",
-      spaceDescription: "Conheca um pouco do ambiente e dos detalhes do salao.",
+      spaceDescription: "",
       spaceImageIds: [],
       experienceImageIds: [],
       resultImageIds: [],
@@ -4218,9 +4272,7 @@ function buildTestSalonLayoutImagePlan(
     ]),
     spaceEnabled: true,
     spaceTitle: basePlan.spaceTitle || "Nosso Espaço",
-    spaceDescription:
-      basePlan.spaceDescription ||
-      "Conheça um pouco do ambiente e dos detalhes do salão.",
+    spaceDescription: basePlan.spaceDescription ?? "",
     spaceImageIds: uniqueIds([
       "dev-interior-365-divas",
       ...(basePlan.spaceImageIds ?? []),

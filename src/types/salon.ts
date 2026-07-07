@@ -401,6 +401,7 @@ export type SalonFormInput = {
   whatsapp?: string;
   phone?: string;
   selectedServices: string[];
+  services?: SalonService[];
   galleryImages?: SalonGalleryImage[];
   imageCandidates?: SalonImageCandidate[];
   imageSelectionSummary?: SalonImageSelectionSummary;

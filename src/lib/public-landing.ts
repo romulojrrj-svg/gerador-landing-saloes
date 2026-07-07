@@ -22,7 +22,7 @@ type PublicServiceKey =
 export type PublicService = {
   id: string;
   title: string;
-  description: string;
+  description?: string;
 };
 
 export type PublicHeroCard = {
@@ -706,12 +706,6 @@ export function getPublicText(language: SalonLanguage) {
 }
 
 const legacySpaceTitleValues = ["nosso espaco", "nosso espaço"];
-const legacySpaceDescriptionValues = [
-  "conheca o ambiente, os detalhes e a atmosfera do salao.",
-  "conheça o ambiente, os detalhes e a atmosfera do salão.",
-  "conheca um pouco do ambiente e dos detalhes do salao.",
-  "conheça um pouco do ambiente e dos detalhes do salão.",
-];
 
 function normalizeLocalTextValue(value: string) {
   return value
@@ -750,11 +744,7 @@ export function getPublicSpaceSectionCopy(
 
   return {
     title: resolveLocalizedSpaceText(title, copy.spaceTitle, legacySpaceTitleValues),
-    description: resolveLocalizedSpaceText(
-      description,
-      copy.spaceDescription,
-      legacySpaceDescriptionValues,
-    ),
+    description: clean(description),
   };
 }
 
@@ -817,43 +807,22 @@ export function getPublicAboutText(salon: Salon) {
 
 export function getPublicServices(
   services: SalonService[],
-  language: SalonLanguage,
+  _language: SalonLanguage,
   preferServiceCopy = false,
 ) {
-  const text = getPublicText(language);
   const seen = new Set<string>();
-  const broadGenericService = getBroadGenericService(language);
-  const normalizedServices = services.length
-    ? services
-    : [{ id: "generic", title: "beauty", description: "" }];
+  const normalizedServices = services.filter((service) => clean(service.title));
 
   return normalizedServices
     .map((service) => {
-      const key = classifyService(service.title);
-      const catalogService = text.serviceCatalog[key] ?? text.serviceCatalog.generic;
-      const publicService =
-        preferServiceCopy && clean(service.title) && clean(service.description)
-          ? {
-              id: service.id || catalogService.id,
-              title: service.title,
-              description: service.description,
-            }
-          : key === "generic"
-            ? {
-                id: service.id || "generic",
-                title:
-                  clean(service.title) && normalizeText(service.title) !== "beauty"
-                    ? service.title
-                    : broadGenericService.title,
-                description:
-                  clean(service.description) || broadGenericService.description,
-              }
-            : catalogService;
-
       return {
-        ...publicService,
-        id: service.id || publicService.id,
-        key,
+        id: service.id || normalizeText(service.title) || "service",
+        title: service.title,
+        description:
+          preferServiceCopy || clean(service.description)
+            ? clean(service.description) || undefined
+            : undefined,
+        key: classifyService(service.title),
       };
     })
     .filter((service) => {
@@ -866,41 +835,6 @@ export function getPublicServices(
       seen.add(key);
       return true;
     });
-}
-
-function getBroadGenericService(language: SalonLanguage) {
-  const copyByLanguage: Record<
-    SalonLanguage,
-    { title: string; description: string }
-  > = {
-    "pt-BR": {
-      title: "Atendimentos de beleza e autocuidado",
-      description:
-        "Uma selecao de atendimentos para rotina, eventos e momentos especiais, sempre com cuidado nos detalhes.",
-    },
-    en: {
-      title: "Beauty and self-care appointments",
-      description:
-        "A broader beauty offer for everyday care, events, and special moments.",
-    },
-    es: {
-      title: "Servicios de belleza y autocuidado",
-      description:
-        "Una propuesta mas amplia para rutina, eventos y momentos especiales.",
-    },
-    fr: {
-      title: "Beaute et soins",
-      description:
-        "Une presentation plus large pour le quotidien, les evenements et les moments speciaux.",
-    },
-    no: {
-      title: "Skjonnhet og egenpleie",
-      description:
-        "Et bredere tilbud for hverdagspleie, arrangementer og spesielle anledninger.",
-    },
-  };
-
-  return copyByLanguage[language] ?? copyByLanguage.en;
 }
 
 export function getPublicServiceSummary(

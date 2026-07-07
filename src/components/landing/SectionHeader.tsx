@@ -1,7 +1,7 @@
 type SectionHeaderProps = {
   eyebrow?: string;
   title: string;
-  description: string;
+  description?: string;
   align?: "left" | "center";
 };
 
@@ -27,9 +27,11 @@ export function SectionHeader({
       <h2 className="mt-3.5 font-serif text-[1.72rem] font-semibold leading-tight text-zinc-950 sm:text-4xl lg:text-[2.75rem]">
         {title}
       </h2>
-      <p className="mt-2.5 text-[0.95rem] leading-7 text-zinc-600 sm:text-lg sm:leading-8">
-        {description}
-      </p>
+      {description ? (
+        <p className="mt-2.5 text-[0.95rem] leading-7 text-zinc-600 sm:text-lg sm:leading-8">
+          {description}
+        </p>
+      ) : null}
     </div>
   );
 }

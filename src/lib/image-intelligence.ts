@@ -280,7 +280,7 @@ export function createLocalImagePlan(
     galleryImageIds: galleryCandidates.map((candidate) => candidate.id),
     spaceEnabled: spaceCandidates.length > 0,
     spaceTitle: "Nosso Espaço",
-    spaceDescription: "Conheça um pouco do ambiente e dos detalhes do salão.",
+    spaceDescription: "",
     spaceImageIds: spaceCandidates.map((candidate) => candidate.id),
     experienceImageIds: spaceCandidates.map((candidate) => candidate.id),
     resultImageIds: [],
@@ -574,9 +574,7 @@ export function validateChatGptCurationJson(
     galleryImageIds,
     spaceEnabled,
     spaceTitle: cleanString(payload.spaceTitle) || "Nosso Espaço",
-    spaceDescription:
-      cleanString(payload.spaceDescription) ||
-      "Conheça um pouco do ambiente e dos detalhes do salão.",
+    spaceDescription: cleanString(payload.spaceDescription) || "",
     spaceImageIds: spaceEnabled ? spaceImageIds : [],
     experienceImageIds: spaceEnabled ? spaceImageIds : [],
     resultImageIds: [],

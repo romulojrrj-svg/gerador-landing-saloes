@@ -463,7 +463,7 @@ function buildServiceCopies(
       serviceId: original.id || publicService.id,
       originalTitle: original.title || publicService.title,
       title: publicService.title,
-      description: publicService.description,
+      description: publicService.description ?? "",
     };
   });
 }

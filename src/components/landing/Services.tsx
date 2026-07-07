@@ -7,8 +7,7 @@ import {
   getPublicText,
   shouldShowPublicServices,
 } from "@/lib/public-landing";
-import type { Salon, SalonService } from "@/types/salon";
-import type { SalonLanguage } from "@/types/salon";
+import type { Salon, SalonLanguage, SalonService } from "@/types/salon";
 import { SectionHeader } from "./SectionHeader";
 
 type ServicesProps = {
@@ -48,13 +47,13 @@ export function Services({ services, language, salon }: ServicesProps) {
     : serviceSummary
       ? serviceSummary.split(",").map((item) => item.trim()).filter(Boolean).slice(0, 4)
       : [];
-  const serviceEntries = compactServices.length
+  const serviceEntries = !publicServices.length && compactServices.length
     ? compactServices.slice(0, 4).map((service, index) => ({
         id: `${service}-${index}`,
         title: service,
-        description: getCompactServiceDescription(service, language),
+        description: undefined,
       }))
-    : publicServices.slice(0, 3).map((service) => ({
+    : publicServices.slice(0, 4).map((service) => ({
         id: service.id,
         title: service.title,
         description: service.description,
@@ -99,9 +98,11 @@ export function Services({ services, language, salon }: ServicesProps) {
                       <ArrowUpRight className="h-3.5 w-3.5" />
                     </span>
                   </div>
-                  <p className="mt-1.5 text-sm leading-6 text-zinc-600">
-                    {service.description}
-                  </p>
+                  {service.description ? (
+                    <p className="mt-1.5 text-sm leading-6 text-zinc-600">
+                      {service.description}
+                    </p>
+                  ) : null}
                 </div>
               </article>
             );
@@ -110,83 +111,4 @@ export function Services({ services, language, salon }: ServicesProps) {
       </div>
     </section>
   );
-}
-
-function getCompactServiceDescription(
-  service: string,
-  language: SalonLanguage,
-) {
-  const normalizedService = service.trim().toLowerCase();
-
-  if (
-    normalizedService.includes("cabelo") ||
-    normalizedService.includes("hair") ||
-    normalizedService.includes("cabello")
-  ) {
-    return getLocalizedCompactDescription(
-      language,
-      "Atendimentos voltados para estilo, finalização e cuidado com o visual.",
-      "Appointments focused on styling, finishing, and everyday beauty care.",
-      "Atenciones enfocadas en estilo, acabado y cuidado del look.",
-      "Behandlinger med fokus på styling, finish og pleie av looken.",
-    );
-  }
-
-  if (
-    normalizedService.includes("unha") ||
-    normalizedService.includes("nail") ||
-    normalizedService.includes("uñas")
-  ) {
-    return getLocalizedCompactDescription(
-      language,
-      "Cuidados para mãos e pés com acabamento delicado e atenção aos detalhes.",
-      "Care for hands and feet with a polished finish and attention to detail.",
-      "Cuidados para manos y pies con acabado delicado y atención al detalle.",
-      "Pleie for hender og føtter med fint resultat og fokus på detaljer.",
-    );
-  }
-
-  if (
-    normalizedService.includes("maqui") ||
-    normalizedService.includes("makeup") ||
-    normalizedService.includes("maquill")
-  ) {
-    return getLocalizedCompactDescription(
-      language,
-      "Produções pensadas para eventos, fotos e momentos especiais.",
-      "Looks prepared for events, photos, and special occasions.",
-      "Looks pensados para eventos, fotos y ocasiones especiales.",
-      "Looks til arrangementer, bilder og spesielle anledninger.",
-    );
-  }
-
-  return getLocalizedCompactDescription(
-    language,
-    "Atendimento disponível para quem busca cuidado, praticidade e boa apresentação.",
-    "Available appointments for clients looking for care, convenience, and a polished result.",
-    "Atención disponible para quienes buscan cuidado, practicidad y una buena presentación.",
-    "Tilgjengelige behandlinger for deg som ønsker pleie, enkelhet og et pent resultat.",
-  );
-}
-
-function getLocalizedCompactDescription(
-  language: SalonLanguage,
-  pt: string,
-  en: string,
-  es: string,
-  no: string,
-) {
-  if (language === "pt-BR") {
-    return pt;
-  }
-
-  if (language === "es") {
-    return es;
-  }
-
-  if (language === "no") {
-    return no;
-  }
-
-  return en;
 }

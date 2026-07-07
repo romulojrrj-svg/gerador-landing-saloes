@@ -19,8 +19,6 @@ type MoveImageToDestinationResult = {
 };
 
 const DEFAULT_SPACE_TITLE = "Nosso Espaco";
-const DEFAULT_SPACE_DESCRIPTION =
-  "Conheca um pouco do ambiente e dos detalhes do salao.";
 
 export function normalizeSalonLayoutImagePlan(
   plan?: SalonLayoutImagePlan,
@@ -155,8 +153,7 @@ export function normalizeSalonLayoutImagePlan(
     galleryImageIds,
     spaceEnabled,
     spaceTitle: cleanString(plan.spaceTitle) || DEFAULT_SPACE_TITLE,
-    spaceDescription:
-      cleanString(plan.spaceDescription) || DEFAULT_SPACE_DESCRIPTION,
+    spaceDescription: cleanString(plan.spaceDescription) ?? "",
     spaceImageIds,
     experienceImageIds: spaceImageIds,
     resultImageIds: [],
@@ -458,7 +455,7 @@ function createEmptySalonLayoutImagePlan(): SalonLayoutImagePlan {
     galleryImageIds: [],
     spaceEnabled: false,
     spaceTitle: DEFAULT_SPACE_TITLE,
-    spaceDescription: DEFAULT_SPACE_DESCRIPTION,
+    spaceDescription: "",
     spaceImageIds: [],
     experienceImageIds: [],
     resultImageIds: [],

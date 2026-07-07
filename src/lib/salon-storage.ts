@@ -43,21 +43,6 @@ export const landingLanguageLabels: Record<string, string> = {
   fr: "FrancÃªs",
 };
 
-const serviceDescriptions: Record<string, string> = {
-  "Design de cabelo":
-    "Personalized cut, finish, and styling direction planned around face shape, lifestyle, and texture.",
-  "Coloracao":
-    "Dimensional color, glossing, and tone correction for a luminous result that looks polished in natural and studio light.",
-  "Rituais de pele":
-    "A calm skin ritual combining cleansing, sculpting massage, and glow-focused finishing products.",
-  "Noivas e eventos":
-    "Camera-ready styling for weddings, dinners, launches, and private event preparation.",
-  "AteliÃª de unhas":
-    "Detailed nail care with refined shaping, long-wear color, and a clean editorial finish.",
-  "Maquiagem":
-    "Soft, elevated makeup for photos, events, and clients who want a polished but breathable finish.",
-};
-
 const defaultGalleryImages: SalonGalleryImage[] = [
   {
     id: "hero",
@@ -404,6 +389,12 @@ export function salonFormInputToPartialSalon(data: SalonFormInput) {
 }
 
 export function formDataToInput(formData: FormData): SalonFormInput {
+  const language = getLanguage(formData);
+  const selectedServices = formData
+    .getAll("services")
+    .map((service) => String(service))
+    .filter(Boolean);
+
   return {
     name: getString(formData, "name", ""),
     location: getString(formData, "location", ""),
@@ -411,7 +402,7 @@ export function formDataToInput(formData: FormData): SalonFormInput {
     country: getString(formData, "country", ""),
     status: getStatus(formData),
     commercialStatus: getCommercialStatus(formData),
-    language: getLanguage(formData),
+    language,
     positioningLine: getString(formData, "positioningLine", ""),
     description: getString(formData, "description", ""),
     visualStyle: getString(formData, "visualStyle", "Luxo suave"),
@@ -434,10 +425,12 @@ export function formDataToInput(formData: FormData): SalonFormInput {
       visualNotes: getOptionalString(formData, "visualNotes"),
     },
     manualAssistantNotes: getOptionalString(formData, "manualAssistantNotes"),
-    selectedServices: formData
-      .getAll("services")
-      .map((service) => String(service))
-      .filter(Boolean),
+    selectedServices,
+    services: selectedServicesToSalonServices(
+      selectedServices,
+      language,
+      getServiceDescriptionMap(formData, selectedServices),
+    ),
     notes: getOptionalString(formData, "notes"),
   };
 }
@@ -764,7 +757,9 @@ function dataToPartialSalon(data: SalonFormInput): Partial<Salon> {
     whatsapp: data.whatsapp,
     phone: data.phone,
     selectedServices: data.selectedServices,
-    services: selectedServicesToSalonServices(data.selectedServices, data.language),
+    services:
+      data.services ??
+      selectedServicesToSalonServices(data.selectedServices, data.language),
     galleryImages: data.galleryImages,
     testimonials: data.testimonials,
     businessHours: data.businessHours,
@@ -814,16 +809,19 @@ function dataToPartialSalon(data: SalonFormInput): Partial<Salon> {
 export function selectedServicesToSalonServices(
   selectedServices: string[] | undefined,
   language: SalonLanguage = "en",
+  descriptions: Record<string, string> = {},
 ): SalonService[] {
+  void language;
   const normalizedSelectedServices = selectedServices ?? [];
-  const services = normalizedSelectedServices.length
-    ? normalizedSelectedServices
-    : [getFallbackServiceTitle(language)];
 
-  return services.map((service) => ({
+  if (!normalizedSelectedServices.length) {
+    return [];
+  }
+
+  return normalizedSelectedServices.map((service) => ({
     id: normalizeSlug(service),
     title: service,
-    description: getServiceDescription(service, language),
+    description: clean(descriptions[service]) || "",
     price: getServicePriceLabel(language),
     category: inferServiceCategory(service),
     featured: true,
@@ -839,9 +837,7 @@ function normalizeServices(
     return services.map((service) => ({
       ...service,
       id: service.id || normalizeSlug(service.title),
-      description:
-        service.description ||
-        getServiceDescription(service.title, language),
+      description: clean(service.description) || "",
       category: service.category || inferServiceCategory(service.title),
       featured: service.featured ?? selectedServices.includes(service.title),
     }));
@@ -863,18 +859,6 @@ function normalizeSelectedServices(
   }
 
   return [];
-}
-
-function getFallbackServiceTitle(language: SalonLanguage) {
-  const fallbackTitles: Record<SalonLanguage, string> = {
-    "pt-BR": "Atendimento de beleza",
-    en: "Beauty appointment",
-    es: "Servicio de belleza",
-    fr: "Service beautÃ©",
-    no: "SkjÃ¸nnhetsbehandling",
-  };
-
-  return fallbackTitles[language] ?? fallbackTitles.en;
 }
 
 function normalizeGalleryImages(
@@ -1093,25 +1077,27 @@ function normalizeCopyHistory(copyHistory?: SalonCopySuggestion[]) {
     .slice(0, 8);
 }
 
-function getServiceDescription(service: string, language: SalonLanguage) {
-  const copyByLanguage: Record<SalonLanguage, string> = {
-    "pt-BR":
-      "Atendimento personalizado, planejado de acordo com perfil, objetivo, rotina e preferencia de agendamento da cliente.",
-    en:
-      "A tailored appointment shaped around the client profile, beauty goals, and preferred booking window.",
-    es:
-      "Una cita personalizada segÃºn el perfil, los objetivos de belleza, la rutina y el horario preferido de la clienta.",
-    fr:
-      "Un rendez-vous personnalisÃ© selon le profil, les objectifs beautÃ©, le rythme et le crÃ©neau prÃ©fÃ©rÃ© de la cliente.",
-    no:
-      "En personlig avtale tilpasset kundens profil, mÃ¥l, rutine og Ã¸nsket bookingtid.",
-  };
+function getServiceDescriptionMap(
+  formData: FormData,
+  selectedServices: string[],
+) {
+  const descriptions: Record<string, string> = {};
 
-  if (language === "en" && serviceDescriptions[service]) {
-    return serviceDescriptions[service];
+  for (const [key, value] of formData.entries()) {
+    if (!key.startsWith("serviceDescription::")) {
+      continue;
+    }
+
+    const serviceName = key.slice("serviceDescription::".length);
+
+    if (!serviceName || !selectedServices.includes(serviceName)) {
+      continue;
+    }
+
+    descriptions[serviceName] = String(value);
   }
 
-  return copyByLanguage[language] ?? copyByLanguage.en;
+  return descriptions;
 }
 
 function getServicePriceLabel(language: SalonLanguage) {

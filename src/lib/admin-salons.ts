@@ -36,7 +36,9 @@ export async function listAdminSalons(): Promise<AdminSalonListResult> {
 
   const { data, error } = await client.client
     .from("salons")
-    .select("*")
+    .select(
+      "id,slug,name,status,commercial_status,language,country,city,address,description,headline,subheadline,booking_url,whatsapp,phone,website_url,instagram_url,google_maps_url,business_hours,created_at,updated_at,services,real_images,real_reviews,copy_suggestions,generated_copy,social_links",
+    )
     .order("updated_at", { ascending: false });
 
   if (error) {
