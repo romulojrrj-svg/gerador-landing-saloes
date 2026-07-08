@@ -1,6 +1,8 @@
+import { normalizeCommercialStatus } from "@/lib/salon-commercial-status";
 import { createSalonDefaults, normalizeSlug } from "@/lib/salon-storage";
 import type {
   Salon,
+  SalonCommercialStatus,
   SalonExtractedBusinessInfo,
   SalonFormInput,
   SalonGalleryImage,
@@ -15,10 +17,12 @@ type ImportFieldKey =
   | "name"
   | "category"
   | "phone"
+  | "whatsapp"
   | "address"
   | "city"
   | "county"
   | "state"
+  | "country"
   | "rating"
   | "reviews"
   | "photo"
@@ -36,7 +40,9 @@ type ImportFieldKey =
   | "opening_hours"
   | "main_services"
   | "short_description"
-  | "data_quality_notes";
+  | "data_quality_notes"
+  | "status"
+  | "commercial_status";
 
 export type OutscraperRawRow = Record<string, string>;
 
@@ -56,6 +62,7 @@ export type OutscraperMappedSalon = {
   city: string;
   county: string;
   state: string;
+  country: string;
   location: string;
   rating: string;
   reviewsCount: string;
@@ -67,6 +74,7 @@ export type OutscraperMappedSalon = {
   bookingUrl: string;
   bookingAppointmentUrl: string;
   reservationLinks: string;
+  posts: string;
   openingHours: string;
   mainServices: string;
   query: string;
@@ -89,6 +97,8 @@ export type OutscraperMappedSalon = {
   hasOpeningHours: boolean;
   hasMainServices: boolean;
   hasReviews: boolean;
+  status?: SalonStatus;
+  commercialStatus?: SalonCommercialStatus;
 };
 
 export type OutscraperImportPreviewRow = {
@@ -176,14 +186,16 @@ const FIELD_ALIASES: Record<ImportFieldKey, string[]> = {
   name: ["name"],
   category: ["category"],
   phone: ["phone", "telephone", "tel"],
-  address: ["address"],
+  whatsapp: ["whatsapp", "whatsapp_phone", "phone_whatsapp"],
+  address: ["address", "full_address", "formatted_address"],
   city: ["city"],
   county: ["county"],
-  state: ["state", "country"],
+  state: ["state", "region", "province"],
+  country: ["country"],
   rating: ["rating"],
-  reviews: ["reviews", "review_count"],
-  photo: ["photo", "image", "cover_photo"],
-  logo: ["logo"],
+  reviews: ["reviews", "review_count", "reviews_count"],
+  photo: ["photo", "photos", "image", "cover_photo"],
+  logo: ["logo", "logo_url"],
   reservation_links: ["reservation_links", "reservation_links_"],
   booking_appointment_link: [
     "booking_appointment_link",
@@ -191,7 +203,7 @@ const FIELD_ALIASES: Record<ImportFieldKey, string[]> = {
   ],
   description: ["description"],
   posts: ["posts"],
-  location_link: ["location_link", "google_maps_url", "google_link"],
+  location_link: ["location_link", "google_maps_url", "google_link", "maps_url"],
   instagram_url: ["instagram_url", "instagram", "instagram_link"],
   instagram_verified: ["instagram_verified"],
   instagram_notes: ["instagram_notes"],
@@ -201,6 +213,13 @@ const FIELD_ALIASES: Record<ImportFieldKey, string[]> = {
   main_services: ["main_services", "services"],
   short_description: ["short_description", "summary"],
   data_quality_notes: ["data_quality_notes", "quality_notes"],
+  status: ["status", "landing_status", "publication_status"],
+  commercial_status: [
+    "commercial_status",
+    "classificacao_interna",
+    "classificacao",
+    "internal_status",
+  ],
 };
 
 export function detectOutscraperColumns(headers: string[]) {
@@ -367,11 +386,11 @@ export function buildSalonForOutscraperImport(
     name: mapped.name,
     location: mapped.location,
     city: mapped.city,
-    country: mapped.state,
+    country: mapped.country || mapped.state,
     language,
     landingLanguage: language,
-    status,
-    commercialStatus: "review_photos",
+    status: mapped.status ?? status,
+    commercialStatus: mapped.commercialStatus ?? "review_photos",
     sourceMode: "imported",
     generationStatus: "needs_review",
     dataConfidence:
@@ -412,8 +431,9 @@ export function mapOutscraperRowToFormInput(
     name: mapped.name,
     location: mapped.location,
     city: mapped.city,
-    country: mapped.state,
-    status: "draft",
+    country: mapped.country || mapped.state,
+    status: mapped.status ?? "draft",
+    commercialStatus: mapped.commercialStatus,
     language,
     positioningLine: mapped.shortDescription,
     description: mapped.description || mapped.shortDescription,
@@ -484,10 +504,12 @@ function mapOutscraperRow(raw: OutscraperRawRow): OutscraperMappedSalon {
   const name = getField(raw, "name");
   const category = getField(raw, "category");
   const phone = getField(raw, "phone");
+  const whatsapp = getField(raw, "whatsapp") || phone;
   const address = getField(raw, "address");
   const city = getField(raw, "city");
   const county = getField(raw, "county");
   const state = getField(raw, "state");
+  const country = getField(raw, "country");
   const rating = getField(raw, "rating");
   const reviewsCount = getField(raw, "reviews");
   const photoUrl = getField(raw, "photo");
@@ -496,6 +518,7 @@ function mapOutscraperRow(raw: OutscraperRawRow): OutscraperMappedSalon {
   const bookingAppointmentUrl = getField(raw, "booking_appointment_link");
   const bookingUrl = getField(raw, "booking_url");
   const description = getField(raw, "description");
+  const posts = getField(raw, "posts");
   const query = getField(raw, "query");
   const locationLink = getField(raw, "location_link");
   const instagramUrl = getField(raw, "instagram_url");
@@ -506,12 +529,15 @@ function mapOutscraperRow(raw: OutscraperRawRow): OutscraperMappedSalon {
   const mainServices = getField(raw, "main_services");
   const shortDescription = getField(raw, "short_description");
   const dataQualityNotes = getField(raw, "data_quality_notes");
-  const whatsapp = phone;
+  const importedStatus = parseOptionalStatus(getField(raw, "status"));
+  const importedCommercialStatus = parseOptionalCommercialStatus(
+    getField(raw, "commercial_status"),
+  );
   const selectedServices = parseServices(mainServices);
   const galleryImages = buildImportedImages(photoUrl, logoUrl, locationLink, websiteUrl);
   const testimonials = buildImportedReviews(raw);
 
-  const location = [city, county, state].filter(Boolean).join(", ") || address;
+  const location = [city, county, state, country].filter(Boolean).join(", ") || address;
   const notes = joinLines([
     category ? `Categoria: ${category}` : "",
     rating ? `Nota do Google: ${rating}` : "",
@@ -533,6 +559,7 @@ function mapOutscraperRow(raw: OutscraperRawRow): OutscraperMappedSalon {
     "Importado de planilha do Outscraper.",
     query ? `Busca: ${query}` : "",
     category ? `Categoria: ${category}` : "",
+    posts ? `Posts: ${posts}` : "",
   ]);
 
   return {
@@ -544,6 +571,7 @@ function mapOutscraperRow(raw: OutscraperRawRow): OutscraperMappedSalon {
     city,
     county,
     state,
+    country,
     location,
     rating,
     reviewsCount,
@@ -555,6 +583,7 @@ function mapOutscraperRow(raw: OutscraperRawRow): OutscraperMappedSalon {
     bookingUrl,
     bookingAppointmentUrl,
     reservationLinks,
+    posts,
     openingHours,
     mainServices,
     query,
@@ -583,6 +612,8 @@ function mapOutscraperRow(raw: OutscraperRawRow): OutscraperMappedSalon {
     hasOpeningHours: Boolean(openingHours),
     hasMainServices: Boolean(mainServices),
     hasReviews: testimonials.length > 0,
+    status: importedStatus,
+    commercialStatus: importedCommercialStatus,
   };
 }
 
@@ -627,13 +658,14 @@ function buildImportedImages(
   const images: SalonGalleryImage[] = [];
 
   if (logoUrl) {
+    const resolvedLogoUrl = firstUrl(logoUrl) || logoUrl;
     images.push({
-      id: `import-logo-${normalizeSlug(logoUrl).slice(0, 18)}`,
-      url: logoUrl,
-      src: logoUrl,
+      id: `import-logo-${normalizeSlug(resolvedLogoUrl).slice(0, 18)}`,
+      url: resolvedLogoUrl,
+      src: resolvedLogoUrl,
       alt: "Logo importada do cadastro",
       type: "logo",
-      source: inferImageSource(logoUrl),
+      source: inferImageSource(resolvedLogoUrl),
       sourceUrl: websiteUrl || locationLink || undefined,
       isReal: true,
       selectedForLanding: true,
@@ -642,13 +674,14 @@ function buildImportedImages(
   }
 
   if (photoUrl) {
+    const resolvedPhotoUrl = firstUrl(photoUrl) || photoUrl;
     images.push({
-      id: `import-photo-${normalizeSlug(photoUrl).slice(0, 18)}`,
-      url: photoUrl,
-      src: photoUrl,
+      id: `import-photo-${normalizeSlug(resolvedPhotoUrl).slice(0, 18)}`,
+      url: resolvedPhotoUrl,
+      src: resolvedPhotoUrl,
       alt: "Foto inicial importada do cadastro",
       type: "hero",
-      source: inferImageSource(photoUrl),
+      source: inferImageSource(resolvedPhotoUrl),
       sourceUrl: locationLink || websiteUrl || undefined,
       isReal: true,
       selectedForLanding: true,
@@ -731,6 +764,31 @@ function parseOptionalCount(value: string) {
   return Number.isFinite(count) ? count : undefined;
 }
 
+function parseOptionalStatus(value: string): SalonStatus | undefined {
+  const normalizedValue = value.trim().toLowerCase();
+
+  if (
+    normalizedValue === "draft" ||
+    normalizedValue === "preview" ||
+    normalizedValue === "published"
+  ) {
+    return normalizedValue;
+  }
+
+  return undefined;
+}
+
+function parseOptionalCommercialStatus(value: string) {
+  const normalizedValue = value.trim().toLowerCase();
+
+  if (!normalizedValue) {
+    return undefined;
+  }
+
+  const nextValue = normalizeCommercialStatus(normalizedValue);
+  return nextValue === "test" && normalizedValue !== "test" ? undefined : nextValue;
+}
+
 function parseServices(value: string) {
   if (!value.trim()) {
     return [];
@@ -759,7 +817,12 @@ function normalizeExternalUrl(value?: string) {
 
   try {
     const url = new URL(raw);
-    return `${url.origin}${url.pathname}`.replace(/\/+$/, "").toLowerCase();
+    const base = `${url.origin}${url.pathname}`.replace(/\/+$/, "").toLowerCase();
+    const preserveSearch =
+      Boolean(url.search) &&
+      (url.pathname === "/" || url.hostname.includes("google."));
+
+    return preserveSearch ? `${base}${url.search.toLowerCase()}` : base;
   } catch {
     return raw.toLowerCase().replace(/\/+$/, "");
   }
