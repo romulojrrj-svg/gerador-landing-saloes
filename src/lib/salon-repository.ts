@@ -68,17 +68,157 @@ export type SalonRepositoryListResult =
       source: SalonRepositorySource;
     };
 
+export type SalonMigrationScope =
+  | "profile"
+  | "contacts"
+  | "services"
+  | "copy"
+  | "images"
+  | "reviews"
+  | "publication"
+  | "commercial";
+
+export type SalonMigrationItem = {
+  id: string;
+  slug: string;
+  name: string;
+  action: "create" | "update" | "skip";
+  status:
+    | "ready"
+    | "blocked-newer-production"
+    | "no-changes"
+    | "migrated"
+    | "failed";
+  changedFields: string[];
+  localUpdatedAt: string;
+  productionUpdatedAt?: string;
+  reason?: string;
+};
+
+export type SalonMigrationOptions = {
+  selectedSlugs: string[];
+  dryRun?: boolean;
+  force?: boolean;
+  scopes?: SalonMigrationScope[];
+};
+
+export const DEFAULT_SALON_MIGRATION_SCOPES: SalonMigrationScope[] = [
+  "profile",
+  "contacts",
+  "services",
+  "copy",
+];
+
+const SALON_MIGRATION_SCOPE_FIELDS: Record<
+  SalonMigrationScope,
+  Array<keyof Salon>
+> = {
+  profile: [
+    "name",
+    "location",
+    "city",
+    "country",
+    "language",
+    "landingLanguage",
+    "positioningLine",
+    "description",
+    "heroOverlayTitle",
+    "heroOverlaySubtitle",
+    "visualStyle",
+    "brandTone",
+    "businessHours",
+    "address",
+    "extractedBusinessInfo",
+    "notes",
+  ],
+  contacts: [
+    "instagramUrl",
+    "instagramProfileUrl",
+    "googleMapsUrl",
+    "googleBusinessUrl",
+    "websiteUrl",
+    "bookingUrl",
+    "whatsapp",
+    "phone",
+    "socialLinks",
+  ],
+  services: [
+    "services",
+    "selectedServices",
+    "serviceCategories",
+    "featuredServices",
+    "suggestedServices",
+  ],
+  copy: [
+    "headline",
+    "subheadline",
+    "aboutText",
+    "ctaPrimary",
+    "ctaSecondary",
+    "ctaTitle",
+    "ctaText",
+    "suggestedCopy",
+    "copySuggestions",
+    "generatedCopy",
+    "copyHistory",
+    "lastGeneratedAt",
+    "lastAppliedAt",
+    "generatedCopyStatus",
+    "aiBrief",
+    "promptMetadata",
+    "manualAssistantNotes",
+  ],
+  images: [
+    "galleryImages",
+    "gallery",
+    "realImages",
+    "imageCandidates",
+    "imageSelectionSummary",
+    "layoutImagePlan",
+    "heroImage",
+    "images",
+    "hasRealImages",
+    "imagesSourceStatus",
+    "suggestedImages",
+    "importedInstagramImages",
+    "instagramImportStatus",
+    "sourceMaterials",
+    "sourceProfile",
+    "lastImportAt",
+    "importErrors",
+  ],
+  reviews: [
+    "testimonials",
+    "realReviews",
+    "googleRating",
+    "googleReviewCount",
+    "hasRealReviews",
+    "reviewsSourceStatus",
+    "googleReviewsImportStatus",
+  ],
+  publication: ["status"],
+  commercial: ["commercialStatus"],
+};
+
 export type SalonMigrationResult =
   | {
       ok: true;
       source: "local" | "server-local";
+      dryRun: boolean;
+      force: boolean;
+      scopes: SalonMigrationScope[];
+      selectedSlugs: string[];
       total: number;
+      plannedCreates: number;
+      plannedUpdates: number;
       created: number;
       updated: number;
       confirmed: number;
+      skipped: number;
       failed: number;
       errors: string[];
       migratedSlugs: string[];
+      items: SalonMigrationItem[];
     }
   | {
       ok: false;
@@ -184,8 +324,12 @@ export async function listSalons(): Promise<SalonRepositoryListResult> {
   }
 
   if (status.activeSource === "server-local") {
-    await maybeSeedServerLocalFromLocalStorage();
-    const serverLocalResult = await listServerLocalSalons();
+    let serverLocalResult = await listServerLocalSalons();
+
+    if (serverLocalResult.ok && serverLocalResult.salons.length === 0) {
+      await maybeSeedServerLocalFromLocalStorage(serverLocalResult);
+      serverLocalResult = await listServerLocalSalons();
+    }
 
     if (serverLocalResult.ok) {
       debugRepository("list-success", {
@@ -666,6 +810,19 @@ export function getLocalSalonCount() {
   return getSalonIndex().length;
 }
 
+export async function listMigrationSourceSalons() {
+  if (isProductionEnvironment()) {
+    return [] as Salon[];
+  }
+
+  if (getSalonRepositoryStatus().activeSource === "server-local") {
+    const result = await listServerLocalSalons();
+    return result.ok ? result.salons : [];
+  }
+
+  return listLocalSalons();
+}
+
 export async function getSupabaseSalonCount() {
   if (shouldUseAdminApi()) {
     const result = await fetchAdminSalonList();
@@ -678,9 +835,21 @@ export async function getSupabaseSalonCount() {
     return null;
   }
 
-  const { count, error } = await client
+  const query = client
     .from("salons")
     .select("id", { count: "exact", head: true });
+  const result = await Promise.race([
+    query,
+    new Promise<null>((resolve) => {
+      setTimeout(() => resolve(null), 4_000);
+    }),
+  ]);
+
+  if (!result) {
+    return null;
+  }
+
+  const { count, error } = result;
 
   if (error) {
     return null;
@@ -689,7 +858,25 @@ export async function getSupabaseSalonCount() {
   return count ?? 0;
 }
 
-export async function migrateLocalSalonsToSupabase(): Promise<SalonMigrationResult> {
+export async function migrateLocalSalonsToSupabase(
+  options: SalonMigrationOptions,
+): Promise<SalonMigrationResult> {
+  const selectedSlugs = Array.from(
+    new Set(options.selectedSlugs.map((slug) => normalizeSlug(slug)).filter(Boolean)),
+  );
+  const dryRun = options.dryRun !== false;
+  const force = options.force === true;
+  const scopes = options.scopes?.length
+    ? Array.from(new Set(options.scopes))
+    : DEFAULT_SALON_MIGRATION_SCOPES;
+
+  if (!selectedSlugs.length) {
+    return {
+      ok: false,
+      error: "Selecione pelo menos um salão. Por segurança, nenhum salão é migrado por padrão.",
+    };
+  }
+
   if (isProductionEnvironment()) {
     return {
       ok: false,
@@ -732,15 +919,21 @@ export async function migrateLocalSalonsToSupabase(): Promise<SalonMigrationResu
     };
   }
 
-  const sourceSalons = sourceResult.salons;
+  const sourceSalonMap = new Map(
+    sourceResult.salons.map((salon) => [normalizeSlug(salon.slug), salon]),
+  );
+  const sourceSalons = selectedSlugs.flatMap((slug) => {
+    const salon = sourceSalonMap.get(slug);
+    return salon ? [salon] : [];
+  });
 
   if (!sourceSalons.length) {
     return {
       ok: false,
       error:
         migrationSource === "server-local"
-          ? "Nenhum salao encontrado no server-local para migrar."
-          : "Nenhum salao encontrado no localStorage para migrar.",
+          ? "Nenhum dos salões selecionados foi encontrado no server-local."
+          : "Nenhum dos salões selecionados foi encontrado no localStorage.",
     };
   }
 
@@ -755,12 +948,23 @@ export async function migrateLocalSalonsToSupabase(): Promise<SalonMigrationResu
 
   const errors: string[] = [];
   const migratedSlugs: string[] = [];
+  const items: SalonMigrationItem[] = [];
+  const productionSalonMap = new Map(
+    adminPreflight.salons.map((salon) => [normalizeSlug(salon.slug), salon]),
+  );
+  const preparedSalons = new Map<
+    string,
+    { salon: Salon; productionUpdatedAt?: string; localUpdatedAt: string }
+  >();
   let created = 0;
   let updated = 0;
 
   debugRepository("migrate-start", {
     source: migrationSource,
-    total: sourceSalons.length,
+    dryRun,
+    force,
+    scopes,
+    total: selectedSlugs.length,
     salons: sourceSalons.map((salon) => ({
       name: salon.name,
       slug: salon.slug,
@@ -770,6 +974,64 @@ export async function migrateLocalSalonsToSupabase(): Promise<SalonMigrationResu
   });
 
   for (const salon of sourceSalons) {
+    const productionSalon = productionSalonMap.get(normalizeSlug(salon.slug));
+    const migrationSalon = buildScopedMigrationSalon(salon, productionSalon, scopes);
+    const changedFields = getChangedMigrationFields(
+      productionSalon,
+      migrationSalon,
+      scopes,
+    );
+    const productionIsNewer =
+      productionSalon &&
+      toTimestamp(productionSalon.updatedAt) > toTimestamp(salon.updatedAt);
+
+    if (productionIsNewer && !force) {
+      items.push({
+        id: salon.id,
+        slug: salon.slug,
+        name: salon.name,
+        action: "skip",
+        status: "blocked-newer-production",
+        changedFields,
+        localUpdatedAt: salon.updatedAt,
+        productionUpdatedAt: productionSalon.updatedAt,
+        reason:
+          "Produção é mais recente. Marque FORCE explicitamente somente após revisar o conflito.",
+      });
+      continue;
+    }
+
+    if (productionSalon && !changedFields.length) {
+      items.push({
+        id: salon.id,
+        slug: salon.slug,
+        name: salon.name,
+        action: "skip",
+        status: "no-changes",
+        changedFields: [],
+        localUpdatedAt: salon.updatedAt,
+        productionUpdatedAt: productionSalon.updatedAt,
+        reason: "Nenhuma diferença encontrada dentro do escopo selecionado.",
+      });
+      continue;
+    }
+
+    items.push({
+      id: salon.id,
+      slug: salon.slug,
+      name: salon.name,
+      action: productionSalon ? "update" : "create",
+      status: "ready",
+      changedFields,
+      localUpdatedAt: salon.updatedAt,
+      productionUpdatedAt: productionSalon?.updatedAt,
+    });
+    preparedSalons.set(salon.slug, {
+      salon: migrationSalon,
+      productionUpdatedAt: productionSalon?.updatedAt,
+      localUpdatedAt: salon.updatedAt,
+    });
+
     debugRepository("migrate-row-start", {
       name: salon.name,
       slug: salon.slug,
@@ -778,61 +1040,92 @@ export async function migrateLocalSalonsToSupabase(): Promise<SalonMigrationResu
       source: migrationSource,
     });
 
-    const existingCheck = await fetchAdminRepository<{ salon: Salon }>(
-      `/api/admin/salons/${encodeURIComponent(salon.slug)}`,
-    );
+  }
 
-    if (!existingCheck.ok && existingCheck.status !== 404) {
-      const errorMessage = `${salon.name} (${salon.slug}): falha ao verificar existencia no Supabase. ${existingCheck.error}`;
-      errors.push(errorMessage);
-      debugRepository("migrate-row-verify-before-failed", {
-        slug: salon.slug,
-        status: existingCheck.status,
-        error: existingCheck.error,
-      });
+  const plannedCreates = items.filter((item) => item.action === "create").length;
+  const plannedUpdates = items.filter((item) => item.action === "update").length;
+
+  if (dryRun) {
+    return {
+      ok: true,
+      source: migrationSource,
+      dryRun: true,
+      force,
+      scopes,
+      selectedSlugs,
+      total: selectedSlugs.length,
+      plannedCreates,
+      plannedUpdates,
+      created: 0,
+      updated: 0,
+      confirmed: 0,
+      skipped: items.filter((item) => item.action === "skip").length,
+      failed: 0,
+      errors,
+      migratedSlugs,
+      items,
+    };
+  }
+
+  for (const item of items) {
+    if (item.status !== "ready") {
       continue;
     }
 
-    const existedBefore = existingCheck.ok;
-    const upsertResult = await fetchAdminUpsertSalon(salon);
+    const prepared = preparedSalons.get(item.slug);
+
+    if (!prepared) {
+      continue;
+    }
+
+    const upsertResult = await fetchAdminMigrateSalon(prepared.salon, {
+      sourceUpdatedAt: prepared.localUpdatedAt,
+      expectedProductionUpdatedAt: prepared.productionUpdatedAt,
+      force,
+    });
 
     if (!upsertResult.ok) {
-      const errorMessage = `${salon.name} (${salon.slug}): ${upsertResult.error}`;
+      const errorMessage = `${item.name} (${item.slug}): ${upsertResult.error}`;
       errors.push(errorMessage);
+      item.status = "failed";
+      item.reason = upsertResult.error;
       debugRepository("migrate-row-upsert-failed", {
-        slug: salon.slug,
+        slug: item.slug,
         error: upsertResult.error,
       });
       continue;
     }
 
     const confirmation = await fetchAdminRepository<{ salon: Salon }>(
-      `/api/admin/salons/${encodeURIComponent(salon.slug)}`,
+      `/api/admin/salons/${encodeURIComponent(item.slug)}`,
     );
 
     if (!confirmation.ok || !confirmation.data?.salon) {
-      const errorMessage = `${salon.name} (${salon.slug}): upsert retornou sucesso, mas o salao nao foi confirmado no Supabase. ${confirmation.ok ? "Resposta sem salao." : confirmation.error}`;
+      const errorMessage = `${item.name} (${item.slug}): gravação retornou sucesso, mas o salão não foi confirmado no Supabase. ${confirmation.ok ? "Resposta sem salão." : confirmation.error}`;
       errors.push(errorMessage);
+      item.status = "failed";
+      item.reason = errorMessage;
       debugRepository("migrate-row-confirmation-failed", {
-        slug: salon.slug,
+        slug: item.slug,
         status: confirmation.status,
         error: confirmation.ok ? "missing-confirmed-salon" : confirmation.error,
       });
       continue;
     }
 
-    migratedSlugs.push(salon.slug);
+    item.status = "migrated";
+    migratedSlugs.push(item.slug);
 
-    if (existedBefore) {
+    if (item.action === "update") {
       updated += 1;
       debugRepository("migrate-row-updated", {
-        slug: salon.slug,
+        slug: item.slug,
         confirmedId: confirmation.data.salon.id,
       });
     } else {
       created += 1;
       debugRepository("migrate-row-created", {
-        slug: salon.slug,
+        slug: item.slug,
         confirmedId: confirmation.data.salon.id,
       });
     }
@@ -854,14 +1147,92 @@ export async function migrateLocalSalonsToSupabase(): Promise<SalonMigrationResu
   return {
     ok: true,
     source: migrationSource,
-    total: sourceSalons.length,
+    dryRun: false,
+    force,
+    scopes,
+    selectedSlugs,
+    total: selectedSlugs.length,
+    plannedCreates,
+    plannedUpdates,
     created,
     updated,
     confirmed,
+    skipped: items.filter((item) => item.action === "skip").length,
     failed: errors.length,
     errors,
     migratedSlugs,
+    items,
   };
+}
+
+function buildScopedMigrationSalon(
+  localSalon: Salon,
+  productionSalon: Salon | undefined,
+  scopes: SalonMigrationScope[],
+) {
+  const targetSalon =
+    productionSalon ??
+    createSalonDefaults({
+      id: localSalon.id,
+      slug: localSalon.slug,
+      name: localSalon.name,
+      createdAt: localSalon.createdAt,
+      updatedAt: localSalon.updatedAt,
+      status: "draft",
+    });
+  const nextSalon = { ...targetSalon } as Salon;
+  const mutableSalon = nextSalon as unknown as Record<string, unknown>;
+  const localRecord = localSalon as unknown as Record<string, unknown>;
+
+  for (const scope of scopes) {
+    for (const field of SALON_MIGRATION_SCOPE_FIELDS[scope]) {
+      mutableSalon[field] = localRecord[field];
+    }
+  }
+
+  if (scopes.includes("contacts") && !scopes.includes("images")) {
+    nextSalon.sourceProfile = {
+      ...targetSalon.sourceProfile,
+      instagramProfileUrl:
+        localSalon.instagramProfileUrl || localSalon.instagramUrl || undefined,
+      googleBusinessUrl:
+        localSalon.googleBusinessUrl || localSalon.googleMapsUrl || undefined,
+    };
+  }
+
+  nextSalon.id = productionSalon?.id ?? localSalon.id;
+  nextSalon.slug = localSalon.slug;
+  nextSalon.createdAt = productionSalon?.createdAt ?? localSalon.createdAt;
+  nextSalon.updatedAt = localSalon.updatedAt;
+
+  return createSalonDefaults(nextSalon);
+}
+
+function getChangedMigrationFields(
+  productionSalon: Salon | undefined,
+  migrationSalon: Salon,
+  scopes: SalonMigrationScope[],
+) {
+  const fields = Array.from(
+    new Set(scopes.flatMap((scope) => SALON_MIGRATION_SCOPE_FIELDS[scope])),
+  );
+
+  if (!productionSalon) {
+    return fields.map(String);
+  }
+
+  return fields
+    .filter(
+      (field) =>
+        JSON.stringify(productionSalon[field] ?? null) !==
+        JSON.stringify(migrationSalon[field] ?? null),
+    )
+    .map(String);
+}
+
+function toTimestamp(value: string | undefined) {
+  const timestamp = value ? Date.parse(value) : Number.NaN;
+  return Number.isFinite(timestamp) ? timestamp : 0;
 }
 
 export function subscribeToSalonRepository(callback: () => void) {
@@ -1205,7 +1576,9 @@ function shouldUseAdminApi() {
   );
 }
 
-async function maybeSeedServerLocalFromLocalStorage() {
+async function maybeSeedServerLocalFromLocalStorage(
+  knownServerLocalResult?: SalonRepositoryListResult,
+) {
   if (
     hasAttemptedServerLocalSeed ||
     !isServerLocalStorageEnabled() ||
@@ -1222,7 +1595,8 @@ async function maybeSeedServerLocalFromLocalStorage() {
     return;
   }
 
-  const existingServerLocalSalons = await listServerLocalSalons();
+  const existingServerLocalSalons =
+    knownServerLocalResult ?? (await listServerLocalSalons());
 
   if (
     !existingServerLocalSalons.ok ||
@@ -1492,6 +1866,40 @@ async function fetchAdminUpsertSalon(
     {
       method: "PUT",
       body: JSON.stringify({ salon }),
+    },
+  );
+
+  if (!response.ok) {
+    return {
+      ok: false,
+      error: response.error,
+      source: "supabase",
+    };
+  }
+
+  return {
+    ok: true,
+    salon: response.data.salon,
+    source: "supabase",
+  };
+}
+
+async function fetchAdminMigrateSalon(
+  salon: Salon,
+  guard: {
+    sourceUpdatedAt: string;
+    expectedProductionUpdatedAt?: string;
+    force: boolean;
+  },
+): Promise<SalonRepositoryResult> {
+  const response = await fetchAdminRepository<{ salon: Salon }>(
+    `/api/admin/salons/${encodeURIComponent(salon.slug)}`,
+    {
+      method: "PUT",
+      body: JSON.stringify({
+        salon,
+        migrationGuard: guard,
+      }),
     },
   );
 

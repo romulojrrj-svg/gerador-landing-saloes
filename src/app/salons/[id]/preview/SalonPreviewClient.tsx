@@ -293,6 +293,7 @@ export function SalonPreviewClient({
       />
       <Gallery
         images={getPublicGalleryImages(salon)}
+        salonSlug={salon.slug}
         salonName={salon.name}
         location={salon.location}
         language={salon.language}

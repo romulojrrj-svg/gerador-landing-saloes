@@ -24,6 +24,12 @@ type AdminSalonListResult =
   | { ok: true; salons: Salon[] }
   | { ok: false; error: string; salons: Salon[] };
 
+export type AdminSalonMigrationGuard = {
+  sourceUpdatedAt: string;
+  expectedProductionUpdatedAt?: string;
+  force: boolean;
+};
+
 export async function listAdminSalons(): Promise<AdminSalonListResult> {
   const client = getConfiguredAdminClient();
 
@@ -160,8 +166,13 @@ export async function updateAdminSalonFromInput(
   return saveAdminSalon(updatedSalon);
 }
 
-export async function upsertAdminSalon(salon: Salon): Promise<AdminSalonResult> {
-  return saveAdminSalon(salon);
+export async function upsertAdminSalon(
+  salon: Salon,
+  migrationGuard?: AdminSalonMigrationGuard,
+): Promise<AdminSalonResult> {
+  return migrationGuard
+    ? saveMigratedAdminSalon(salon, migrationGuard)
+    : saveAdminSalon(salon);
 }
 
 export async function deleteAdminSalon(slug: string) {
@@ -220,6 +231,122 @@ function getConfiguredAdminClient(options?: { requireWrite?: boolean }) {
   return {
     ok: true as const,
     client,
+  };
+}
+
+async function saveMigratedAdminSalon(
+  salon: Salon,
+  guard: AdminSalonMigrationGuard,
+): Promise<AdminSalonResult> {
+  const writeAccess = getConfiguredAdminClient({ requireWrite: true });
+
+  if (!writeAccess.ok) {
+    return {
+      ok: false,
+      error: writeAccess.error,
+    };
+  }
+
+  const { data: currentRow, error: readError } = await writeAccess.client
+    .from("salons")
+    .select("id,slug,updated_at")
+    .eq("slug", salon.slug)
+    .maybeSingle();
+
+  if (readError) {
+    return {
+      ok: false,
+      error: `Nao foi possivel validar a versao atual de producao: ${readError.message}`,
+    };
+  }
+
+  const currentUpdatedAt = currentRow?.updated_at as string | undefined;
+
+  if (currentUpdatedAt && !guard.force) {
+    if (!guard.expectedProductionUpdatedAt) {
+      return {
+        ok: false,
+        error:
+          "Migracao bloqueada: execute o DRY_RUN novamente antes de atualizar este salao.",
+      };
+    }
+
+    if (currentUpdatedAt !== guard.expectedProductionUpdatedAt) {
+      return {
+        ok: false,
+        error:
+          "Migracao bloqueada: a producao mudou depois do DRY_RUN. Revise os dados e gere uma nova previa.",
+      };
+    }
+
+    if (toAdminTimestamp(currentUpdatedAt) > toAdminTimestamp(guard.sourceUpdatedAt)) {
+      return {
+        ok: false,
+        error:
+          "Migracao bloqueada: updated_at da producao e mais recente que o local. Use FORCE somente apos revisar o conflito.",
+      };
+    }
+  }
+
+  const payload = ensureCompleteSalon({
+    ...salon,
+    id: (currentRow?.id as string | undefined) ?? salon.id,
+    updatedAt: new Date().toISOString(),
+  });
+  const row = mapSalonToSupabaseRow(payload, { compact: true });
+
+  if (currentRow) {
+    let updateQuery = writeAccess.client
+      .from("salons")
+      .update(row)
+      .eq("slug", salon.slug);
+
+    if (!guard.force && guard.expectedProductionUpdatedAt) {
+      updateQuery = updateQuery.eq(
+        "updated_at",
+        guard.expectedProductionUpdatedAt,
+      );
+    }
+
+    const { data, error } = await updateQuery
+      .select("id,slug,updated_at")
+      .maybeSingle();
+
+    if (error) {
+      return {
+        ok: false,
+        error: formatSupabaseError(error),
+      };
+    }
+
+    if (!data) {
+      return {
+        ok: false,
+        error:
+          "Migracao bloqueada: nenhum registro corresponde mais a versao revisada no DRY_RUN.",
+      };
+    }
+  } else {
+    const { error } = await writeAccess.client.from("salons").insert(row);
+
+    if (error) {
+      return {
+        ok: false,
+        error: formatSupabaseError(error),
+      };
+    }
+  }
+
+  debugAdminSalons("migration-save-success", {
+    slug: payload.slug,
+    force: guard.force,
+    sourceUpdatedAt: guard.sourceUpdatedAt,
+    previousProductionUpdatedAt: currentUpdatedAt ?? null,
+  });
+
+  return {
+    ok: true,
+    salon: payload,
   };
 }
 
@@ -329,6 +456,11 @@ async function saveAdminSalon(salon: Salon): Promise<AdminSalonResult> {
     ok: true,
     salon: payload,
   };
+}
+
+function toAdminTimestamp(value: string | undefined) {
+  const timestamp = value ? Date.parse(value) : Number.NaN;
+  return Number.isFinite(timestamp) ? timestamp : 0;
 }
 
 async function generateUniqueAdminSlug(name: string, currentSlug?: string) {

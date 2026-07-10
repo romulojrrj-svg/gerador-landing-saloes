@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
+  type AdminSalonMigrationGuard,
   deleteAdminSalon,
   getAdminSalonBySlug,
   updateAdminSalonFromInput,
@@ -53,6 +54,7 @@ export async function PUT(request: NextRequest, context: RouteContext) {
     const payload = (await request.json()) as {
       input?: SalonFormInput;
       salon?: Salon;
+      migrationGuard?: AdminSalonMigrationGuard;
     };
 
     const result = payload.input
@@ -61,7 +63,7 @@ export async function PUT(request: NextRequest, context: RouteContext) {
         ? await upsertAdminSalon({
             ...payload.salon,
             slug,
-          })
+          }, payload.migrationGuard)
         : null;
 
     if (!result) {

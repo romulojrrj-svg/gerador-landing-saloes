@@ -1,10 +1,15 @@
-import Image from "next/image";
+"use client";
+
+import { useState } from "react";
 import { getPublicText } from "@/lib/public-landing";
+import { filterValidLandingImages } from "@/lib/salon-images";
 import type { SalonGalleryImage, SalonLanguage } from "@/types/salon";
+import { LandingImage } from "./LandingImage";
 import { SectionHeader } from "./SectionHeader";
 
 type GalleryProps = {
   images: SalonGalleryImage[];
+  salonSlug?: string;
   salonName?: string;
   location?: string;
   language: SalonLanguage;
@@ -14,24 +19,28 @@ type GalleryProps = {
 
 export function Gallery({
   images,
+  salonSlug,
+  salonName,
   language,
   hasRealImages,
   mode = "public",
 }: GalleryProps) {
+  const [failedImageIds, setFailedImageIds] = useState<string[]>([]);
   const copy = getPublicText(language);
-  const realImages = images.filter(
-    (image) => image.isReal && image.selectedForLanding && image.type !== "logo",
-  );
+  const realImages = filterValidLandingImages(images);
   const selectedImages =
     mode === "public"
       ? realImages
-      : images.filter((image) => image.selectedForLanding && image.type !== "logo");
+      : filterValidLandingImages(images, { requireReal: false });
+  const loadableImages = selectedImages.filter(
+    (image) => !failedImageIds.includes(image.id),
+  );
 
-  if (!selectedImages.length) {
+  if (!loadableImages.length) {
     return null;
   }
 
-  const displayImages = selectedImages.slice(0, 8);
+  const displayImages = loadableImages.slice(0, 8);
 
   const title =
     mode === "public"
@@ -70,15 +79,22 @@ export function Gallery({
           {displayImages.map((image, index) => (
             <figure
               key={image.id}
-              className={getGalleryCardClass(index, selectedImages.length)}
+              className={getGalleryCardClass(index, loadableImages.length)}
             >
-              <Image
-                src={image.src}
+              <LandingImage
+                image={image}
+                salonSlug={salonSlug ?? salonName ?? "unknown-salon"}
+                section="gallery"
                 alt={image.alt}
                 fill
                 loading={index > 1 ? "lazy" : "eager"}
                 sizes="(min-width: 1280px) 30vw, (min-width: 768px) 50vw, 100vw"
                 className="object-cover transition duration-700 group-hover:scale-[1.03]"
+                onLoadError={(imageId) =>
+                  setFailedImageIds((current) =>
+                    current.includes(imageId) ? current : [...current, imageId],
+                  )
+                }
               />
               <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/18 via-transparent to-transparent opacity-70" />
             </figure>

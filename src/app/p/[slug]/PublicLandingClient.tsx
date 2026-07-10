@@ -14,6 +14,7 @@ import {
   Phone,
 } from "lucide-react";
 import { Gallery, Hero, Services, Testimonials } from "@/components/landing";
+import { LandingImage } from "@/components/landing/LandingImage";
 import { detectBrowserLanguage, getLandingCopy } from "@/lib/landing-copy";
 import {
   getAppliedCopy,
@@ -98,6 +99,7 @@ export function PublicLandingClient({
       <PublicSpaceSection salon={salon} />
       <Gallery
         images={getPublicGalleryImages(salon)}
+        salonSlug={salon.slug}
         salonName={salon.name}
         location={salon.location}
         language={salon.language}
@@ -116,7 +118,10 @@ export function PublicLandingClient({
 }
 
 function PublicSpaceSection({ salon }: { salon: Salon }) {
-  const images = getPublicSpaceImages(salon);
+  const [failedImageIds, setFailedImageIds] = useState<string[]>([]);
+  const images = getPublicSpaceImages(salon).filter(
+    (image) => !failedImageIds.includes(image.id),
+  );
 
   if (!images.length) {
     return null;
@@ -152,13 +157,20 @@ function PublicSpaceSection({ salon }: { salon: Salon }) {
                   : "aspect-[4/4.3] max-h-[12rem]"
               }`}
             >
-              <Image
-                src={image.src}
+              <LandingImage
+                image={image}
+                salonSlug={salon.slug}
+                section="space"
                 alt={image.alt}
                 fill
                 sizes="(min-width: 1024px) 28vw, 50vw"
                 loading="lazy"
                 className="object-cover transition duration-700 hover:scale-[1.03]"
+                onLoadError={(imageId) =>
+                  setFailedImageIds((current) =>
+                    current.includes(imageId) ? current : [...current, imageId],
+                  )
+                }
               />
             </figure>
           ))}

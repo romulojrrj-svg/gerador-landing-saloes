@@ -1,5 +1,6 @@
 import { calculateLandingReadiness } from "@/lib/copy-generator";
 import { normalizeCommercialStatus } from "@/lib/salon-commercial-status";
+import { filterValidLandingImages } from "@/lib/salon-images";
 import { ensureCompleteSalon } from "@/lib/salon-storage";
 import type {
   Salon,
@@ -68,7 +69,10 @@ export function mapSalonToSupabaseRow(
   const completeSalon = ensureCompleteSalon(salon);
   const compact = options?.compact === true;
   const readiness = calculateLandingReadiness(completeSalon);
-  const realImages = completeSalon.galleryImages.filter((image) => image.isReal);
+  const realImages = filterValidLandingImages(completeSalon.galleryImages, {
+    includeLogo: true,
+    requireSelected: false,
+  });
   const realReviews = completeSalon.testimonials.filter((review) => review.isReal);
   const sourceProfile: SalonSourceProfile = {
     ...completeSalon.sourceProfile,

@@ -39,14 +39,19 @@ import {
   deleteSalon,
   duplicateSalon,
   createSalon,
+  DEFAULT_SALON_MIGRATION_SCOPES,
   getLocalSalonCount,
   getSalonRepositoryStatus,
   getSalonRepositorySourceLabel,
   getSupabaseSalonCount,
+  listMigrationSourceSalons,
   listSalons,
   migrateLocalSalonsToSupabase,
   subscribeToSalonRepository,
   upsertSalon,
+  type SalonMigrationOptions,
+  type SalonMigrationResult,
+  type SalonMigrationScope,
   type SalonRepositorySource,
   type SalonRepositoryStatus,
 } from "@/lib/salon-repository";
@@ -70,6 +75,7 @@ export function SalonsDashboardClient() {
   );
   const [localCount, setLocalCount] = useState(0);
   const [supabaseCount, setSupabaseCount] = useState<number | null>(null);
+  const [migrationCandidates, setMigrationCandidates] = useState<Salon[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [commercialFilter, setCommercialFilter] = useState<
     "all" | SalonCommercialStatus
@@ -86,6 +92,10 @@ export function SalonsDashboardClient() {
 
   const fetchDashboardSnapshot = useCallback(async () => {
     const result = await listSalons();
+    const nextMigrationCandidates =
+      result.source === "supabase"
+        ? await listMigrationSourceSalons()
+        : result.salons;
     const nextLocalCount = getLocalSalonCount();
     const nextSupabaseCount =
       result.source === "supabase"
@@ -106,12 +116,13 @@ export function SalonsDashboardClient() {
       result,
       nextLocalCount,
       nextSupabaseCount,
+      nextMigrationCandidates,
     };
   }, [requestedStorageMode]);
 
   const loadDashboard = useCallback(async () => {
     setIsLoading(true);
-    const { result, nextLocalCount, nextSupabaseCount } =
+    const { result, nextLocalCount, nextSupabaseCount, nextMigrationCandidates } =
       await fetchDashboardSnapshot();
 
     if (result.ok) {
@@ -132,6 +143,7 @@ export function SalonsDashboardClient() {
 
     setLocalCount(nextLocalCount);
     setSupabaseCount(nextSupabaseCount);
+    setMigrationCandidates(nextMigrationCandidates);
     setIsLoading(false);
   }, [fetchDashboardSnapshot]);
 
@@ -139,7 +151,7 @@ export function SalonsDashboardClient() {
     let isActive = true;
 
     async function loadDashboardSafe() {
-      const { result, nextLocalCount, nextSupabaseCount } =
+      const { result, nextLocalCount, nextSupabaseCount, nextMigrationCandidates } =
         await fetchDashboardSnapshot();
 
       if (!isActive) {
@@ -164,6 +176,7 @@ export function SalonsDashboardClient() {
 
       setLocalCount(nextLocalCount);
       setSupabaseCount(nextSupabaseCount);
+      setMigrationCandidates(nextMigrationCandidates);
       setIsLoading(false);
     }
 
@@ -208,23 +221,29 @@ export function SalonsDashboardClient() {
     setPendingDeleteSalon(null);
   }
 
-  async function handleMigration() {
+  async function handleMigration(
+    options: SalonMigrationOptions,
+  ): Promise<SalonMigrationResult> {
     setMessage("");
-    const result = await migrateLocalSalonsToSupabase();
+    const result = await migrateLocalSalonsToSupabase(options);
 
     if (!result.ok) {
       setMessage(result.error);
-      await loadDashboard();
-      return;
+      return result;
     }
 
-    const summary = `Migração concluída: ${result.created} criado${result.created === 1 ? "" : "s"}, ${result.updated} atualizado${result.updated === 1 ? "" : "s"}, ${result.failed} falha${result.failed === 1 ? "" : "s"}.`;
+    const summary = result.dryRun
+      ? `DRY_RUN concluído: ${result.plannedCreates} criação, ${result.plannedUpdates} atualização e ${result.skipped} bloqueado/sem alteração.`
+      : `Migração concluída: ${result.created} criado${result.created === 1 ? "" : "s"}, ${result.updated} atualizado${result.updated === 1 ? "" : "s"}, ${result.skipped} ignorado${result.skipped === 1 ? "" : "s"} e ${result.failed} falha${result.failed === 1 ? "" : "s"}.`;
     setMessage(
       result.failed && result.errors.length
         ? `${summary} ${result.errors.join(" | ")}`
         : summary,
     );
-    await loadDashboard();
+    if (!result.dryRun) {
+      await loadDashboard();
+    }
+    return result;
   }
 
   async function handleCreateTestSalon() {
@@ -440,6 +459,7 @@ export function SalonsDashboardClient() {
         ) : null}
 
         <DatabasePanel
+          salons={migrationCandidates}
           localCount={localCount}
           supabaseCount={supabaseCount}
           repositoryStatus={repositoryStatus}
@@ -695,7 +715,23 @@ function DevStorageDebugPanel({
   );
 }
 
+const MIGRATION_SCOPE_OPTIONS: Array<{
+  id: SalonMigrationScope;
+  label: string;
+  warning?: string;
+}> = [
+  { id: "profile", label: "Perfil e endereço" },
+  { id: "contacts", label: "Links e contatos" },
+  { id: "services", label: "Serviços" },
+  { id: "copy", label: "Textos e SEO" },
+  { id: "images", label: "Imagens e layout", warning: "substitui a curadoria visual" },
+  { id: "reviews", label: "Reviews e nota", warning: "substitui avaliações de produção" },
+  { id: "publication", label: "Status draft/published", warning: "altera publicação" },
+  { id: "commercial", label: "Status comercial", warning: "altera o funil comercial" },
+];
+
 function DatabasePanel({
+  salons,
   localCount,
   supabaseCount,
   repositoryStatus,
@@ -703,17 +739,73 @@ function DatabasePanel({
   sourceCount,
   onMigrate,
 }: {
+  salons: Salon[];
   localCount: number;
   supabaseCount: number | null;
   repositoryStatus: SalonRepositoryStatus;
   source: SalonRepositorySource;
   sourceCount: number;
-  onMigrate: () => void;
+  onMigrate: (options: SalonMigrationOptions) => Promise<SalonMigrationResult>;
 }) {
+  const [selectedSlugs, setSelectedSlugs] = useState<string[]>([]);
+  const [scopes, setScopes] = useState<SalonMigrationScope[]>(
+    DEFAULT_SALON_MIGRATION_SCOPES,
+  );
+  const [force, setForce] = useState(false);
+  const [report, setReport] = useState<SalonMigrationResult | null>(null);
+  const [confirmed, setConfirmed] = useState(false);
+  const [isMigrating, setIsMigrating] = useState(false);
   const canMigrate =
     repositoryStatus.supabaseConfigured && repositoryStatus.supabaseWriteEnabled;
   const migrationSourceLabel = source === "server-local" ? "Server-local" : "LocalStorage";
   const migrationSourceCount = source === "server-local" ? sourceCount : localCount;
+
+  function resetPreview() {
+    setReport(null);
+    setConfirmed(false);
+  }
+
+  function toggleSalon(slug: string) {
+    setSelectedSlugs((current) =>
+      current.includes(slug)
+        ? current.filter((currentSlug) => currentSlug !== slug)
+        : [...current, slug],
+    );
+    resetPreview();
+  }
+
+  function toggleScope(scope: SalonMigrationScope) {
+    setScopes((current) =>
+      current.includes(scope)
+        ? current.filter((currentScope) => currentScope !== scope)
+        : [...current, scope],
+    );
+    resetPreview();
+  }
+
+  async function runMigration(dryRun: boolean) {
+    setIsMigrating(true);
+    const result = await onMigrate({
+      selectedSlugs,
+      scopes,
+      force,
+      dryRun,
+    });
+    setReport(result);
+    setConfirmed(false);
+
+    if (result.ok && !result.dryRun) {
+      setSelectedSlugs((current) =>
+        current.filter((slug) => !result.migratedSlugs.includes(slug)),
+      );
+    }
+
+    setIsMigrating(false);
+  }
+
+  const readyItems = report?.ok
+    ? report.items.filter((item) => item.status === "ready")
+    : [];
 
   return (
     <section className="mt-8 rounded-[2rem] border border-zinc-200 bg-white p-5 shadow-xl shadow-zinc-950/5">
@@ -735,15 +827,9 @@ function DatabasePanel({
           </div>
         </div>
 
-        <button
-          type="button"
-          onClick={onMigrate}
-          disabled={!canMigrate || migrationSourceCount === 0}
-          className="btn btn-secondary min-h-10 px-4 py-2 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          <RefreshCw className="h-4 w-4" />
-          Migrar salões locais para Supabase
-        </button>
+        <span className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-900">
+          DRY_RUN obrigatório antes de gravar
+        </span>
       </div>
 
       <div className="mt-5 grid gap-3 text-sm sm:grid-cols-3">
@@ -764,8 +850,240 @@ function DatabasePanel({
           value={canMigrate ? "disponível" : "bloqueada"}
         />
       </div>
+
+      <div className="mt-6 grid gap-5 lg:grid-cols-[1.05fr_0.95fr]">
+        <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-4">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <h3 className="font-semibold text-zinc-950">1. Selecione os salões</h3>
+              <p className="mt-1 text-xs leading-5 text-zinc-600">
+                Nenhum salão vem marcado. Somente os itens abaixo serão considerados.
+              </p>
+            </div>
+            <span className="text-xs font-semibold text-zinc-600">
+              {selectedSlugs.length} selecionado{selectedSlugs.length === 1 ? "" : "s"}
+            </span>
+          </div>
+
+          <div className="mt-3 max-h-64 space-y-2 overflow-y-auto pr-1">
+            {salons.map((salon) => (
+              <label
+                key={salon.slug}
+                className="flex cursor-pointer items-start gap-3 rounded-xl border border-zinc-200 bg-white px-3 py-3 text-sm transition hover:border-teal-300"
+              >
+                <input
+                  type="checkbox"
+                  checked={selectedSlugs.includes(salon.slug)}
+                  onChange={() => toggleSalon(salon.slug)}
+                  className="mt-0.5 h-4 w-4 accent-teal-700"
+                />
+                <span className="min-w-0">
+                  <span className="block truncate font-semibold text-zinc-950">
+                    {salon.name}
+                  </span>
+                  <span className="mt-0.5 block truncate text-xs text-zinc-500">
+                    {salon.slug} · local {formatMigrationDate(salon.updatedAt)}
+                  </span>
+                </span>
+              </label>
+            ))}
+            {!salons.length ? (
+              <p className="rounded-xl border border-dashed border-zinc-300 px-3 py-5 text-center text-sm text-zinc-500">
+                Nenhum salão local disponível para migração.
+              </p>
+            ) : null}
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-4">
+          <h3 className="font-semibold text-zinc-950">2. Defina o escopo</h3>
+          <p className="mt-1 text-xs leading-5 text-zinc-600">
+            Imagens, reviews, publicação e status comercial ficam protegidos por padrão.
+          </p>
+          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            {MIGRATION_SCOPE_OPTIONS.map((option) => (
+              <label
+                key={option.id}
+                className="flex cursor-pointer items-start gap-2 rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm"
+              >
+                <input
+                  type="checkbox"
+                  checked={scopes.includes(option.id)}
+                  onChange={() => toggleScope(option.id)}
+                  className="mt-0.5 h-4 w-4 accent-teal-700"
+                />
+                <span>
+                  <span className="font-medium text-zinc-900">{option.label}</span>
+                  {option.warning ? (
+                    <span className="mt-0.5 block text-[0.68rem] leading-4 text-amber-700">
+                      {option.warning}
+                    </span>
+                  ) : null}
+                </span>
+              </label>
+            ))}
+          </div>
+
+          <label className="mt-3 flex cursor-pointer items-start gap-3 rounded-xl border border-red-200 bg-red-50 px-3 py-3 text-sm text-red-950">
+            <input
+              type="checkbox"
+              checked={force}
+              onChange={(event) => {
+                setForce(event.currentTarget.checked);
+                resetPreview();
+              }}
+              className="mt-0.5 h-4 w-4 accent-red-700"
+            />
+            <span>
+              <span className="font-semibold">FORCE=true</span>
+              <span className="mt-0.5 block text-xs leading-5">
+                Permite substituir produção mais recente. Use somente após revisar o conflito.
+              </span>
+            </span>
+          </label>
+        </div>
+      </div>
+
+      <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center">
+        <button
+          type="button"
+          onClick={() => void runMigration(true)}
+          disabled={
+            !canMigrate ||
+            migrationSourceCount === 0 ||
+            selectedSlugs.length === 0 ||
+            scopes.length === 0 ||
+            isMigrating
+          }
+          className="btn btn-secondary min-h-11 px-4 py-2.5 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          <RefreshCw className={`h-4 w-4 ${isMigrating ? "animate-spin" : ""}`} />
+          {isMigrating ? "Verificando..." : "Rodar DRY_RUN"}
+        </button>
+        <p className="text-xs leading-5 text-zinc-500">
+          O DRY_RUN compara as versões e não grava no Supabase.
+        </p>
+      </div>
+
+      {report?.ok ? (
+        <MigrationReport report={report} />
+      ) : report ? (
+        <p className="mt-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900">
+          {report.error}
+        </p>
+      ) : null}
+
+      {report?.ok && report.dryRun && readyItems.length ? (
+        <div className="mt-5 rounded-2xl border border-red-200 bg-red-50 p-4">
+          <h3 className="font-semibold text-red-950">3. Confirme a gravação real</h3>
+          <p className="mt-1 text-xs leading-5 text-red-800">
+            Serão aplicados exatamente {readyItems.length} salão{readyItems.length === 1 ? "" : "ões"} listado{readyItems.length === 1 ? "" : "s"} no relatório acima.
+          </p>
+          <label className="mt-3 flex cursor-pointer items-start gap-3 text-sm text-red-950">
+            <input
+              type="checkbox"
+              checked={confirmed}
+              onChange={(event) => setConfirmed(event.currentTarget.checked)}
+              className="mt-0.5 h-4 w-4 accent-red-700"
+            />
+            <span>Revisei os salões, os campos e as datas exibidas no DRY_RUN.</span>
+          </label>
+          <button
+            type="button"
+            onClick={() => void runMigration(false)}
+            disabled={!confirmed || isMigrating}
+            className="btn mt-4 min-h-11 bg-red-700 px-4 py-2.5 text-white hover:bg-red-800 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Aplicar somente os selecionados
+          </button>
+        </div>
+      ) : null}
     </section>
   );
+}
+
+function MigrationReport({ report }: { report: Extract<SalonMigrationResult, { ok: true }> }) {
+  return (
+    <div className="mt-5 rounded-2xl border border-zinc-200 bg-white p-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h3 className="font-semibold text-zinc-950">
+          {report.dryRun ? "Relatório do DRY_RUN" : "Relatório da migração"}
+        </h3>
+        <span className="text-xs font-semibold text-zinc-600">
+          {report.items.length} salão{report.items.length === 1 ? "" : "ões"}
+        </span>
+      </div>
+      <div className="mt-3 space-y-2">
+        {report.items.map((item) => (
+          <div key={item.slug} className="rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-3">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div>
+                <p className="text-sm font-semibold text-zinc-950">{item.name}</p>
+                <p className="mt-0.5 text-xs text-zinc-500">{item.slug} · {item.id}</p>
+              </div>
+              <MigrationStatus status={item.status} action={item.action} />
+            </div>
+            <div className="mt-2 grid gap-1 text-xs text-zinc-600 sm:grid-cols-2">
+              <p>Local: {formatMigrationDate(item.localUpdatedAt)}</p>
+              <p>
+                Produção: {item.productionUpdatedAt ? formatMigrationDate(item.productionUpdatedAt) : "novo registro"}
+              </p>
+            </div>
+            <p className="mt-2 text-xs leading-5 text-zinc-600">
+              <span className="font-semibold text-zinc-800">Campos:</span>{" "}
+              {item.changedFields.length ? item.changedFields.join(", ") : "nenhum"}
+            </p>
+            {item.reason ? (
+              <p className="mt-2 text-xs font-medium leading-5 text-amber-800">{item.reason}</p>
+            ) : null}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function MigrationStatus({
+  status,
+  action,
+}: {
+  status: Extract<SalonMigrationResult, { ok: true }>["items"][number]["status"];
+  action: Extract<SalonMigrationResult, { ok: true }>["items"][number]["action"];
+}) {
+  const label =
+    status === "blocked-newer-production"
+      ? "bloqueado: produção mais recente"
+      : status === "no-changes"
+        ? "sem alterações"
+        : status === "migrated"
+          ? "migrado"
+          : status === "failed"
+            ? "falhou"
+            : action === "create"
+              ? "pronto para criar"
+              : "pronto para atualizar";
+  const classes =
+    status === "ready" || status === "migrated"
+      ? "border-teal-200 bg-teal-50 text-teal-800"
+      : status === "no-changes"
+        ? "border-zinc-200 bg-white text-zinc-600"
+        : "border-amber-200 bg-amber-50 text-amber-800";
+
+  return (
+    <span className={`rounded-full border px-2.5 py-1 text-[0.68rem] font-semibold ${classes}`}>
+      {label}
+    </span>
+  );
+}
+
+function formatMigrationDate(value: string) {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime())
+    ? value
+    : new Intl.DateTimeFormat("pt-BR", {
+        dateStyle: "short",
+        timeStyle: "short",
+      }).format(date);
 }
 
 function SalonRow({

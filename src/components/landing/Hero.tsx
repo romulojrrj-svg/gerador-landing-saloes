@@ -1,10 +1,10 @@
-import Image from "next/image";
 import {
   ArrowRight,
   MapPin,
   Sparkles,
   Star,
 } from "lucide-react";
+import { LandingImage } from "./LandingImage";
 import {
   getPrimaryContactAction,
   getPublicContactLinks,
@@ -176,8 +176,11 @@ function HeroImageCard({
     <div className="relative overflow-hidden rounded-[1.6rem] border border-white/60 bg-[#efe4d5] p-2 shadow-[0_20px_50px_rgba(83,57,33,0.13)] sm:rounded-[2.4rem] sm:p-3 sm:shadow-[0_32px_80px_rgba(83,57,33,0.16)]">
       <div className="relative aspect-[4/3] max-h-[17.5rem] overflow-hidden rounded-[1.25rem] bg-zinc-200 sm:aspect-[5/5.3] sm:max-h-none sm:rounded-[2rem]">
         {heroImage ? (
-          <Image
-            src={heroImage}
+          <LandingImage
+            image={heroImage}
+            imageId="hero"
+            salonSlug={salon.slug}
+            section="hero"
             alt={
               salon.hasRealImages
                 ? `${salon.name} salon`
@@ -187,13 +190,10 @@ function HeroImageCard({
             priority
             sizes="(min-width: 1024px) 45vw, 100vw"
             className="object-cover transition-transform duration-700 hover:scale-[1.02]"
+            fallback={<HeroMediaFallback salonName={salon.name} />}
           />
         ) : (
-          <div className="absolute inset-0 flex items-center justify-center bg-[linear-gradient(135deg,#f3e7d8_0%,#fffaf4_100%)] px-6 text-center">
-            <span className="font-serif text-3xl font-semibold text-[#8d6239]/80">
-              {salon.name}
-            </span>
-          </div>
+          <HeroMediaFallback salonName={salon.name} />
         )}
         <div className="absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-black/30 to-transparent" />
         {hasOverlay ? (
@@ -226,13 +226,16 @@ function HeroMosaic({
     <div className="rounded-[1.6rem] border border-white/60 bg-[#f4eadf] p-2 shadow-[0_20px_50px_rgba(83,57,33,0.13)] sm:rounded-[2.4rem] sm:p-3 sm:shadow-[0_32px_80px_rgba(83,57,33,0.16)]">
       <div className="grid grid-cols-[1.08fr_0.92fr] gap-2 sm:gap-3">
         <div className="relative min-h-[15rem] overflow-hidden rounded-[1.25rem] bg-zinc-200 sm:min-h-[33rem] sm:rounded-[2rem]">
-          <Image
-            src={images[0].src}
+          <LandingImage
+            image={images[0]}
+            salonSlug={salon.slug}
+            section="hero-mosaic"
             alt={images[0].alt}
             fill
             priority
             sizes="(min-width: 1024px) 27vw, 100vw"
             className="object-cover transition-transform duration-700 hover:scale-[1.02]"
+            fallback={<HeroMediaFallback salonName={salon.name} compact />}
           />
         </div>
         <div className="grid gap-2 sm:gap-3">
@@ -243,17 +246,40 @@ function HeroMosaic({
                 index === 0 ? "min-h-[7.25rem] sm:min-h-[16rem]" : "min-h-[7rem] sm:min-h-[16rem]"
               }`}
             >
-              <Image
-                src={image.src}
+              <LandingImage
+                image={image}
+                salonSlug={salon.slug}
+                section="hero-mosaic"
                 alt={image.alt || `${salon.name} detail`}
                 fill
                 sizes="(min-width: 1024px) 18vw, 100vw"
                 className="object-cover transition-transform duration-700 hover:scale-[1.02]"
+                fallback={<HeroMediaFallback salonName={salon.name} compact />}
               />
             </div>
           ))}
         </div>
       </div>
+    </div>
+  );
+}
+
+function HeroMediaFallback({
+  salonName,
+  compact = false,
+}: {
+  salonName: string;
+  compact?: boolean;
+}) {
+  return (
+    <div className="absolute inset-0 flex items-center justify-center bg-[linear-gradient(135deg,#f3e7d8_0%,#fffaf4_100%)] px-5 text-center">
+      <span
+        className={`font-serif font-semibold text-[#8d6239]/80 ${
+          compact ? "text-xl" : "text-3xl"
+        }`}
+      >
+        {salonName}
+      </span>
     </div>
   );
 }
