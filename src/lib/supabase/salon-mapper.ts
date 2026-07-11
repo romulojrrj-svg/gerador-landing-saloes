@@ -163,6 +163,8 @@ export function mapSalonToSupabaseRow(
           googleRating: completeSalon.googleRating,
           googleReviewCount: completeSalon.googleReviewCount,
           extractedBusinessInfo: completeSalon.extractedBusinessInfo,
+          template: completeSalon.template,
+          premiumEditorial: completeSalon.premiumEditorial,
         } as unknown as Json)
       : ({
           salon: completeSalon as unknown as Json,
@@ -179,6 +181,8 @@ export function mapSalonToSupabaseRow(
           googleRating: completeSalon.googleRating,
           googleReviewCount: completeSalon.googleReviewCount,
           extractedBusinessInfo: completeSalon.extractedBusinessInfo,
+          template: completeSalon.template,
+          premiumEditorial: completeSalon.premiumEditorial,
         } as unknown as Json),
   };
 }

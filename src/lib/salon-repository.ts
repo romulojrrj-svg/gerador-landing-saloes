@@ -13,6 +13,7 @@ import {
   saveSalon as saveLocalSalon,
 } from "@/lib/salon-storage";
 import { estimatePayloadSize, logPerfEvent } from "@/lib/perf-logs";
+import { filterValidLandingImages, getValidImageUrl } from "@/lib/salon-images";
 import {
   getSupabaseClient,
   isSupabaseConfigured,
@@ -100,6 +101,7 @@ export type SalonMigrationOptions = {
   dryRun?: boolean;
   force?: boolean;
   scopes?: SalonMigrationScope[];
+  expectedProductionVersions?: Record<string, string | null>;
 };
 
 export const DEFAULT_SALON_MIGRATION_SCOPES: SalonMigrationScope[] = [
@@ -375,6 +377,24 @@ export async function listSalons(): Promise<SalonRepositoryListResult> {
     source: "local",
     warning: supabaseResult.error,
   };
+}
+
+/**
+ * Loads the Supabase dataset for the local dashboard without changing the
+ * active repository. This is useful in server-local development, where a
+ * published salon may have been written to Supabase but is not present in the
+ * shared local file yet.
+ */
+export async function listSupabaseSalonsForDashboard() {
+  if (typeof window !== "undefined") {
+    const adminResult = await fetchAdminSalonList();
+
+    if (adminResult.ok) {
+      return adminResult;
+    }
+  }
+
+  return tryListSupabaseSalons();
 }
 
 export async function getSalonBySlug(
@@ -716,6 +736,25 @@ export async function upsertSalon(salon: Salon): Promise<SalonRepositoryResult> 
     : supabaseResult;
 }
 
+export async function upsertSalonFromSource(
+  salon: Salon,
+  source: SalonRepositorySource,
+): Promise<SalonRepositoryResult> {
+  if (source !== "supabase") {
+    return upsertSalon(salon);
+  }
+
+  if (typeof window !== "undefined") {
+    const adminResult = await fetchAdminUpsertSalon(salon);
+
+    if (adminResult.ok) {
+      return adminResult;
+    }
+  }
+
+  return upsertSupabaseSalon(salon);
+}
+
 export async function deleteSalon(slug: string) {
   debugRepository("delete-start", { slug, source: getSalonRepositoryStatus().activeSource });
   if (shouldUseAdminApi()) {
@@ -768,6 +807,32 @@ export async function deleteSalon(slug: string) {
         error: "Não foi possível excluir este salão.",
         source: "local" as const,
       };
+}
+
+export async function deleteSalonFromSource(
+  slug: string,
+  source: SalonRepositorySource,
+) {
+  if (source !== "supabase") {
+    return deleteSalon(slug);
+  }
+
+  if (typeof window !== "undefined") {
+    const adminResult = await fetchAdminDeleteSalon(slug);
+
+    if (adminResult.ok) {
+      notifyRepositoryChanged();
+      return adminResult;
+    }
+  }
+
+  const supabaseResult = await deleteSupabaseSalon(slug);
+
+  if (supabaseResult.ok) {
+    notifyRepositoryChanged();
+  }
+
+  return supabaseResult;
 }
 
 export async function duplicateSalon(
@@ -937,21 +1002,31 @@ export async function migrateLocalSalonsToSupabase(
     };
   }
 
-  const adminPreflight = await fetchAdminSalonList();
-
-  if (!adminPreflight.ok) {
-    return {
-      ok: false,
-      error: getSupabaseMigrationConfigError(adminPreflight.error),
-    };
-  }
-
   const errors: string[] = [];
   const migratedSlugs: string[] = [];
   const items: SalonMigrationItem[] = [];
-  const productionSalonMap = new Map(
-    adminPreflight.salons.map((salon) => [normalizeSlug(salon.slug), salon]),
-  );
+  const productionSalonMap = new Map<string, Salon>();
+
+  for (const sourceSalon of sourceSalons) {
+    const productionResult = await fetchAdminRepository<{ salon: Salon }>(
+      `/api/admin/salons/${encodeURIComponent(sourceSalon.slug)}`,
+    );
+
+    if (productionResult.ok) {
+      productionSalonMap.set(
+        normalizeSlug(sourceSalon.slug),
+        productionResult.data.salon,
+      );
+      continue;
+    }
+
+    if (productionResult.status !== 404) {
+      return {
+        ok: false,
+        error: getSupabaseMigrationConfigError(productionResult.error),
+      };
+    }
+  }
   const preparedSalons = new Map<
     string,
     { salon: Salon; productionUpdatedAt?: string; localUpdatedAt: string }
@@ -984,6 +1059,35 @@ export async function migrateLocalSalonsToSupabase(
     const productionIsNewer =
       productionSalon &&
       toTimestamp(productionSalon.updatedAt) > toTimestamp(salon.updatedAt);
+    const hasReviewedVersion = Object.prototype.hasOwnProperty.call(
+      options.expectedProductionVersions ?? {},
+      salon.slug,
+    );
+    const reviewedProductionUpdatedAt =
+      options.expectedProductionVersions?.[salon.slug] ?? null;
+    const currentProductionUpdatedAt = productionSalon?.updatedAt ?? null;
+
+    if (
+      !dryRun &&
+      !force &&
+      (!hasReviewedVersion ||
+        reviewedProductionUpdatedAt !== currentProductionUpdatedAt)
+    ) {
+      items.push({
+        id: salon.id,
+        slug: salon.slug,
+        name: salon.name,
+        action: "skip",
+        status: "blocked-newer-production",
+        changedFields,
+        localUpdatedAt: salon.updatedAt,
+        productionUpdatedAt: productionSalon?.updatedAt,
+        reason: hasReviewedVersion
+          ? "Produção mudou depois do DRY_RUN. Gere uma nova prévia antes de aplicar."
+          : "Aplicação sem versão revisada. Execute o DRY_RUN antes de confirmar.",
+      });
+      continue;
+    }
 
     if (productionIsNewer && !force) {
       items.push({
@@ -1200,12 +1304,49 @@ function buildScopedMigrationSalon(
     };
   }
 
+  if (scopes.includes("images") && productionSalon) {
+    const mergedImages = mergeMigrationImages(
+      localSalon.galleryImages,
+      productionSalon.galleryImages,
+    );
+    nextSalon.galleryImages = mergedImages;
+    nextSalon.gallery = mergedImages;
+    nextSalon.realImages = mergedImages.filter((image) => image.isReal);
+  }
+
   nextSalon.id = productionSalon?.id ?? localSalon.id;
   nextSalon.slug = localSalon.slug;
   nextSalon.createdAt = productionSalon?.createdAt ?? localSalon.createdAt;
   nextSalon.updatedAt = localSalon.updatedAt;
 
   return createSalonDefaults(nextSalon);
+}
+
+function mergeMigrationImages(
+  localImages: Salon["galleryImages"],
+  productionImages: Salon["galleryImages"],
+) {
+  const validProductionImages = filterValidLandingImages(productionImages, {
+    includeLogo: true,
+    requireReal: false,
+    requireSelected: false,
+  });
+  const validLocalImages = filterValidLandingImages(localImages, {
+    includeLogo: true,
+    requireReal: false,
+    requireSelected: false,
+  });
+  const imagesByIdentity = new Map<string, (typeof validLocalImages)[number]>();
+
+  for (const image of [...validProductionImages, ...validLocalImages]) {
+    const identity = image.id || getValidImageUrl(image);
+
+    if (identity) {
+      imagesByIdentity.set(identity, image);
+    }
+  }
+
+  return Array.from(imagesByIdentity.values());
 }
 
 function getChangedMigrationFields(

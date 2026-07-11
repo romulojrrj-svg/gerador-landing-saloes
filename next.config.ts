@@ -35,7 +35,12 @@ const nextConfig: NextConfig = {
       },
       {
         protocol: "https",
-        hostname: "*.fbcdn.net",
+        hostname: "**.fbcdn.net",
+        pathname: "/**",
+      },
+      {
+        protocol: "https",
+        hostname: "streetviewpixels-pa.googleapis.com",
         pathname: "/**",
       },
     ],

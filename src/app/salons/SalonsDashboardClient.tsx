@@ -36,19 +36,20 @@ import {
   getPublicLandingPath,
 } from "@/lib/mvp-commercial";
 import {
-  deleteSalon,
   duplicateSalon,
   createSalon,
   DEFAULT_SALON_MIGRATION_SCOPES,
+  deleteSalonFromSource,
   getLocalSalonCount,
   getSalonRepositoryStatus,
   getSalonRepositorySourceLabel,
   getSupabaseSalonCount,
   listMigrationSourceSalons,
   listSalons,
+  listSupabaseSalonsForDashboard,
   migrateLocalSalonsToSupabase,
   subscribeToSalonRepository,
-  upsertSalon,
+  upsertSalonFromSource,
   type SalonMigrationOptions,
   type SalonMigrationResult,
   type SalonMigrationScope,
@@ -63,6 +64,9 @@ export function SalonsDashboardClient() {
   const isDevelopment = process.env.NODE_ENV === "development";
   const requestedStorageMode = process.env.NEXT_PUBLIC_STORAGE_MODE ?? "default";
   const [salons, setSalons] = useState<Salon[]>([]);
+  const [salonSourceBySlug, setSalonSourceBySlug] = useState<
+    Record<string, SalonRepositorySource>
+  >({});
   const [source, setSource] = useState<SalonRepositorySource>(
     repositoryStatus.activeSource,
   );
@@ -91,18 +95,51 @@ export function SalonsDashboardClient() {
   >(null);
 
   const fetchDashboardSnapshot = useCallback(async () => {
-    const result = await listSalons();
+    const repositoryResult = await listSalons();
+    let result = repositoryResult;
+    let supabaseDashboardCount: number | null | undefined;
+    const nextSalonSourceBySlug: Record<string, SalonRepositorySource> = {};
+
+    for (const salon of repositoryResult.salons) {
+      nextSalonSourceBySlug[salon.slug] = repositoryResult.source;
+    }
+
+    if (
+      repositoryResult.ok &&
+      repositoryResult.source !== "supabase" &&
+      getSalonRepositoryStatus().supabaseConfigured
+    ) {
+      const supabaseResult = await listSupabaseSalonsForDashboard();
+
+      if (supabaseResult.ok) {
+        supabaseDashboardCount = supabaseResult.salons.length;
+        const mergedSalons = new Map(
+          repositoryResult.salons.map((salon) => [salon.slug, salon]),
+        );
+
+        for (const salon of supabaseResult.salons) {
+          mergedSalons.set(salon.slug, salon);
+          nextSalonSourceBySlug[salon.slug] = "supabase";
+        }
+
+        result = {
+          ...repositoryResult,
+          salons: Array.from(mergedSalons.values()),
+        };
+      }
+    }
+
     const nextMigrationCandidates =
-      result.source === "supabase"
+      repositoryResult.source === "supabase"
         ? await listMigrationSourceSalons()
-        : result.salons;
+        : repositoryResult.salons;
     const nextLocalCount = getLocalSalonCount();
     const nextSupabaseCount =
-      result.source === "supabase"
-        ? result.ok
-          ? result.salons.length
+      repositoryResult.source === "supabase"
+        ? repositoryResult.ok
+          ? repositoryResult.salons.length
           : null
-        : await getSupabaseSalonCount();
+        : supabaseDashboardCount ?? (await getSupabaseSalonCount());
 
     console.debug?.("[salons-dashboard]", {
       storageMode: requestedStorageMode,
@@ -117,17 +154,24 @@ export function SalonsDashboardClient() {
       nextLocalCount,
       nextSupabaseCount,
       nextMigrationCandidates,
+      nextSalonSourceBySlug,
     };
   }, [requestedStorageMode]);
 
   const loadDashboard = useCallback(async () => {
     setIsLoading(true);
-    const { result, nextLocalCount, nextSupabaseCount, nextMigrationCandidates } =
-      await fetchDashboardSnapshot();
+    const {
+      result,
+      nextLocalCount,
+      nextSupabaseCount,
+      nextMigrationCandidates,
+      nextSalonSourceBySlug,
+    } = await fetchDashboardSnapshot();
 
     if (result.ok) {
       setLoadError("");
       setSalons(result.salons);
+      setSalonSourceBySlug(nextSalonSourceBySlug);
       setSource(result.source);
       if (result.warning) {
         setMessage(`Aviso: ${result.warning}`);
@@ -151,8 +195,13 @@ export function SalonsDashboardClient() {
     let isActive = true;
 
     async function loadDashboardSafe() {
-      const { result, nextLocalCount, nextSupabaseCount, nextMigrationCandidates } =
-        await fetchDashboardSnapshot();
+      const {
+        result,
+        nextLocalCount,
+        nextSupabaseCount,
+        nextMigrationCandidates,
+        nextSalonSourceBySlug,
+      } = await fetchDashboardSnapshot();
 
       if (!isActive) {
         return;
@@ -161,6 +210,7 @@ export function SalonsDashboardClient() {
       if (result.ok) {
         setLoadError("");
         setSalons(result.salons);
+        setSalonSourceBySlug(nextSalonSourceBySlug);
         setSource(result.source);
         if (result.warning) {
           setMessage(`Aviso: ${result.warning}`);
@@ -212,7 +262,10 @@ export function SalonsDashboardClient() {
       return;
     }
 
-    const deleted = await deleteSalon(pendingDeleteSalon.slug);
+    const deleted = await deleteSalonFromSource(
+      pendingDeleteSalon.slug,
+      salonSourceBySlug[pendingDeleteSalon.slug] ?? source,
+    );
     setMessage(
       deleted.ok
         ? `Salão excluído: ${pendingDeleteSalon.name}.`
@@ -277,11 +330,14 @@ export function SalonsDashboardClient() {
         : null,
     );
 
-    const result = await upsertSalon({
-      ...salon,
-      commercialStatus: nextCommercialStatus,
-      updatedAt: new Date().toISOString(),
-    });
+    const result = await upsertSalonFromSource(
+      {
+        ...salon,
+        commercialStatus: nextCommercialStatus,
+        updatedAt: new Date().toISOString(),
+      },
+      salonSourceBySlug[salon.slug] ?? source,
+    );
 
     if (!result.ok) {
       setInlineOrderSnapshot(null);
@@ -577,7 +633,7 @@ export function SalonsDashboardClient() {
               <SalonRow
                 key={salon.slug}
                 salon={salon}
-                storageSource={source}
+                storageSource={salonSourceBySlug[salon.slug] ?? source}
                 onCommercialStatusChange={handleCommercialStatusChange}
                 onDuplicate={handleDuplicate}
                 onDelete={handleDelete}
@@ -790,6 +846,15 @@ function DatabasePanel({
       scopes,
       force,
       dryRun,
+      expectedProductionVersions:
+        !dryRun && report?.ok && report.dryRun
+          ? Object.fromEntries(
+              report.items.map((item) => [
+                item.slug,
+                item.productionUpdatedAt ?? null,
+              ]),
+            )
+          : undefined,
     });
     setReport(result);
     setConfirmed(false);
@@ -1109,8 +1174,10 @@ function SalonRow({
   const hasGeneratedCopy = Boolean(salon.copySuggestions || salon.generatedCopy);
   const hasAppliedCopy = Boolean(salon.generatedCopy?.status === "applied");
   const commercialStatus = normalizeCommercialStatus(salon.commercialStatus);
-  const previewPath = getPreviewPath(salon.slug);
-  const publicPath = getPublicLandingPath(salon.slug);
+  const sourceQuery = storageSource === "supabase" ? "?source=supabase" : "";
+  const previewPath = `${getPreviewPath(salon.slug)}${sourceQuery}`;
+  const publicPath = `${getPublicLandingPath(salon.slug)}${sourceQuery}`;
+  const editPath = `/salons/${salon.slug}/edit${sourceQuery}`;
   const previewUrl = getAbsoluteAppUrl(previewPath);
   const publicUrl = getAbsoluteAppUrl(publicPath);
   const approachMessage = getApproachMessage(salon);
@@ -1304,7 +1371,7 @@ function SalonRow({
 
         <div className="flex flex-wrap gap-2 lg:justify-end">
           <Link
-            href={`/salons/${salon.slug}/edit`}
+            href={editPath}
             className="btn btn-secondary min-h-10 px-4 py-2"
           >
             <Edit3 className="h-4 w-4" />

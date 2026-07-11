@@ -38,6 +38,46 @@ export type SalonCopySource = "assisted" | "manual" | "ai_future";
 
 export type SalonCopyStatus = "draft" | "applied" | "ignored";
 
+export type SalonTemplate = "default" | "premium_editorial";
+
+export type SalonFaqItem = {
+  id: string;
+  question: string;
+  answer: string;
+  order: number;
+  enabled: boolean;
+};
+
+export type SalonBeforeAfterItem = {
+  id: string;
+  title: string;
+  description?: string;
+  beforeImageId: string;
+  afterImageId: string;
+  order: number;
+  enabled: boolean;
+};
+
+export type SalonPremiumEditorial = {
+  accentColor: string;
+  backgroundColor: string;
+  heroEyebrow: string;
+  heroTitle: string;
+  heroDescription: string;
+  heroImageId?: string;
+  aboutImageId?: string;
+  aboutTitle: string;
+  aboutRole: string;
+  aboutText: string;
+  methodEyebrow: string;
+  methodTitle: string;
+  methodText: string;
+  beforeAfterItems: SalonBeforeAfterItem[];
+  faqItems: SalonFaqItem[];
+  finalCtaTitle: string;
+  finalCtaText: string;
+};
+
 export type SalonImageSource =
   | "placeholder"
   | "instagram"
@@ -382,6 +422,8 @@ export type Salon = {
   stats: SalonStat[];
   ctaTitle: string;
   ctaText: string;
+  template: SalonTemplate;
+  premiumEditorial: SalonPremiumEditorial;
 };
 
 export type SalonFormInput = {
@@ -417,6 +459,8 @@ export type SalonFormInput = {
   sourceMaterials?: SalonSourceMaterial[];
   manualAssistantNotes?: string;
   notes?: string;
+  template?: SalonTemplate;
+  premiumEditorial?: SalonPremiumEditorial;
   copySuggestions?: SalonCopySuggestion;
   generatedCopy?: SalonCopySuggestion;
   copyHistory?: SalonCopySuggestion[];

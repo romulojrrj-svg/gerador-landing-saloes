@@ -3,6 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   CalendarDays,
   Clock3,
@@ -15,6 +16,7 @@ import {
 } from "lucide-react";
 import { Gallery, Hero, Services, Testimonials } from "@/components/landing";
 import { LandingImage } from "@/components/landing/LandingImage";
+import { PremiumEditorialLanding } from "@/components/landing/premium/PremiumEditorialLanding";
 import { detectBrowserLanguage, getLandingCopy } from "@/lib/landing-copy";
 import {
   getAppliedCopy,
@@ -42,6 +44,8 @@ export function PublicLandingClient({
   initialSalon = null,
   skipClientLoad = false,
 }: PublicLandingClientProps) {
+  const searchParams = useSearchParams();
+  const forceSupabase = searchParams.get("source") === "supabase";
   const [salon, setSalon] = useState<Salon | null>(initialSalon);
   const [loadError, setLoadError] = useState("");
   const [hasCheckedStorage, setHasCheckedStorage] = useState(
@@ -49,7 +53,7 @@ export function PublicLandingClient({
   );
 
   useEffect(() => {
-    if (initialSalon || skipClientLoad) {
+    if (initialSalon || (skipClientLoad && !forceSupabase)) {
       return;
     }
 
@@ -57,7 +61,9 @@ export function PublicLandingClient({
 
     async function loadSalon() {
       setHasCheckedStorage(false);
-      const result = await getPublicSalonBySlug(slug);
+      const result = forceSupabase
+        ? await fetchSupabaseSalonForPreview(slug)
+        : await getPublicSalonBySlug(slug);
 
       if (!isActive) {
         return;
@@ -77,7 +83,7 @@ export function PublicLandingClient({
       isActive = false;
       unsubscribe();
     };
-  }, [initialSalon, skipClientLoad, slug]);
+  }, [forceSupabase, initialSalon, skipClientLoad, slug]);
 
   if (!hasCheckedStorage) {
     return <PublicLoading />;
@@ -89,6 +95,10 @@ export function PublicLandingClient({
 
   if (!salon) {
     return <PublicNotFound />;
+  }
+
+  if (salon.template === "premium_editorial") {
+    return <PremiumEditorialLanding salon={salon} />;
   }
 
   return (
@@ -115,6 +125,25 @@ export function PublicLandingClient({
       <PublicContactSection salon={salon} />
     </main>
   );
+}
+
+async function fetchSupabaseSalonForPreview(slug: string) {
+  const response = await fetch(`/api/admin/salons/${encodeURIComponent(slug)}`, {
+    cache: "no-store",
+  });
+  const payload = (await response.json().catch(() => null)) as
+    | { success?: boolean; salon?: Salon; error?: string }
+    | null;
+
+  if (!response.ok || !payload?.success || !payload.salon) {
+    return {
+      ok: false as const,
+      salon: null,
+      error: payload?.error || "Salão não encontrado no Supabase.",
+    };
+  }
+
+  return { ok: true as const, salon: payload.salon };
 }
 
 function PublicSpaceSection({ salon }: { salon: Salon }) {

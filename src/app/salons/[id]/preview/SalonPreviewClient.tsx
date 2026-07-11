@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
   ArrowLeft,
@@ -15,6 +16,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { CTA, Gallery, Hero, Services, Testimonials } from "@/components/landing";
+import { PremiumEditorialLanding } from "@/components/landing/premium/PremiumEditorialLanding";
 import {
   getLandingCopy,
   translateStatLabel,
@@ -42,12 +44,19 @@ export function SalonPreviewClient({
   slug,
   fallbackSalon,
 }: SalonPreviewClientProps) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const forceSupabase = searchParams.get("source") === "supabase";
   const repositoryStatus = getSalonRepositoryStatus();
   const [storedSalon, setStoredSalon] = useState<Salon | null>(null);
   const [source, setSource] = useState<SalonRepositorySource>(
     repositoryStatus.activeSource,
   );
   const [hasCheckedStorage, setHasCheckedStorage] = useState(false);
+  const [isDuplicating, setIsDuplicating] = useState(false);
+  const [duplicateError, setDuplicateError] = useState("");
+  const [isPublishing, setIsPublishing] = useState(false);
+  const [publishError, setPublishError] = useState("");
   const salon = hasCheckedStorage ? (storedSalon ?? fallbackSalon) : fallbackSalon;
   const isStoredSalon = Boolean(storedSalon);
   const landingCopy = useMemo(
@@ -59,12 +68,66 @@ export function SalonPreviewClient({
     [landingCopy, salon],
   );
 
+  async function duplicateAsPremium() {
+    setIsDuplicating(true);
+    setDuplicateError("");
+
+    try {
+      const response = await fetch(
+        `/api/admin/salons/${encodeURIComponent(slug)}/duplicate`,
+        { method: "POST" },
+      );
+      const payload = (await response.json()) as {
+        salon?: Salon;
+        error?: string;
+      };
+
+      if (!response.ok || !payload.salon) {
+        throw new Error(payload.error || "Não foi possível duplicar o salão.");
+      }
+
+      router.push(`/salons/${payload.salon.slug}/edit?source=supabase`);
+    } catch (error) {
+      setDuplicateError(
+        error instanceof Error ? error.message : "Não foi possível duplicar o salão.",
+      );
+      setIsDuplicating(false);
+    }
+  }
+
+  async function publishPremiumSalon() {
+    setIsPublishing(true);
+    setPublishError("");
+
+    try {
+      const response = await fetch(
+        `/api/admin/salons/${encodeURIComponent(salon.slug)}/publish`,
+        { method: "POST" },
+      );
+      const payload = (await response.json()) as { salon?: Salon; error?: string };
+
+      if (!response.ok || !payload.salon) {
+        throw new Error(payload.error || "Não foi possível publicar o site.");
+      }
+
+      window.open(`/p/${payload.salon.slug}?source=supabase`, "_blank", "noopener,noreferrer");
+    } catch (error) {
+      setPublishError(
+        error instanceof Error ? error.message : "Não foi possível publicar o site.",
+      );
+    } finally {
+      setIsPublishing(false);
+    }
+  }
+
   useEffect(() => {
     let isActive = true;
 
     async function loadSalon() {
       setHasCheckedStorage(false);
-      const result = await getSalonBySlug(slug);
+      const result = forceSupabase
+        ? await fetchSupabaseSalon(slug)
+        : await getSalonBySlug(slug);
 
       if (!isActive) {
         return;
@@ -89,7 +152,7 @@ export function SalonPreviewClient({
       isActive = false;
       unsubscribe();
     };
-  }, [slug]);
+  }, [forceSupabase, slug]);
 
   useEffect(() => {
     if (!hasCheckedStorage) {
@@ -106,6 +169,19 @@ export function SalonPreviewClient({
 
   if (!hasCheckedStorage) {
     return <PreviewLoading />;
+  }
+
+  if (salon.template === "premium_editorial") {
+    return (
+      <>
+        <div className="fixed left-4 top-4 z-[60] rounded-full bg-zinc-950/85 px-3 py-2 text-xs font-semibold text-white shadow-lg backdrop-blur">
+          Prévia premium · <Link href={`/salons/${salon.slug}/edit${forceSupabase ? "?source=supabase" : ""}`} className="underline">Editar</Link>
+          <button type="button" onClick={publishPremiumSalon} disabled={isPublishing} className="ml-3 rounded-full bg-white px-3 py-1 text-zinc-950 disabled:opacity-60">{isPublishing ? "Publicando..." : "Publicar site"}</button>
+        </div>
+        {publishError ? <p className="fixed left-4 top-16 z-[60] max-w-[calc(100vw-2rem)] rounded-xl bg-rose-100 px-3 py-2 text-xs font-semibold text-rose-900 shadow-lg">{publishError}</p> : null}
+        <PremiumEditorialLanding salon={salon} />
+      </>
+    );
   }
 
   return (
@@ -157,9 +233,25 @@ export function SalonPreviewClient({
               <Sparkles className="h-4 w-4" />
               Editar cadastro
             </Link>
+            {slug === "flavia-goi-s-hairdresser" ? (
+              <button
+                type="button"
+                onClick={duplicateAsPremium}
+                disabled={isDuplicating}
+                className="btn min-h-10 bg-zinc-950 px-4 py-2 text-white disabled:opacity-60"
+              >
+                {isDuplicating ? "Duplicando..." : "Duplicar como premium 2"}
+              </button>
+            ) : null}
           </div>
         </div>
       </header>
+
+      {duplicateError ? (
+        <div className="mx-auto max-w-7xl px-6 pt-4 text-sm font-semibold text-rose-800 sm:px-8 lg:px-10">
+          {duplicateError}
+        </div>
+      ) : null}
 
       <section className="border-b border-zinc-200 bg-[#fbfaf8] px-6 py-3 sm:px-8 lg:px-10">
         <div className="mx-auto max-w-7xl">
@@ -413,4 +505,23 @@ function debugPreviewStorage(event: string, payload: unknown) {
   }
 
   console.debug(`[salon-lg:preview] ${event} ${JSON.stringify(payload)}`);
+}
+
+async function fetchSupabaseSalon(slug: string) {
+  const response = await fetch(`/api/admin/salons/${encodeURIComponent(slug)}`, {
+    cache: "no-store",
+  });
+  const payload = (await response.json().catch(() => null)) as
+    | { success?: boolean; salon?: Salon; error?: string }
+    | null;
+
+  if (!response.ok || !payload?.success || !payload.salon) {
+    return {
+      ok: false as const,
+      error: payload?.error || "Não foi possível carregar a prévia no Supabase.",
+      source: "supabase" as const,
+    };
+  }
+
+  return { ok: true as const, salon: payload.salon, source: "supabase" as const };
 }

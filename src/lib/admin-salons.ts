@@ -14,6 +14,7 @@ import {
   salonFormInputToPartialSalon,
 } from "@/lib/salon-storage";
 import { estimatePayloadSize, logPerfEvent } from "@/lib/perf-logs";
+import { normalizePremiumEditorial } from "@/lib/premium-editorial";
 import type { Salon, SalonFormInput } from "@/types/salon";
 
 type AdminSalonResult =
@@ -45,7 +46,7 @@ export async function listAdminSalons(): Promise<AdminSalonListResult> {
   const { data, error } = await client.client
     .from("salons")
     .select(
-      "id,slug,name,status,commercial_status,language,country,city,address,description,headline,subheadline,booking_url,whatsapp,phone,website_url,instagram_url,google_maps_url,business_hours,created_at,updated_at,services,copy_suggestions,generated_copy,source_profile,social_links,cta,seo,metadata",
+      "id,slug,name,status,commercial_status,language,country,city,address,description,headline,subheadline,booking_url,whatsapp,phone,website_url,instagram_url,google_maps_url,business_hours,notes,readiness_score,created_at,updated_at,services,real_images,real_reviews,copy_suggestions,copy_history,generated_copy,source_profile,social_links,cta,seo,metadata",
     )
     .order("updated_at", { ascending: false });
 
@@ -146,6 +147,54 @@ export async function createAdminSalonFromInput(
   });
 
   return saveAdminSalon(salon);
+}
+
+export async function duplicateAdminSalonAsPremium(slug: string): Promise<AdminSalonResult> {
+  const existing = await getAdminSalonBySlug(slug);
+
+  if (!existing.ok) {
+    return existing;
+  }
+
+  const name = `${existing.salon.name} 2`;
+  const requestedSlug = normalizeSlug(name);
+  const existingDuplicate = await getAdminSalonBySlug(requestedSlug);
+
+  if (existingDuplicate.ok) {
+    return existingDuplicate;
+  }
+
+  const now = new Date().toISOString();
+  const duplicated = ensureCompleteSalon({
+    ...existing.salon,
+    id: crypto.randomUUID(),
+    slug: await generateUniqueAdminSlug(name),
+    name,
+    status: "draft",
+    template: "premium_editorial",
+    premiumEditorial: normalizePremiumEditorial(existing.salon.premiumEditorial, {
+      ...existing.salon,
+      name,
+    }),
+    createdAt: now,
+    updatedAt: now,
+  });
+
+  return saveAdminSalon(duplicated);
+}
+
+export async function publishAdminSalon(slug: string): Promise<AdminSalonResult> {
+  const existing = await getAdminSalonBySlug(slug);
+
+  if (!existing.ok) {
+    return existing;
+  }
+
+  return saveAdminSalon({
+    ...existing.salon,
+    status: "published",
+    updatedAt: new Date().toISOString(),
+  });
 }
 
 export async function updateAdminSalonFromInput(

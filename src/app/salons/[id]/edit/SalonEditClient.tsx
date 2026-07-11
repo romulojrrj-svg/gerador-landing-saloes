@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { ArrowLeft, FileWarning, Sparkles } from "lucide-react";
 import { SalonForm } from "@/components/salon/SalonForm";
@@ -21,6 +21,8 @@ type SalonEditClientProps = {
 
 export function SalonEditClient({ slug }: SalonEditClientProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const forceSupabase = searchParams.get("source") === "supabase";
   const repositoryStatus = getSalonRepositoryStatus();
   const [salon, setSalon] = useState<Salon | null>(null);
   const [source, setSource] = useState<SalonRepositorySource>(
@@ -36,7 +38,9 @@ export function SalonEditClient({ slug }: SalonEditClientProps) {
 
     async function loadSalon() {
       setHasCheckedStorage(false);
-      const result = await getSalonBySlug(slug);
+      const result = forceSupabase
+        ? await fetchSupabaseSalon(slug)
+        : await getSalonBySlug(slug);
 
       if (!isActive) {
         return;
@@ -61,7 +65,7 @@ export function SalonEditClient({ slug }: SalonEditClientProps) {
       isActive = false;
       unsubscribe();
     };
-  }, [slug]);
+  }, [forceSupabase, slug]);
 
   async function handleUpdate(input: SalonFormInput) {
     setErrorMessage("");
@@ -73,7 +77,9 @@ export function SalonEditClient({ slug }: SalonEditClientProps) {
     }
 
     setIsSubmitting(true);
-    const result = await updateSalon(slug, input);
+    const result = forceSupabase
+      ? await updateSupabaseSalon(slug, input)
+      : await updateSalon(slug, input);
 
     if (!result.ok) {
       setIsSubmitting(false);
@@ -88,7 +94,9 @@ export function SalonEditClient({ slug }: SalonEditClientProps) {
     setSalon(result.salon);
     setSource(result.source);
     setSuccessMessage("Alterações salvas com sucesso.");
-    router.push(`/salons/${result.salon.slug}/preview`);
+    router.push(
+      `/salons/${result.salon.slug}/preview${forceSupabase ? "?source=supabase" : ""}`,
+    );
   }
 
   if (!hasCheckedStorage) {
@@ -155,6 +163,47 @@ export function SalonEditClient({ slug }: SalonEditClientProps) {
       </section>
     </main>
   );
+}
+
+async function fetchSupabaseSalon(slug: string) {
+  const response = await fetch(`/api/admin/salons/${encodeURIComponent(slug)}`, {
+    cache: "no-store",
+  });
+  const payload = (await response.json().catch(() => null)) as
+    | { success?: boolean; salon?: Salon; error?: string }
+    | null;
+
+  if (!response.ok || !payload?.success || !payload.salon) {
+    return {
+      ok: false as const,
+      error: payload?.error || "Não foi possível carregar o salão no Supabase.",
+      source: "supabase" as const,
+    };
+  }
+
+  return { ok: true as const, salon: payload.salon, source: "supabase" as const };
+}
+
+async function updateSupabaseSalon(slug: string, input: SalonFormInput) {
+  const response = await fetch(`/api/admin/salons/${encodeURIComponent(slug)}`, {
+    method: "PUT",
+    cache: "no-store",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ input }),
+  });
+  const payload = (await response.json().catch(() => null)) as
+    | { success?: boolean; salon?: Salon; error?: string }
+    | null;
+
+  if (!response.ok || !payload?.success || !payload.salon) {
+    return {
+      ok: false as const,
+      error: payload?.error || "Não foi possível salvar o salão no Supabase.",
+      source: "supabase" as const,
+    };
+  }
+
+  return { ok: true as const, salon: payload.salon, source: "supabase" as const };
 }
 
 function EditLoading() {
