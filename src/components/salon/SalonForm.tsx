@@ -92,7 +92,10 @@ import type {
   SalonSourceMaterial,
   SalonTestimonial,
 } from "@/types/salon";
-import { createDefaultPremiumEditorial } from "@/lib/premium-editorial";
+import {
+  getPremiumEditorialLabels,
+  normalizePremiumEditorial,
+} from "@/lib/premium-editorial";
 
 type SalonFormProps = {
   mode: "create" | "edit";
@@ -377,7 +380,11 @@ export function SalonForm({
   >(() => initialEffectiveLayoutImagePlan);
   const [template, setTemplate] = useState(initialSalon?.template ?? "default");
   const [premiumEditorial, setPremiumEditorial] = useState<SalonPremiumEditorial>(
-    () => initialSalon?.premiumEditorial ?? createDefaultPremiumEditorial(initialSalon),
+    () =>
+      normalizePremiumEditorial(
+        initialSalon?.premiumEditorial,
+        initialSalon,
+      ),
   );
   const [copySuggestion, setCopySuggestion] = useState<
     SalonCopySuggestion | undefined
@@ -522,6 +529,49 @@ export function SalonForm({
       lastGeneratedAt: nextCopySuggestion?.generatedAt,
       lastAppliedAt: nextAppliedCopy?.appliedAt,
     });
+  }
+
+  async function handleReviewScreenshotUpload(files: File[]) {
+    const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
+    const maxBytes = 5 * 1024 * 1024;
+
+    if (!files.length) {
+      return [];
+    }
+
+    if (files.length > 10) {
+      throw new Error("Selecione ate 10 prints por vez.");
+    }
+
+    if (files.some((file) => !allowedTypes.includes(file.type))) {
+      throw new Error("Envie prints em jpg, jpeg, png ou webp.");
+    }
+
+    if (files.some((file) => file.size > maxBytes)) {
+      throw new Error("Um ou mais prints excedem o limite de 5 MB.");
+    }
+
+    const createdImages: SalonGalleryImage[] = [];
+
+    for (const file of files) {
+      const dataUrl = await compressImageToDataUrl(file);
+      const imageId = createLocalId("review-screenshot");
+      createdImages.push({
+        id: imageId,
+        url: dataUrl,
+        src: dataUrl,
+        alt: `${initialSalon?.name || "Salao"} - feedback de paciente`,
+        title: file.name,
+        type: "gallery",
+        source: "manual",
+        isReal: true,
+        selectedForLanding: false,
+        createdAt: new Date().toISOString(),
+      });
+    }
+
+    setRealImages((current) => [...current, ...createdImages]);
+    return createdImages;
   }
 
   function buildDraftSalonFromForm() {
@@ -762,8 +812,10 @@ export function SalonForm({
         template={template}
         premiumEditorial={premiumEditorial}
         images={realImages}
+        language={initialSalon?.landingLanguage ?? initialSalon?.language}
         onTemplateChange={setTemplate}
         onChange={setPremiumEditorial}
+        onUploadReviewScreenshots={handleReviewScreenshotUpload}
       />
 
       <ContactSection initialSalon={initialSalon} />
@@ -791,7 +843,10 @@ export function SalonForm({
             onSelectionChange={setImageSelectionSummary}
             onLayoutPlanChange={setLayoutImagePlan}
           />
-          <RealReviewsSection reviews={realReviews} onChange={setRealReviews} />
+          {template !== "premium_editorial" ||
+          premiumEditorial.reviewDisplayType === "google" ? (
+            <RealReviewsSection reviews={realReviews} onChange={setRealReviews} />
+          ) : null}
         </>
       ) : null}
 
@@ -1066,16 +1121,26 @@ function PremiumEditorialSection({
   template,
   premiumEditorial,
   images,
+  language,
   onTemplateChange,
   onChange,
+  onUploadReviewScreenshots,
 }: {
   template: "default" | "premium_editorial";
   premiumEditorial: SalonPremiumEditorial;
   images: SalonGalleryImage[];
+  language?: Salon["language"];
   onTemplateChange: (value: "default" | "premium_editorial") => void;
   onChange: Dispatch<SetStateAction<SalonPremiumEditorial>>;
+  onUploadReviewScreenshots: (
+    files: File[],
+  ) => Promise<SalonGalleryImage[]>;
 }) {
   const realImageOptions = images.filter((image) => image.isReal && image.src);
+  const labelDefaults = getPremiumEditorialLabels({ language }, premiumEditorial);
+  const [isUploadingReviewScreenshots, setIsUploadingReviewScreenshots] =
+    useState(false);
+  const [reviewScreenshotMessage, setReviewScreenshotMessage] = useState("");
 
   function updateField<K extends keyof SalonPremiumEditorial>(
     key: K,
@@ -1151,6 +1216,107 @@ function PremiumEditorialSection({
       ...current,
       faqItems: current.faqItems.filter((item) => item.id !== itemId),
     }));
+  }
+
+  function updateReviewScreenshot(
+    screenshotId: string,
+    patch: Partial<SalonPremiumEditorial["reviewScreenshotImages"][number]>,
+  ) {
+    onChange((current) => ({
+      ...current,
+      reviewScreenshotImages: current.reviewScreenshotImages.map((item) =>
+        item.id === screenshotId ? { ...item, ...patch } : item,
+      ),
+    }));
+  }
+
+  function removeReviewScreenshot(screenshotId: string) {
+    onChange((current) => ({
+      ...current,
+      reviewScreenshotImages: current.reviewScreenshotImages
+        .filter((item) => item.id !== screenshotId)
+        .map((item, index) => ({ ...item, order: index })),
+    }));
+  }
+
+  function moveReviewScreenshot(screenshotId: string, direction: -1 | 1) {
+    onChange((current) => {
+      const ordered = [...current.reviewScreenshotImages].sort(
+        (first, second) => first.order - second.order,
+      );
+      const currentIndex = ordered.findIndex((item) => item.id === screenshotId);
+      const targetIndex = currentIndex + direction;
+
+      if (
+        currentIndex < 0 ||
+        targetIndex < 0 ||
+        targetIndex >= ordered.length
+      ) {
+        return current;
+      }
+
+      [ordered[currentIndex], ordered[targetIndex]] = [
+        ordered[targetIndex],
+        ordered[currentIndex],
+      ];
+
+      return {
+        ...current,
+        reviewScreenshotImages: ordered.map((item, index) => ({
+          ...item,
+          order: index,
+        })),
+      };
+    });
+  }
+
+  async function handleReviewScreenshotFiles(
+    event: ChangeEvent<HTMLInputElement>,
+  ) {
+    const files = Array.from(event.currentTarget.files ?? []);
+    event.currentTarget.value = "";
+
+    if (!files.length) {
+      return;
+    }
+
+    setIsUploadingReviewScreenshots(true);
+    setReviewScreenshotMessage("");
+
+    try {
+      const createdImages = await onUploadReviewScreenshots(files);
+
+      if (!createdImages.length) {
+        return;
+      }
+
+      onChange((current) => {
+        const startOrder = current.reviewScreenshotImages.length;
+        return {
+          ...current,
+          reviewScreenshotImages: [
+            ...current.reviewScreenshotImages,
+            ...createdImages.map((image, index) => ({
+              id: `review-screenshot-${image.id}`,
+              imageId: image.id,
+              imageAlt: image.alt || "Feedback de paciente",
+              order: startOrder + index,
+            })),
+          ],
+        };
+      });
+      setReviewScreenshotMessage(
+        `${createdImages.length} print(s) adicionado(s). Salve as alteracoes para publicar.`,
+      );
+    } catch (error) {
+      setReviewScreenshotMessage(
+        error instanceof Error
+          ? error.message
+          : "Nao foi possivel adicionar os prints.",
+      );
+    } finally {
+      setIsUploadingReviewScreenshots(false);
+    }
   }
 
   return (
@@ -1235,6 +1401,62 @@ function PremiumEditorialSection({
           </div>
 
           <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-4">
+            <div>
+              <h3 className="font-semibold text-zinc-950">Textos de navegação e botões</h3>
+              <p className="mt-1 text-xs leading-5 text-zinc-600">
+                Os valores sugeridos acompanham o idioma da landing. Edite qualquer texto se quiser personalizar.
+              </p>
+            </div>
+            <div className="mt-4 grid gap-4 md:grid-cols-2">
+              <PremiumInputField
+                label="Texto do menu Sobre"
+                value={labelDefaults.about}
+                onChange={(value) => updateField("aboutLabel", value)}
+              />
+              <PremiumInputField
+                label="Texto do menu Serviços"
+                value={labelDefaults.services}
+                onChange={(value) => updateField("servicesLabel", value)}
+              />
+              <PremiumInputField
+                label="Texto do menu Resultados"
+                value={labelDefaults.results}
+                onChange={(value) => updateField("resultsLabel", value)}
+              />
+              <PremiumInputField
+                label="Texto do menu Contato"
+                value={labelDefaults.contact}
+                onChange={(value) => updateField("contactLabel", value)}
+              />
+              <PremiumInputField
+                label="Botão principal de agendamento"
+                value={labelDefaults.bookAppointment}
+                onChange={(value) => updateField("bookAppointmentLabel", value)}
+              />
+              <PremiumInputField
+                label="Botão abaixo dos serviços"
+                value={labelDefaults.bookViaWhatsapp}
+                onChange={(value) => updateField("bookViaWhatsappLabel", value)}
+              />
+              <PremiumInputField
+                label="Título da seção de reservas"
+                value={labelDefaults.reservations}
+                onChange={(value) => updateField("reservationsLabel", value)}
+              />
+              <PremiumInputField
+                label="Botão do WhatsApp"
+                value={labelDefaults.chatOnWhatsapp}
+                onChange={(value) => updateField("chatOnWhatsappLabel", value)}
+              />
+              <PremiumInputField
+                label="Botão do Fresha"
+                value={labelDefaults.bookOnFresha}
+                onChange={(value) => updateField("bookOnFreshaLabel", value)}
+              />
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div><h3 className="font-semibold text-zinc-950">FAQ</h3><p className="mt-1 text-xs leading-5 text-zinc-600">Opcional. Perguntas vazias não aparecem no site.</p></div>
               <button type="button" onClick={addFaqItem} className="btn btn-secondary px-4 py-2 text-sm">Adicionar pergunta</button>
@@ -1266,6 +1488,164 @@ function PremiumEditorialSection({
               ))}
               {!premiumEditorial.beforeAfterItems.length ? <p className="rounded-xl border border-dashed border-zinc-300 bg-white p-4 text-sm text-zinc-500">Nenhum par cadastrado ainda.</p> : null}
             </div>
+          </div>
+
+          <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-4">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+              <div>
+                <h3 className="font-semibold text-zinc-950">Reviews</h3>
+                <p className="mt-1 text-xs leading-5 text-zinc-600">
+                  Escolha qual formato de feedback será exibido nesta landing.
+                </p>
+              </div>
+              <div
+                className="grid grid-cols-2 rounded-2xl border border-zinc-200 bg-white p-1 text-sm font-semibold"
+                role="group"
+                aria-label="Tipo de feedback exibido"
+              >
+                <button
+                  type="button"
+                  onClick={() => updateField("reviewDisplayType", "google")}
+                  className={`rounded-xl px-3 py-2 transition ${premiumEditorial.reviewDisplayType === "google" ? "bg-zinc-950 text-white" : "text-zinc-600 hover:bg-zinc-100"}`}
+                >
+                  Avaliações do Google
+                </button>
+                <button
+                  type="button"
+                  onClick={() => updateField("reviewDisplayType", "screenshots")}
+                  className={`rounded-xl px-3 py-2 transition ${premiumEditorial.reviewDisplayType === "screenshots" ? "bg-zinc-950 text-white" : "text-zinc-600 hover:bg-zinc-100"}`}
+                >
+                  Prints de feedback
+                </button>
+              </div>
+            </div>
+
+            {premiumEditorial.reviewDisplayType === "screenshots" ? (
+              <div className="mt-5 grid gap-4 border-t border-zinc-200 pt-5">
+                <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-5 text-amber-950">
+                  Antes de publicar, confirme que você possui autorização para exibir o feedback e oculte informações pessoais quando necessário.
+                </div>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <PremiumInputField
+                    label="Eyebrow da seção"
+                    value={premiumEditorial.reviewEyebrow}
+                    onChange={(value) => updateField("reviewEyebrow", value)}
+                  />
+                  <PremiumInputField
+                    label="Título da seção"
+                    value={premiumEditorial.reviewTitle}
+                    onChange={(value) => updateField("reviewTitle", value)}
+                  />
+                  <PremiumTextAreaField
+                    label="Descrição curta"
+                    value={premiumEditorial.reviewDescription}
+                    onChange={(value) => updateField("reviewDescription", value)}
+                  />
+                </div>
+
+                <label className="grid gap-2 rounded-2xl border border-dashed border-zinc-300 bg-white p-4 text-sm font-semibold text-zinc-800">
+                  <span>Upload dos prints de feedback</span>
+                  <span className="text-xs font-normal leading-5 text-zinc-500">
+                    Adicione vários arquivos verticais em JPG, PNG ou WEBP. O sistema preserva o print inteiro.
+                  </span>
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    multiple
+                    onChange={(event) => void handleReviewScreenshotFiles(event)}
+                    disabled={isUploadingReviewScreenshots}
+                    className="block w-full rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs font-normal disabled:cursor-not-allowed disabled:opacity-60"
+                  />
+                </label>
+
+                {reviewScreenshotMessage ? (
+                  <p className="rounded-2xl border border-teal-100 bg-teal-50 px-4 py-3 text-xs font-semibold text-teal-950">
+                    {reviewScreenshotMessage}
+                  </p>
+                ) : null}
+
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                  {[...premiumEditorial.reviewScreenshotImages]
+                    .sort((first, second) => first.order - second.order)
+                    .map((screenshot, index, orderedScreenshots) => {
+                      const image = findPremiumImage(realImageOptions, screenshot.imageId);
+                      const imageSource = image?.src || screenshot.imageUrl;
+
+                      return (
+                        <article
+                          key={screenshot.id}
+                          className="rounded-2xl border border-zinc-200 bg-white p-3 shadow-sm"
+                        >
+                          <div className="relative aspect-[9/16] overflow-hidden rounded-xl bg-[#f8f5f0]">
+                            {imageSource ? (
+                              <Image
+                                src={imageSource}
+                                alt={screenshot.imageAlt}
+                                fill
+                                unoptimized
+                                sizes="(min-width: 1024px) 20vw, 45vw"
+                                className="object-contain"
+                              />
+                            ) : (
+                              <div className="flex h-full items-center justify-center px-3 text-center text-xs text-zinc-500">
+                                Imagem não encontrada
+                              </div>
+                            )}
+                          </div>
+                          <input
+                            value={screenshot.imageAlt}
+                            onChange={(event) =>
+                              updateReviewScreenshot(screenshot.id, {
+                                imageAlt: event.currentTarget.value,
+                              })
+                            }
+                            aria-label="Texto alternativo do print"
+                            className="mt-3 w-full rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs text-zinc-900 outline-none focus:border-teal-700"
+                          />
+                          <div className="mt-3 flex items-center justify-between gap-2">
+                            <div className="flex gap-1">
+                              <button
+                                type="button"
+                                onClick={() => moveReviewScreenshot(screenshot.id, -1)}
+                                disabled={index === 0}
+                                aria-label="Mover print para esquerda"
+                                className="rounded-lg border border-zinc-200 px-2 py-1 text-sm disabled:cursor-not-allowed disabled:opacity-30"
+                              >
+                                <ArrowLeft className="h-4 w-4" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => moveReviewScreenshot(screenshot.id, 1)}
+                                disabled={index === orderedScreenshots.length - 1}
+                                aria-label="Mover print para direita"
+                                className="rounded-lg border border-zinc-200 px-2 py-1 text-sm disabled:cursor-not-allowed disabled:opacity-30"
+                              >
+                                <ArrowRight className="h-4 w-4" />
+                              </button>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => removeReviewScreenshot(screenshot.id)}
+                              className="text-xs font-semibold text-rose-700 hover:text-rose-900"
+                            >
+                              Remover
+                            </button>
+                          </div>
+                        </article>
+                      );
+                    })}
+                </div>
+                {!premiumEditorial.reviewScreenshotImages.length ? (
+                  <p className="rounded-xl border border-dashed border-zinc-300 bg-white p-4 text-sm text-zinc-500">
+                    Nenhum print adicionado ainda.
+                  </p>
+                ) : null}
+              </div>
+            ) : (
+              <p className="mt-5 rounded-2xl border border-zinc-200 bg-white px-4 py-3 text-xs leading-5 text-zinc-600">
+                As avaliações atuais do Google continuam disponíveis na seção de reviews abaixo. Os prints permanecem salvos e podem ser ativados a qualquer momento.
+              </p>
+            )}
           </div>
         </div>
       ) : null}

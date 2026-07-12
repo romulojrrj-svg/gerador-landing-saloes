@@ -3,7 +3,12 @@ import Image from "next/image";
 import { ArrowUpRight, Menu, MapPin, ExternalLink, Star } from "lucide-react";
 import { LandingImage } from "@/components/landing/LandingImage";
 import { BeforeAfterSlider } from "./BeforeAfterSlider";
-import { getPremiumEditorialImages, getPremiumImage } from "@/lib/premium-editorial";
+import { FeedbackScreenshotCarousel } from "./FeedbackScreenshotCarousel";
+import {
+  getPremiumEditorialImages,
+  getPremiumEditorialLabels,
+  getPremiumImage,
+} from "@/lib/premium-editorial";
 import { getPublicReviewMetrics } from "@/lib/public-landing";
 import type { Salon, SalonGalleryImage, SalonService } from "@/types/salon";
 
@@ -30,6 +35,7 @@ export function PremiumEditorialLanding({ salon }: { salon: Salon }) {
     );
   const accent = content.accentColor || "#9b7353";
   const background = content.backgroundColor || "#f8f5f0";
+  const labels = getPremiumEditorialLabels(salon, content);
 
   return (
     <main className="min-h-screen overflow-x-hidden text-zinc-950" style={{ backgroundColor: background }}>
@@ -39,24 +45,24 @@ export function PremiumEditorialLanding({ salon }: { salon: Salon }) {
             {salon.name}
           </a>
           <nav className="hidden items-center gap-7 text-sm font-medium text-zinc-700 md:flex">
-            <a href="#about" className="transition hover:text-zinc-950">About</a>
-            <a href="#services" className="transition hover:text-zinc-950">Services</a>
-            {beforeAfterItems.length ? <a href="#results" className="transition hover:text-zinc-950">Results</a> : null}
-            <a href="#contact" className="transition hover:text-zinc-950">Contact</a>
+            <a href="#about" className="transition hover:text-zinc-950">{labels.about}</a>
+            <a href="#services" className="transition hover:text-zinc-950">{labels.services}</a>
+            {beforeAfterItems.length ? <a href="#results" className="transition hover:text-zinc-950">{labels.results}</a> : null}
+            <a href="#contact" className="transition hover:text-zinc-950">{labels.contact}</a>
           </nav>
           <div className="flex items-center gap-2">
             <a href={salon.bookingUrl || salon.whatsapp ? buildPrimaryContactHref(salon) : "#contact"} className="hidden rounded-full px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 md:inline-flex" style={{ backgroundColor: accent }}>
-              Book now
+              {labels.bookAppointment}
             </a>
             <details className="relative md:hidden">
               <summary className="flex h-10 w-10 cursor-pointer list-none items-center justify-center rounded-full border border-zinc-200 bg-white">
                 <Menu className="h-5 w-5" />
               </summary>
               <div className="absolute right-0 top-12 grid min-w-44 gap-2 rounded-2xl border border-zinc-200 bg-white p-3 text-sm shadow-2xl">
-                <a href="#about" className="rounded-xl px-3 py-2 hover:bg-zinc-50">About</a>
-                <a href="#services" className="rounded-xl px-3 py-2 hover:bg-zinc-50">Services</a>
-                {beforeAfterItems.length ? <a href="#results" className="rounded-xl px-3 py-2 hover:bg-zinc-50">Results</a> : null}
-                <a href="#contact" className="rounded-xl px-3 py-2 hover:bg-zinc-50">Contact</a>
+                <a href="#about" className="rounded-xl px-3 py-2 hover:bg-zinc-50">{labels.about}</a>
+                <a href="#services" className="rounded-xl px-3 py-2 hover:bg-zinc-50">{labels.services}</a>
+                {beforeAfterItems.length ? <a href="#results" className="rounded-xl px-3 py-2 hover:bg-zinc-50">{labels.results}</a> : null}
+                <a href="#contact" className="rounded-xl px-3 py-2 hover:bg-zinc-50">{labels.contact}</a>
               </div>
             </details>
           </div>
@@ -69,7 +75,7 @@ export function PremiumEditorialLanding({ salon }: { salon: Salon }) {
           <h1 className="mt-5 max-w-2xl font-serif text-5xl leading-[0.95] tracking-tight sm:text-7xl lg:text-[6.4rem]">{content.heroTitle || salon.name}</h1>
           {content.heroDescription ? <p className="mt-7 max-w-lg text-base leading-8 text-zinc-600 sm:text-lg">{content.heroDescription}</p> : null}
           <div className="mt-8 flex flex-wrap gap-3">
-            <a href={buildPrimaryContactHref(salon)} className="inline-flex items-center gap-2 rounded-full px-5 py-3 text-sm font-semibold text-white shadow-lg transition hover:-translate-y-0.5" style={{ backgroundColor: accent }}>Book an appointment <ArrowUpRight className="h-4 w-4" /></a>
+            <a href={buildPrimaryContactHref(salon)} className="inline-flex items-center gap-2 rounded-full px-5 py-3 text-sm font-semibold text-white shadow-lg transition hover:-translate-y-0.5" style={{ backgroundColor: accent }}>{labels.bookAppointment} <ArrowUpRight className="h-4 w-4" /></a>
             {salon.instagramUrl ? <a href={salon.instagramUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 rounded-full border border-zinc-300 bg-white/70 px-5 py-3 text-sm font-semibold transition hover:bg-white"><Image src="/brand/instagram-icon.png" alt="" width={18} height={18} className="rounded-[4px]" /> Instagram</a> : null}
           </div>
         </div>
@@ -84,7 +90,7 @@ export function PremiumEditorialLanding({ salon }: { salon: Salon }) {
             {aboutImage ? <LandingImage image={aboutImage} salonSlug={salon.slug} section="premium-about" imageId={aboutImage.id} alt={`${salon.name} portrait`} fill sizes="(min-width: 1024px) 38vw, 100vw" className="object-cover" /> : <ImageFallback name={salon.name} />}
           </div>
           <div className="order-1 max-w-xl lg:order-2">
-            <p className="text-xs font-semibold uppercase tracking-[0.22em]" style={{ color: accent }}>About</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.22em]" style={{ color: accent }}>{labels.about}</p>
             <h2 className="mt-4 font-serif text-4xl leading-tight sm:text-6xl">{content.aboutTitle}</h2>
             {content.aboutRole ? <p className="mt-4 text-sm font-semibold uppercase tracking-[0.16em] text-zinc-500">{content.aboutRole}</p> : null}
             {content.aboutText ? <p className="mt-7 text-base leading-8 text-zinc-600 sm:text-lg">{content.aboutText}</p> : null}
@@ -101,28 +107,28 @@ export function PremiumEditorialLanding({ salon }: { salon: Salon }) {
 
       <section id="services" className="bg-white px-5 py-16 sm:px-8 sm:py-24 lg:px-10">
         <div className="mx-auto max-w-6xl">
-          <p className="text-xs font-semibold uppercase tracking-[0.22em]" style={{ color: accent }}>Services</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.22em]" style={{ color: accent }}>{labels.services}</p>
           <h2 className="mt-4 max-w-2xl font-serif text-[2.35rem] leading-tight sm:text-5xl">A menu crafted for every woman</h2>
           <div className="mt-7 border-y border-zinc-200">
             {services.map((service, index) => (
               <article key={service.id || service.title} className="grid grid-cols-[3rem_1fr] gap-x-3 gap-y-3 border-b border-zinc-200/80 py-7 last:border-b-0 sm:grid-cols-[5rem_1fr_auto] sm:items-start sm:gap-4 sm:py-8">
                 <span className="pt-1 font-serif text-xl text-[#b48b82] sm:text-2xl">{String(index + 1).padStart(2, "0")}</span>
                 <div><h3 className="font-serif text-[1.35rem] leading-tight sm:text-2xl">{service.title}</h3>{service.description ? <p className="mt-2.5 max-w-2xl text-[0.88rem] leading-6 text-zinc-600 sm:text-[0.95rem]">{service.description}</p> : null}</div>
-                {salon.bookingUrl ? <a href={salon.bookingUrl} target="_blank" rel="noreferrer" className="col-start-2 inline-flex items-center gap-1 text-sm font-semibold sm:col-start-auto" style={{ color: accent }}>Book <ArrowUpRight className="h-4 w-4" /></a> : null}
+                {salon.bookingUrl ? <a href={salon.bookingUrl} target="_blank" rel="noreferrer" className="col-start-2 inline-flex items-center gap-1 text-sm font-semibold sm:col-start-auto" style={{ color: accent }}>{labels.serviceCta} <ArrowUpRight className="h-4 w-4" /></a> : null}
               </article>
             ))}
           </div>
           {(salon.bookingUrl || salon.whatsapp) ? (
             <div className="mt-7 text-center">
               <a href={salon.whatsapp ? buildWhatsappHref(salon.whatsapp) : buildPrimaryContactHref(salon)} className="inline-flex items-center gap-2 rounded-full border border-zinc-300 bg-white px-5 py-2.5 text-sm font-medium text-zinc-800 transition hover:-translate-y-0.5 hover:border-zinc-950 hover:bg-zinc-50">
-                Book via WhatsApp <ArrowUpRight className="h-4 w-4" />
+                {labels.bookViaWhatsapp} <ArrowUpRight className="h-4 w-4" />
               </a>
             </div>
           ) : null}
         </div>
       </section>
 
-      {beforeAfterItems.length ? <section id="results" className="px-5 py-14 sm:px-8 sm:py-20 lg:px-10"><div className="mx-auto max-w-6xl"><p className="text-[0.68rem] font-semibold uppercase tracking-[0.24em]" style={{ color: accent }}>Results</p><h2 className="mt-3 max-w-xl font-serif text-3xl leading-tight sm:text-5xl">Before & after</h2><p className="mt-3 max-w-xl text-sm leading-6 text-zinc-500">Drag to compare selected transformations.</p><div className="mt-8 grid gap-8 md:grid-cols-2">{beforeAfterItems.map(({ item, before, after }) => <article key={item.id} className="overflow-hidden rounded-[2rem] bg-white shadow-[0_20px_60px_rgba(24,24,27,0.08)]"><BeforeAfterSlider beforeImage={before} afterImage={after} salonSlug={salon.slug} title={item.title} /><div className="p-5"><h3 className="font-serif text-2xl">{item.title}</h3>{item.description ? <p className="mt-2 text-sm leading-7 text-zinc-600">{item.description}</p> : null}</div></article>)}</div></div></section> : null}
+      {beforeAfterItems.length ? <section id="results" className="px-5 py-14 sm:px-8 sm:py-20 lg:px-10"><div className="mx-auto max-w-6xl"><p className="text-[0.68rem] font-semibold uppercase tracking-[0.24em]" style={{ color: accent }}>{labels.results}</p><h2 className="mt-3 max-w-xl font-serif text-3xl leading-tight sm:text-5xl">{labels.beforeAfterTitle}</h2><p className="mt-3 max-w-xl text-sm leading-6 text-zinc-500">{labels.beforeAfterDescription}</p><div className="mt-8 grid gap-8 md:grid-cols-2">{beforeAfterItems.map(({ item, before, after }) => <article key={item.id} className="overflow-hidden rounded-[2rem] bg-white shadow-[0_20px_60px_rgba(24,24,27,0.08)]"><BeforeAfterSlider beforeImage={before} afterImage={after} salonSlug={salon.slug} title={item.title} beforeLabel={labels.before} afterLabel={labels.after} adjustLabel={labels.adjustComparison} /><div className="p-5"><h3 className="font-serif text-2xl">{item.title}</h3>{item.description ? <p className="mt-2 text-sm leading-7 text-zinc-600">{item.description}</p> : null}</div></article>)}</div></div></section> : null}
 
       <PremiumReviews salon={salon} accent={accent} />
 
@@ -130,13 +136,13 @@ export function PremiumEditorialLanding({ salon }: { salon: Salon }) {
 
       <section id="contact" className="bg-[#281916] px-5 py-20 text-center text-[#f7eee8] sm:px-8 sm:py-28 lg:px-10">
         <div className="mx-auto max-w-3xl">
-          <p className="text-[0.68rem] font-semibold uppercase tracking-[0.28em] text-[#c9988d]">Reservations</p>
+          <p className="text-[0.68rem] font-semibold uppercase tracking-[0.28em] text-[#c9988d]">{labels.reservations}</p>
           <h2 className="mt-6 font-serif text-4xl leading-tight sm:text-6xl">{content.finalCtaTitle || "Secure Your Appointment"}</h2>
           <div className="mx-auto mt-8 h-px w-20 bg-[#c9988d]/60" />
           {content.finalCtaText ? <p className="mx-auto mt-8 max-w-xl text-base leading-8 text-[#d8c5bd] sm:text-lg">{content.finalCtaText}</p> : null}
           <div className="mx-auto mt-9 grid max-w-md gap-4">
-            {salon.bookingUrl ? <a href={salon.bookingUrl} target="_blank" rel="noreferrer" className="inline-flex min-h-14 items-center justify-center gap-2 rounded-full bg-[#f7eee8] px-6 py-4 text-base font-semibold text-[#281916] transition hover:-translate-y-0.5 hover:bg-white">Book on Fresha <ArrowUpRight className="h-4 w-4" /></a> : null}
-            {salon.whatsapp ? <a href={buildWhatsappHref(salon.whatsapp)} className="inline-flex min-h-14 items-center justify-center gap-2 rounded-full border border-[#f7eee8]/25 px-6 py-4 text-base font-semibold text-[#f7eee8] transition hover:-translate-y-0.5 hover:bg-white/10"><WhatsAppIcon /> Chat on WhatsApp</a> : null}
+            {salon.bookingUrl ? <a href={salon.bookingUrl} target="_blank" rel="noreferrer" className="inline-flex min-h-14 items-center justify-center gap-2 rounded-full bg-[#f7eee8] px-6 py-4 text-base font-semibold text-[#281916] transition hover:-translate-y-0.5 hover:bg-white">{labels.bookOnFresha} <ArrowUpRight className="h-4 w-4" /></a> : null}
+            {salon.whatsapp ? <a href={buildWhatsappHref(salon.whatsapp)} className="inline-flex min-h-14 items-center justify-center gap-2 rounded-full border border-[#f7eee8]/25 px-6 py-4 text-base font-semibold text-[#f7eee8] transition hover:-translate-y-0.5 hover:bg-white/10"><WhatsAppIcon /> {labels.chatOnWhatsapp}</a> : null}
           </div>
           <div className="mt-10 grid gap-2 text-sm text-[#bba49b]">
             {salon.address || salon.location ? <p className="flex items-center justify-center gap-2"><MapPin className="h-4 w-4" /> {salon.address || salon.location}</p> : null}
@@ -155,6 +161,14 @@ function firstUsableImage(imageMap: Map<string, SalonGalleryImage>, salon: Salon
 }
 
 function PremiumReviews({ salon, accent }: { salon: Salon; accent: string }) {
+  if (salon.premiumEditorial.reviewDisplayType === "screenshots") {
+    return <PremiumScreenshotReviews salon={salon} accent={accent} />;
+  }
+
+  return <PremiumGoogleReviews salon={salon} accent={accent} />;
+}
+
+function PremiumGoogleReviews({ salon, accent }: { salon: Salon; accent: string }) {
   const reviews = salon.testimonials
     .filter((review) => review.isReal && review.selectedForLanding && review.text)
     .slice(0, 3);
@@ -189,6 +203,64 @@ function PremiumReviews({ salon, accent }: { salon: Salon; accent: string }) {
               <figcaption className="mt-5 text-[0.68rem] font-semibold uppercase tracking-[0.16em] text-zinc-500">{review.authorName}</figcaption>
             </figure>
           ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function PremiumScreenshotReviews({ salon, accent }: { salon: Salon; accent: string }) {
+  const imageMap = getPremiumEditorialImages(salon);
+  const screenshots = salon.premiumEditorial.reviewScreenshotImages
+    .map((screenshot) => ({
+      screenshot,
+      image: screenshot.imageId
+        ? imageMap.get(screenshot.imageId)
+        : undefined,
+      src: screenshot.imageId
+        ? imageMap.get(screenshot.imageId)?.src || screenshot.imageUrl
+        : screenshot.imageUrl,
+    }))
+    .filter(
+      (item): item is typeof item & { src: string } => Boolean(item.src?.trim()),
+    )
+    .sort((first, second) => first.screenshot.order - second.screenshot.order);
+
+  if (!screenshots.length) {
+    return null;
+  }
+
+  return (
+    <section className="bg-[#fbf8f5] px-5 py-12 sm:px-8 sm:py-16 lg:px-10">
+      <div className="mx-auto max-w-6xl">
+        <div className="flex flex-wrap items-end justify-between gap-4 border-b border-zinc-200 pb-4">
+          <div>
+            <p
+              className="text-[0.68rem] font-semibold uppercase tracking-[0.24em]"
+              style={{ color: accent }}
+            >
+              {salon.premiumEditorial.reviewEyebrow || "O que dizem as pacientes"}
+            </p>
+            <h2 className="mt-3 font-serif text-2xl leading-tight sm:text-4xl">
+              {salon.premiumEditorial.reviewTitle ||
+                "Experiências que refletem nosso cuidado"}
+            </h2>
+            {salon.premiumEditorial.reviewDescription ? (
+              <p className="mt-3 max-w-2xl text-sm leading-6 text-zinc-500">
+                {salon.premiumEditorial.reviewDescription}
+              </p>
+            ) : null}
+          </div>
+        </div>
+        <div className="mt-6">
+          <FeedbackScreenshotCarousel
+            accent={accent}
+            items={screenshots.map(({ screenshot, src }) => ({
+              id: screenshot.id,
+              src,
+              alt: screenshot.imageAlt || "Feedback de paciente",
+            }))}
+          />
         </div>
       </div>
     </section>

@@ -5,7 +5,88 @@ import type {
   SalonFaqItem,
   SalonGalleryImage,
   SalonPremiumEditorial,
+  SalonPremiumReviewScreenshot,
+  SalonReviewDisplayType,
 } from "@/types/salon";
+
+export type PremiumEditorialLabels = {
+  about: string;
+  services: string;
+  results: string;
+  contact: string;
+  bookAppointment: string;
+  bookViaWhatsapp: string;
+  reservations: string;
+  chatOnWhatsapp: string;
+  bookOnFresha: string;
+  serviceCta: string;
+  before: string;
+  after: string;
+  beforeAfterTitle: string;
+  beforeAfterDescription: string;
+  adjustComparison: string;
+};
+
+export function getPremiumEditorialLabels(
+  salon?: Partial<Pick<Salon, "language" | "landingLanguage">>,
+  content?: Partial<SalonPremiumEditorial>,
+): PremiumEditorialLabels {
+  const language = salon?.landingLanguage ?? salon?.language;
+  const isPortuguese = language === "pt-BR";
+  const defaults: PremiumEditorialLabels = isPortuguese
+    ? {
+        about: "Sobre",
+        services: "Serviços",
+        results: "Resultados",
+        contact: "Contato",
+        bookAppointment: "Agendar atendimento",
+        bookViaWhatsapp: "Agendar pelo WhatsApp",
+        reservations: "Agendamentos",
+        chatOnWhatsapp: "Conversar no WhatsApp",
+        bookOnFresha: "Agendar pelo Fresha",
+        serviceCta: "Agendar",
+        before: "Antes",
+        after: "Depois",
+        beforeAfterTitle: "Antes e depois",
+        beforeAfterDescription: "Arraste para comparar as transformações selecionadas.",
+        adjustComparison: "Ajustar comparação entre antes e depois",
+      }
+    : {
+        about: "About",
+        services: "Services",
+        results: "Results",
+        contact: "Contact",
+        bookAppointment: "Book an appointment",
+        bookViaWhatsapp: "Book via WhatsApp",
+        reservations: "Reservations",
+        chatOnWhatsapp: "Chat on WhatsApp",
+        bookOnFresha: "Book on Fresha",
+        serviceCta: "Book",
+        before: "Before",
+        after: "After",
+        beforeAfterTitle: "Before & after",
+        beforeAfterDescription: "Drag to compare selected transformations.",
+        adjustComparison: "Adjust before and after comparison",
+      };
+
+  return {
+    ...defaults,
+    about: content?.aboutLabel?.trim() || defaults.about,
+    services: content?.servicesLabel?.trim() || defaults.services,
+    results: content?.resultsLabel?.trim() || defaults.results,
+    contact: content?.contactLabel?.trim() || defaults.contact,
+    bookAppointment:
+      content?.bookAppointmentLabel?.trim() || defaults.bookAppointment,
+    bookViaWhatsapp:
+      content?.bookViaWhatsappLabel?.trim() || defaults.bookViaWhatsapp,
+    reservations:
+      content?.reservationsLabel?.trim() || defaults.reservations,
+    chatOnWhatsapp:
+      content?.chatOnWhatsappLabel?.trim() || defaults.chatOnWhatsapp,
+    bookOnFresha:
+      content?.bookOnFreshaLabel?.trim() || defaults.bookOnFresha,
+  };
+}
 
 export function createDefaultPremiumEditorial(
   salon?: Partial<Salon>,
@@ -36,6 +117,12 @@ export function createDefaultPremiumEditorial(
       "From the first conversation to the final detail, the focus is on thoughtful consultation, careful technique, and results that feel like you.",
     beforeAfterItems: [],
     faqItems: [],
+    reviewDisplayType: "google",
+    reviewEyebrow: "O que dizem as pacientes",
+    reviewTitle: "Experiências que refletem nosso cuidado",
+    reviewDescription:
+      "Confira alguns relatos de pacientes que compartilharam suas experiências após o atendimento.",
+    reviewScreenshotImages: [],
     finalCtaTitle: "Ready for your next appointment?",
     finalCtaText:
       "Choose the channel that works best for you and let’s plan your visit.",
@@ -51,6 +138,23 @@ export function normalizePremiumEditorial(
   return {
     ...defaults,
     ...value,
+    reviewDisplayType: normalizeReviewDisplayType(value?.reviewDisplayType),
+    reviewEyebrow: value?.reviewEyebrow?.trim() || defaults.reviewEyebrow,
+    reviewTitle: value?.reviewTitle?.trim() || defaults.reviewTitle,
+    reviewDescription:
+      value?.reviewDescription?.trim() || defaults.reviewDescription,
+    reviewScreenshotImages: normalizeReviewScreenshotImages(
+      value?.reviewScreenshotImages,
+    ),
+    aboutLabel: normalizeOptionalLabel(value?.aboutLabel),
+    servicesLabel: normalizeOptionalLabel(value?.servicesLabel),
+    resultsLabel: normalizeOptionalLabel(value?.resultsLabel),
+    contactLabel: normalizeOptionalLabel(value?.contactLabel),
+    bookAppointmentLabel: normalizeOptionalLabel(value?.bookAppointmentLabel),
+    bookViaWhatsappLabel: normalizeOptionalLabel(value?.bookViaWhatsappLabel),
+    reservationsLabel: normalizeOptionalLabel(value?.reservationsLabel),
+    chatOnWhatsappLabel: normalizeOptionalLabel(value?.chatOnWhatsappLabel),
+    bookOnFreshaLabel: normalizeOptionalLabel(value?.bookOnFreshaLabel),
     beforeAfterItems: normalizeBeforeAfterItems(value?.beforeAfterItems),
     faqItems: normalizeFaqItems(value?.faqItems),
   } satisfies SalonPremiumEditorial;
@@ -123,4 +227,37 @@ function normalizeFaqItems(value: SalonFaqItem[] | undefined) {
     }))
     .filter((item) => item.question && item.answer)
     .sort((a, b) => a.order - b.order);
+}
+
+function normalizeReviewDisplayType(
+  value: SalonReviewDisplayType | undefined,
+): SalonReviewDisplayType {
+  return value === "screenshots" ? "screenshots" : "google";
+}
+
+function normalizeOptionalLabel(value: string | undefined) {
+  return value?.trim() || undefined;
+}
+
+function normalizeReviewScreenshotImages(
+  value: SalonPremiumReviewScreenshot[] | undefined,
+) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .filter(
+      (item): item is SalonPremiumReviewScreenshot =>
+        Boolean(item && typeof item === "object"),
+    )
+    .map((item, index) => ({
+      id: item.id?.trim() || `review-screenshot-${index + 1}`,
+      imageId: item.imageId?.trim() || undefined,
+      imageUrl: item.imageUrl?.trim() || undefined,
+      imageAlt: item.imageAlt?.trim() || "Feedback de paciente",
+      order: Number.isFinite(item.order) ? item.order : index,
+    }))
+    .filter((item) => item.imageId || item.imageUrl)
+    .sort((first, second) => first.order - second.order);
 }

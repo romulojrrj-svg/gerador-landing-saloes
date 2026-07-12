@@ -58,6 +58,16 @@ export type SalonBeforeAfterItem = {
   enabled: boolean;
 };
 
+export type SalonReviewDisplayType = "google" | "screenshots";
+
+export type SalonPremiumReviewScreenshot = {
+  id: string;
+  imageId?: string;
+  imageUrl?: string;
+  imageAlt: string;
+  order: number;
+};
+
 export type SalonPremiumEditorial = {
   accentColor: string;
   backgroundColor: string;
@@ -74,8 +84,22 @@ export type SalonPremiumEditorial = {
   methodText: string;
   beforeAfterItems: SalonBeforeAfterItem[];
   faqItems: SalonFaqItem[];
+  reviewDisplayType: SalonReviewDisplayType;
+  reviewEyebrow: string;
+  reviewTitle: string;
+  reviewDescription: string;
+  reviewScreenshotImages: SalonPremiumReviewScreenshot[];
   finalCtaTitle: string;
   finalCtaText: string;
+  aboutLabel?: string;
+  servicesLabel?: string;
+  resultsLabel?: string;
+  contactLabel?: string;
+  bookAppointmentLabel?: string;
+  bookViaWhatsappLabel?: string;
+  reservationsLabel?: string;
+  chatOnWhatsappLabel?: string;
+  bookOnFreshaLabel?: string;
 };
 
 export type SalonImageSource =

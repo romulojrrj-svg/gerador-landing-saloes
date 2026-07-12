@@ -10,6 +10,9 @@ type BeforeAfterSliderProps = {
   afterImage: SalonGalleryImage;
   salonSlug: string;
   title: string;
+  beforeLabel: string;
+  afterLabel: string;
+  adjustLabel: string;
 };
 
 export function BeforeAfterSlider({
@@ -17,6 +20,9 @@ export function BeforeAfterSlider({
   afterImage,
   salonSlug,
   title,
+  beforeLabel,
+  afterLabel,
+  adjustLabel,
 }: BeforeAfterSliderProps) {
   const [position, setPosition] = useState(50);
 
@@ -86,7 +92,7 @@ export function BeforeAfterSlider({
         >
           <button
             type="button"
-            aria-label={`Adjust ${title} before and after comparison`}
+            aria-label={`${adjustLabel}: ${title}`}
             aria-valuemin={0}
             aria-valuemax={100}
             aria-valuenow={Math.round(position)}
@@ -100,10 +106,10 @@ export function BeforeAfterSlider({
           </button>
         </div>
         <span className="absolute left-3 top-3 z-20 rounded-full bg-white/90 px-2.5 py-1 text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-zinc-800 shadow-sm">
-          Before
+          {beforeLabel}
         </span>
         <span className="absolute right-3 top-3 z-20 rounded-full bg-zinc-950/75 px-2.5 py-1 text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-white shadow-sm">
-          After
+          {afterLabel}
         </span>
       </div>
     </div>
