@@ -33,6 +33,9 @@ export function PremiumEditorialLanding({ salon }: { salon: Salon }) {
         after: SalonGalleryImage;
       } => Boolean(entry.before && entry.after),
     );
+  const faqItems = content.faqItems.filter(
+    (item) => item.enabled && item.question.trim() && item.answer.trim(),
+  );
   const accent = content.accentColor || "#9b7353";
   const background = content.backgroundColor || "#f8f5f0";
   const labels = getPremiumEditorialLabels(salon, content);
@@ -69,7 +72,7 @@ export function PremiumEditorialLanding({ salon }: { salon: Salon }) {
         </div>
       </header>
 
-      <section id="top" className="mx-auto grid max-w-7xl gap-10 px-5 pb-16 pt-12 sm:px-8 sm:pb-24 sm:pt-20 lg:grid-cols-[0.8fr_1.2fr] lg:items-center lg:px-10 lg:pt-24">
+      <section id="top" className="mx-auto grid max-w-7xl gap-10 px-5 pb-0 pt-12 sm:px-8 sm:pb-24 sm:pt-20 lg:grid-cols-[0.8fr_1.2fr] lg:items-center lg:px-10 lg:pt-24">
         <div className="max-w-xl">
           <p className="text-xs font-semibold uppercase tracking-[0.22em]" style={{ color: accent }}>{content.heroEyebrow}</p>
           <h1 className="mt-5 max-w-2xl font-serif text-5xl leading-[0.95] tracking-tight sm:text-7xl lg:text-[6.4rem]">{content.heroTitle || salon.name}</h1>
@@ -84,28 +87,28 @@ export function PremiumEditorialLanding({ salon }: { salon: Salon }) {
         </div>
       </section>
 
-      <section id="about" className="bg-white px-5 py-16 sm:px-8 sm:py-24 lg:px-10">
+      <section id="about" className="bg-white px-5 pb-16 pt-14 sm:px-8 sm:py-24 lg:px-10">
         <div className="mx-auto grid max-w-6xl gap-10 lg:grid-cols-[0.85fr_1.15fr] lg:items-center">
           <div className="order-2 relative aspect-[4/5] overflow-hidden rounded-[2rem] bg-zinc-100 sm:rounded-[3rem] lg:order-1">
             {aboutImage ? <LandingImage image={aboutImage} salonSlug={salon.slug} section="premium-about" imageId={aboutImage.id} alt={`${salon.name} portrait`} fill sizes="(min-width: 1024px) 38vw, 100vw" className="object-cover" /> : <ImageFallback name={salon.name} />}
           </div>
           <div className="order-1 max-w-xl lg:order-2">
             <p className="text-xs font-semibold uppercase tracking-[0.22em]" style={{ color: accent }}>{labels.about}</p>
-            <h2 className="mt-4 font-serif text-4xl leading-tight sm:text-6xl">{content.aboutTitle}</h2>
-            {content.aboutRole ? <p className="mt-4 text-sm font-semibold uppercase tracking-[0.16em] text-zinc-500">{content.aboutRole}</p> : null}
-            {content.aboutText ? <p className="mt-7 text-base leading-8 text-zinc-600 sm:text-lg">{content.aboutText}</p> : null}
+            <h2 className="mt-6 font-serif text-4xl leading-tight sm:mt-4 sm:text-6xl">{content.aboutTitle}</h2>
+            {content.aboutRole ? <p className="mt-7 text-sm font-semibold uppercase tracking-[0.16em] text-zinc-500 sm:mt-4">{content.aboutRole}</p> : null}
+            {content.aboutText ? <p className="mt-8 text-base leading-8 text-zinc-600 sm:mt-7 sm:text-lg">{content.aboutText}</p> : null}
           </div>
         </div>
       </section>
 
-      <section className="px-5 py-12 sm:px-8 sm:py-16 lg:px-10">
+      {content.methodEyebrow || content.methodTitle || content.methodText ? <section className="px-5 pb-10 pt-8 sm:px-8 sm:py-16 lg:px-10">
         <div className="mx-auto grid max-w-6xl gap-6 lg:grid-cols-[0.7fr_1.3fr]">
           <div><p className="text-[0.68rem] font-semibold uppercase tracking-[0.22em]" style={{ color: accent }}>{content.methodEyebrow}</p><h2 className="mt-4 font-serif text-3xl leading-tight sm:text-5xl">{content.methodTitle}</h2></div>
           {content.methodText ? <p className="max-w-2xl self-end text-base leading-7 text-zinc-600 sm:text-xl sm:leading-8">{content.methodText}</p> : null}
         </div>
-      </section>
+      </section> : null}
 
-      <section id="services" className="bg-white px-5 py-16 sm:px-8 sm:py-24 lg:px-10">
+      {services.length ? <section id="services" className="bg-white px-5 pb-14 pt-12 sm:px-8 sm:py-24 lg:px-10">
         <div className="mx-auto max-w-6xl">
           <p className="text-xs font-semibold uppercase tracking-[0.22em]" style={{ color: accent }}>{labels.services}</p>
           <h2 className="mt-4 max-w-2xl font-serif text-[2.35rem] leading-tight sm:text-5xl">{labels.servicesTitle}</h2>
@@ -126,13 +129,13 @@ export function PremiumEditorialLanding({ salon }: { salon: Salon }) {
             </div>
           ) : null}
         </div>
-      </section>
+      </section> : null}
 
-      {beforeAfterItems.length ? <section id="results" className="px-5 py-14 sm:px-8 sm:py-20 lg:px-10"><div className="mx-auto max-w-6xl"><p className="text-[0.68rem] font-semibold uppercase tracking-[0.24em]" style={{ color: accent }}>{labels.results}</p><h2 className="mt-3 max-w-xl font-serif text-3xl leading-tight sm:text-5xl">{labels.beforeAfterTitle}</h2><p className="mt-3 max-w-xl text-sm leading-6 text-zinc-500">{labels.beforeAfterDescription}</p><div className="mt-8 grid gap-8 md:grid-cols-2">{beforeAfterItems.map(({ item, before, after }) => <article key={item.id} className="overflow-hidden rounded-[2rem] bg-white shadow-[0_20px_60px_rgba(24,24,27,0.08)]"><BeforeAfterSlider beforeImage={before} afterImage={after} salonSlug={salon.slug} title={item.title} beforeLabel={labels.before} afterLabel={labels.after} adjustLabel={labels.adjustComparison} /><div className="p-5"><h3 className="font-serif text-2xl">{item.title}</h3>{item.description ? <p className="mt-2 text-sm leading-7 text-zinc-600">{item.description}</p> : null}</div></article>)}</div></div></section> : null}
+      {beforeAfterItems.length ? <section id="results" className="px-5 pb-14 pt-12 sm:px-8 sm:py-20 lg:px-10"><div className="mx-auto max-w-6xl"><p className="text-[0.68rem] font-semibold uppercase tracking-[0.24em]" style={{ color: accent }}>{labels.results}</p><h2 className="mt-3 max-w-xl font-serif text-3xl leading-tight sm:text-5xl">{labels.beforeAfterTitle}</h2><p className="mt-3 max-w-xl text-sm leading-6 text-zinc-500">{labels.beforeAfterDescription}</p><div className="mt-8 grid gap-8 md:grid-cols-2">{beforeAfterItems.map(({ item, before, after }) => <article key={item.id} className="overflow-hidden rounded-[2rem] bg-white shadow-[0_20px_60px_rgba(24,24,27,0.08)]"><BeforeAfterSlider beforeImage={before} afterImage={after} salonSlug={salon.slug} title={item.title} beforeLabel={labels.before} afterLabel={labels.after} adjustLabel={labels.adjustComparison} /><div className="p-5"><h3 className="font-serif text-2xl">{item.title}</h3>{item.description ? <p className="mt-2 text-sm leading-7 text-zinc-600">{item.description}</p> : null}</div></article>)}</div></div></section> : null}
 
       <PremiumReviews salon={salon} accent={accent} />
 
-      {content.faqItems.length ? <section className="px-5 py-16 sm:px-8 sm:py-24 lg:px-10"><div className="mx-auto max-w-4xl"><p className="text-xs font-semibold uppercase tracking-[0.22em]" style={{ color: accent }}>FAQ</p><div className="mt-7 divide-y divide-zinc-300 border-y border-zinc-300">{content.faqItems.filter((item) => item.enabled).map((item) => <details key={item.id} className="group py-5"><summary className="flex cursor-pointer list-none items-center justify-between gap-6 font-serif text-xl marker:hidden"><span>{item.question}</span><span className="font-sans text-2xl font-normal" style={{ color: accent }}>+</span></summary><p className="mt-3 max-w-2xl text-sm leading-7 text-zinc-600">{item.answer}</p></details>)}</div></div></section> : null}
+      {faqItems.length ? <section className="px-5 pb-14 pt-12 sm:px-8 sm:py-24 lg:px-10"><div className="mx-auto max-w-4xl"><p className="text-xs font-semibold uppercase tracking-[0.22em]" style={{ color: accent }}>FAQ</p><div className="mt-7 divide-y divide-zinc-300 border-y border-zinc-300">{faqItems.map((item) => <details key={item.id} className="group py-5"><summary className="flex cursor-pointer list-none items-center justify-between gap-6 font-serif text-xl marker:hidden"><span>{item.question}</span><span className="font-sans text-2xl font-normal" style={{ color: accent }}>+</span></summary><p className="mt-3 max-w-2xl text-sm leading-7 text-zinc-600">{item.answer}</p></details>)}</div></div></section> : null}
 
       <section id="contact" className="bg-[#281916] px-5 py-20 text-center text-[#f7eee8] sm:px-8 sm:py-28 lg:px-10">
         <div className="mx-auto max-w-3xl">
