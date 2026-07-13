@@ -130,6 +130,8 @@ export function createDefaultPremiumEditorial(
     finalCtaTitle: "Ready for your next appointment?",
     finalCtaText:
       "Choose the channel that works best for you and let’s plan your visit.",
+    finalCtaBackgroundColor: "#281916",
+    finalWhatsappButtonColor: "#25D366",
   };
 }
 
@@ -147,6 +149,11 @@ export function normalizePremiumEditorial(
     reviewTitle: value?.reviewTitle?.trim() || defaults.reviewTitle,
     reviewDescription:
       value?.reviewDescription?.trim() || defaults.reviewDescription,
+    finalCtaBackgroundColor:
+      value?.finalCtaBackgroundColor?.trim() || defaults.finalCtaBackgroundColor,
+    finalWhatsappButtonColor:
+      value?.finalWhatsappButtonColor?.trim() ||
+      defaults.finalWhatsappButtonColor,
     reviewScreenshotImages: normalizeReviewScreenshotImages(
       value?.reviewScreenshotImages,
     ),

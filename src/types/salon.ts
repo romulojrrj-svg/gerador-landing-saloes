@@ -91,6 +91,8 @@ export type SalonPremiumEditorial = {
   reviewScreenshotImages: SalonPremiumReviewScreenshot[];
   finalCtaTitle: string;
   finalCtaText: string;
+  finalCtaBackgroundColor?: string;
+  finalWhatsappButtonColor?: string;
   aboutLabel?: string;
   servicesLabel?: string;
   servicesTitle?: string;

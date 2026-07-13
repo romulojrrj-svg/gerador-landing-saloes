@@ -39,6 +39,8 @@ export function PremiumEditorialLanding({ salon }: { salon: Salon }) {
   );
   const accent = content.accentColor || "#9b7353";
   const background = content.backgroundColor || "#f8f5f0";
+  const finalCtaBackground = content.finalCtaBackgroundColor || "#281916";
+  const finalWhatsappButtonColor = content.finalWhatsappButtonColor || "#25D366";
   const labels = getPremiumEditorialLabels(salon, content);
 
   return (
@@ -136,7 +138,7 @@ export function PremiumEditorialLanding({ salon }: { salon: Salon }) {
 
       {faqItems.length ? <section className="px-5 pb-8 pt-10 sm:px-8 md:py-24 lg:px-10"><div className="mx-auto max-w-4xl"><p className="text-[0.68rem] font-semibold uppercase tracking-[0.22em]" style={{ color: accent }}>FAQ</p><div className="mt-6 divide-y divide-zinc-300 border-y border-zinc-300">{faqItems.map((item) => <details key={item.id} className="group py-4"><summary className="flex cursor-pointer list-none items-center justify-between gap-6 font-serif text-lg leading-[1.2] marker:hidden"><span>{item.question}</span><span className="font-sans text-xl font-normal" style={{ color: accent }}>+</span></summary><p className="mt-2.5 max-w-2xl text-[0.82rem] leading-6 text-zinc-600">{item.answer}</p></details>)}</div></div></section> : null}
 
-      <section id="contact" className="bg-[#281916] px-5 py-20 text-center text-[#f7eee8] sm:px-8 md:py-28 lg:px-10">
+      <section id="contact" className="px-5 py-20 text-center text-[#f7eee8] sm:px-8 md:py-28 lg:px-10" style={{ backgroundColor: finalCtaBackground }}>
         <div className="mx-auto max-w-3xl">
           <p className="text-[0.62rem] font-semibold uppercase tracking-[0.28em] text-[#c9988d]">{labels.reservations}</p>
           <h2 className="mt-5 font-serif text-3xl leading-tight sm:text-5xl">{content.finalCtaTitle || "Secure Your Appointment"}</h2>
@@ -144,7 +146,7 @@ export function PremiumEditorialLanding({ salon }: { salon: Salon }) {
           {content.finalCtaText ? <p className="mx-auto mt-7 max-w-xl whitespace-pre-line text-[0.95rem] leading-7 text-[#d8c5bd] sm:text-base">{content.finalCtaText}</p> : null}
           <div className="mx-auto mt-8 grid max-w-md gap-3">
             {salon.bookingUrl ? <a href={salon.bookingUrl} target="_blank" rel="noreferrer" className="inline-flex min-h-13 items-center justify-center gap-2 rounded-full bg-[#f7eee8] px-6 py-3 text-[0.9rem] font-semibold text-[#281916] shadow-lg transition hover:-translate-y-0.5 hover:bg-white">{labels.bookOnFresha} <ArrowUpRight className="h-4 w-4" /></a> : null}
-            {salon.whatsapp ? <a href={buildWhatsappHref(salon.whatsapp, salon.whatsappMessage)} className="inline-flex min-h-13 items-center justify-center gap-2 rounded-full border border-transparent bg-[#25D366] px-6 py-3 text-[0.9rem] font-semibold text-white shadow-[0_12px_28px_rgba(37,211,102,0.22)] transition hover:-translate-y-0.5 hover:bg-[#20bd5a]"><WhatsAppIcon /> {labels.chatOnWhatsapp}</a> : null}
+            {salon.whatsapp ? <a href={buildWhatsappHref(salon.whatsapp, salon.whatsappMessage)} className="inline-flex min-h-13 items-center justify-center gap-2 rounded-full border border-transparent px-6 py-3 text-[0.9rem] font-semibold text-white shadow-[0_12px_28px_rgba(37,211,102,0.22)] transition hover:-translate-y-0.5 hover:brightness-95" style={{ backgroundColor: finalWhatsappButtonColor }}><WhatsAppIcon /> {labels.chatOnWhatsapp}</a> : null}
           </div>
           <div className="mt-8 grid gap-2 text-[0.82rem] text-[#bba49b]">
             {salon.address || salon.location ? <p className="flex items-center justify-center gap-2"><MapPin className="h-4 w-4" /> {salon.address || salon.location}</p> : null}
