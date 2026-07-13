@@ -51,7 +51,7 @@ export function FeedbackScreenshotCarousel({
 
       <div
         ref={trackRef}
-        className={`flex snap-x snap-mandatory gap-4 overflow-x-auto pb-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${items.length < 3 ? "md:justify-center" : "md:justify-start"}`}
+        className={`flex snap-x snap-mandatory gap-4 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${items.length < 3 ? "md:justify-center" : "md:justify-start"}`}
       >
         {items.map((item) => (
           <figure
