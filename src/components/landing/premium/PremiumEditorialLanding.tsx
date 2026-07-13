@@ -43,8 +43,14 @@ export function PremiumEditorialLanding({ salon }: { salon: Salon }) {
   const finalWhatsappButtonColor = content.finalWhatsappButtonColor || "#25D366";
   const finalWhatsappButtonTextColor =
     content.finalWhatsappButtonTextColor || "#ffffff";
-  const finalSecondaryButtonTextColor =
-    content.finalSecondaryButtonTextColor || "#281916";
+  const bookingButtonTextColor =
+    content.bookingButtonTextColor ||
+    content.finalSecondaryButtonTextColor ||
+    "#ffffff";
+  const instagramButtonTextColor =
+    content.instagramButtonTextColor ||
+    content.finalSecondaryButtonTextColor ||
+    "#281916";
   const labels = getPremiumEditorialLabels(salon, content);
 
   return (
@@ -64,7 +70,7 @@ export function PremiumEditorialLanding({ salon }: { salon: Salon }) {
             <a href="#contact" className="transition hover:text-zinc-950">{labels.contact}</a>
           </nav>
           <div className="flex items-center gap-2">
-            <a href={salon.bookingUrl || salon.whatsapp ? buildPrimaryContactHref(salon) : "#contact"} className="hidden rounded-full px-4 py-2 text-[0.82rem] font-semibold shadow-sm transition hover:-translate-y-0.5 md:inline-flex" style={{ backgroundColor: accent, color: finalSecondaryButtonTextColor }}>
+            <a href={salon.bookingUrl || salon.whatsapp ? buildPrimaryContactHref(salon) : "#contact"} className="hidden rounded-full px-4 py-2 text-[0.82rem] font-semibold shadow-sm transition hover:-translate-y-0.5 md:inline-flex" style={{ backgroundColor: accent, color: bookingButtonTextColor }}>
               {labels.bookAppointment}
             </a>
             <details className="relative md:hidden">
@@ -88,8 +94,8 @@ export function PremiumEditorialLanding({ salon }: { salon: Salon }) {
           <h1 className="mt-4 max-w-2xl font-serif text-[2.75rem] leading-[0.96] tracking-tight sm:text-6xl lg:text-[6rem]">{content.heroTitle || salon.name}</h1>
           {content.heroDescription ? <p className="mt-6 max-w-lg text-[0.95rem] leading-7 text-zinc-600 sm:text-base">{content.heroDescription}</p> : null}
           <div className="mt-7 flex flex-wrap gap-3">
-            <a href={buildPrimaryContactHref(salon)} className="inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-[0.82rem] font-semibold shadow-lg transition hover:-translate-y-0.5" style={{ backgroundColor: accent, color: finalSecondaryButtonTextColor }}>{labels.bookAppointment} <ArrowUpRight className="h-4 w-4" /></a>
-            {salon.instagramUrl ? <a href={salon.instagramUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 rounded-full border border-zinc-300 bg-white/70 px-5 py-2.5 text-[0.82rem] font-semibold transition hover:bg-white" style={{ color: finalSecondaryButtonTextColor }}><Image src="/brand/instagram-icon.png" alt="" width={18} height={18} className="rounded-[4px]" /> Instagram</a> : null}
+            <a href={buildPrimaryContactHref(salon)} className="inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-[0.82rem] font-semibold shadow-lg transition hover:-translate-y-0.5" style={{ backgroundColor: accent, color: bookingButtonTextColor }}>{labels.bookAppointment} <ArrowUpRight className="h-4 w-4" /></a>
+            {salon.instagramUrl ? <a href={salon.instagramUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 rounded-full border border-zinc-300 bg-white/70 px-5 py-2.5 text-[0.82rem] font-semibold transition hover:bg-white" style={{ color: instagramButtonTextColor }}><Image src="/brand/instagram-icon.png" alt="" width={18} height={18} className="rounded-[4px]" /> Instagram</a> : null}
           </div>
         </div>
         <div className="relative aspect-[4/5] overflow-hidden rounded-[2rem] bg-zinc-200 sm:rounded-[3rem]">
@@ -126,7 +132,7 @@ export function PremiumEditorialLanding({ salon }: { salon: Salon }) {
           </div>
           {(salon.bookingUrl || salon.whatsapp) ? (
             <div className="mt-6 text-center">
-              <a href={salon.whatsapp ? buildWhatsappHref(salon.whatsapp, salon.whatsappMessage) : buildPrimaryContactHref(salon)} className="inline-flex items-center gap-2 rounded-full border border-transparent px-6 py-3 text-[0.82rem] font-semibold shadow-lg transition hover:-translate-y-0.5 hover:brightness-95" style={{ backgroundColor: accent, color: finalSecondaryButtonTextColor }}>
+              <a href={salon.whatsapp ? buildWhatsappHref(salon.whatsapp, salon.whatsappMessage) : buildPrimaryContactHref(salon)} className="inline-flex items-center gap-2 rounded-full border border-transparent px-6 py-3 text-[0.82rem] font-semibold shadow-lg transition hover:-translate-y-0.5 hover:brightness-95" style={{ backgroundColor: accent, color: bookingButtonTextColor }}>
                 {labels.bookViaWhatsapp} <ArrowUpRight className="h-4 w-4" />
               </a>
             </div>
@@ -149,7 +155,7 @@ export function PremiumEditorialLanding({ salon }: { salon: Salon }) {
           <div className="mx-auto mt-7 h-px w-20 bg-[#c9988d]/60" />
           {content.finalCtaText ? <p className="mx-auto mt-7 max-w-xl whitespace-pre-line text-[0.95rem] leading-7 text-[#d8c5bd] sm:text-base">{content.finalCtaText}</p> : null}
           <div className="mx-auto mt-8 grid max-w-md gap-3">
-            {salon.bookingUrl ? <a href={salon.bookingUrl} target="_blank" rel="noreferrer" className="inline-flex min-h-13 items-center justify-center gap-2 rounded-full bg-[#f7eee8] px-6 py-3 text-[0.9rem] font-semibold shadow-lg transition hover:-translate-y-0.5 hover:bg-white" style={{ color: finalSecondaryButtonTextColor }}>{labels.bookOnFresha} <ArrowUpRight className="h-4 w-4" /></a> : null}
+            {salon.bookingUrl ? <a href={salon.bookingUrl} target="_blank" rel="noreferrer" className="inline-flex min-h-13 items-center justify-center gap-2 rounded-full bg-[#f7eee8] px-6 py-3 text-[0.9rem] font-semibold shadow-lg transition hover:-translate-y-0.5 hover:bg-white" style={{ color: bookingButtonTextColor }}>{labels.bookOnFresha} <ArrowUpRight className="h-4 w-4" /></a> : null}
             {salon.whatsapp ? <a href={buildWhatsappHref(salon.whatsapp, salon.whatsappMessage)} className="inline-flex min-h-13 items-center justify-center gap-2 rounded-full border border-transparent px-6 py-3 text-[0.9rem] font-semibold shadow-[0_12px_28px_rgba(37,211,102,0.22)] transition hover:-translate-y-0.5 hover:brightness-95" style={{ backgroundColor: finalWhatsappButtonColor, color: finalWhatsappButtonTextColor }}><WhatsAppIcon /> {labels.chatOnWhatsapp}</a> : null}
           </div>
           <div className="mt-8 grid gap-2 text-[0.82rem] text-[#bba49b]">

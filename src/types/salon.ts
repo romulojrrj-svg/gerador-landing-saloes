@@ -94,6 +94,8 @@ export type SalonPremiumEditorial = {
   finalCtaBackgroundColor?: string;
   finalWhatsappButtonColor?: string;
   finalWhatsappButtonTextColor?: string;
+  bookingButtonTextColor?: string;
+  instagramButtonTextColor?: string;
   finalSecondaryButtonTextColor?: string;
   aboutLabel?: string;
   servicesLabel?: string;

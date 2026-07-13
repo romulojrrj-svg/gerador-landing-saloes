@@ -133,6 +133,8 @@ export function createDefaultPremiumEditorial(
     finalCtaBackgroundColor: "#281916",
     finalWhatsappButtonColor: "#25D366",
     finalWhatsappButtonTextColor: "#ffffff",
+    bookingButtonTextColor: "#ffffff",
+    instagramButtonTextColor: "#281916",
     finalSecondaryButtonTextColor: "#281916",
   };
 }
@@ -159,6 +161,14 @@ export function normalizePremiumEditorial(
     finalWhatsappButtonTextColor:
       value?.finalWhatsappButtonTextColor?.trim() ||
       defaults.finalWhatsappButtonTextColor,
+    bookingButtonTextColor:
+      value?.bookingButtonTextColor?.trim() ||
+      value?.finalSecondaryButtonTextColor?.trim() ||
+      defaults.bookingButtonTextColor,
+    instagramButtonTextColor:
+      value?.instagramButtonTextColor?.trim() ||
+      value?.finalSecondaryButtonTextColor?.trim() ||
+      defaults.instagramButtonTextColor,
     finalSecondaryButtonTextColor:
       value?.finalSecondaryButtonTextColor?.trim() ||
       defaults.finalSecondaryButtonTextColor,
