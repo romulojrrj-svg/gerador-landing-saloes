@@ -43,6 +43,8 @@ export function PremiumEditorialLanding({ salon }: { salon: Salon }) {
   const finalWhatsappButtonColor = content.finalWhatsappButtonColor || "#25D366";
   const finalWhatsappButtonTextColor =
     content.finalWhatsappButtonTextColor || "#ffffff";
+  const finalSecondaryButtonTextColor =
+    content.finalSecondaryButtonTextColor || "#281916";
   const labels = getPremiumEditorialLabels(salon, content);
 
   return (
@@ -147,7 +149,7 @@ export function PremiumEditorialLanding({ salon }: { salon: Salon }) {
           <div className="mx-auto mt-7 h-px w-20 bg-[#c9988d]/60" />
           {content.finalCtaText ? <p className="mx-auto mt-7 max-w-xl whitespace-pre-line text-[0.95rem] leading-7 text-[#d8c5bd] sm:text-base">{content.finalCtaText}</p> : null}
           <div className="mx-auto mt-8 grid max-w-md gap-3">
-            {salon.bookingUrl ? <a href={salon.bookingUrl} target="_blank" rel="noreferrer" className="inline-flex min-h-13 items-center justify-center gap-2 rounded-full bg-[#f7eee8] px-6 py-3 text-[0.9rem] font-semibold text-[#281916] shadow-lg transition hover:-translate-y-0.5 hover:bg-white">{labels.bookOnFresha} <ArrowUpRight className="h-4 w-4" /></a> : null}
+            {salon.bookingUrl ? <a href={salon.bookingUrl} target="_blank" rel="noreferrer" className="inline-flex min-h-13 items-center justify-center gap-2 rounded-full bg-[#f7eee8] px-6 py-3 text-[0.9rem] font-semibold shadow-lg transition hover:-translate-y-0.5 hover:bg-white" style={{ color: finalSecondaryButtonTextColor }}>{labels.bookOnFresha} <ArrowUpRight className="h-4 w-4" /></a> : null}
             {salon.whatsapp ? <a href={buildWhatsappHref(salon.whatsapp, salon.whatsappMessage)} className="inline-flex min-h-13 items-center justify-center gap-2 rounded-full border border-transparent px-6 py-3 text-[0.9rem] font-semibold shadow-[0_12px_28px_rgba(37,211,102,0.22)] transition hover:-translate-y-0.5 hover:brightness-95" style={{ backgroundColor: finalWhatsappButtonColor, color: finalWhatsappButtonTextColor }}><WhatsAppIcon /> {labels.chatOnWhatsapp}</a> : null}
           </div>
           <div className="mt-8 grid gap-2 text-[0.82rem] text-[#bba49b]">

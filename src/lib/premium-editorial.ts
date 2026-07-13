@@ -133,6 +133,7 @@ export function createDefaultPremiumEditorial(
     finalCtaBackgroundColor: "#281916",
     finalWhatsappButtonColor: "#25D366",
     finalWhatsappButtonTextColor: "#ffffff",
+    finalSecondaryButtonTextColor: "#281916",
   };
 }
 
@@ -158,6 +159,9 @@ export function normalizePremiumEditorial(
     finalWhatsappButtonTextColor:
       value?.finalWhatsappButtonTextColor?.trim() ||
       defaults.finalWhatsappButtonTextColor,
+    finalSecondaryButtonTextColor:
+      value?.finalSecondaryButtonTextColor?.trim() ||
+      defaults.finalSecondaryButtonTextColor,
     reviewScreenshotImages: normalizeReviewScreenshotImages(
       value?.reviewScreenshotImages,
     ),
