@@ -70,7 +70,7 @@ export function CTA({ salon }: CTAProps) {
               <p className="text-sm leading-7 text-zinc-300">{cta.noContactText}</p>
             )}
 
-            <p className="mt-4 text-sm leading-7 text-zinc-300">
+            <p className="mt-4 whitespace-pre-line text-sm leading-7 text-zinc-300">
               {cta.text}
             </p>
           </div>

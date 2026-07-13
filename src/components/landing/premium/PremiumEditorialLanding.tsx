@@ -2,6 +2,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { ArrowUpRight, Menu, MapPin, ExternalLink, Star } from "lucide-react";
 import { LandingImage } from "@/components/landing/LandingImage";
+import { SalonHeaderBrand } from "@/components/landing/SalonHeaderBrand";
 import { BeforeAfterSlider } from "./BeforeAfterSlider";
 import { FeedbackScreenshotCarousel } from "./FeedbackScreenshotCarousel";
 import {
@@ -9,7 +10,7 @@ import {
   getPremiumEditorialLabels,
   getPremiumImage,
 } from "@/lib/premium-editorial";
-import { getPublicReviewMetrics } from "@/lib/public-landing";
+import { buildWhatsappHref, getPublicReviewMetrics } from "@/lib/public-landing";
 import type { Salon, SalonGalleryImage, SalonService } from "@/types/salon";
 
 export function PremiumEditorialLanding({ salon }: { salon: Salon }) {
@@ -44,9 +45,12 @@ export function PremiumEditorialLanding({ salon }: { salon: Salon }) {
     <main className="min-h-screen overflow-x-hidden text-zinc-950" style={{ backgroundColor: background }}>
       <header className="sticky top-0 z-50 border-b border-zinc-900/10 bg-white/85 backdrop-blur-xl">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-4 sm:px-8 lg:px-10">
-          <a href="#top" className="font-serif text-lg font-semibold tracking-tight sm:text-xl">
-            {salon.name}
-          </a>
+          <SalonHeaderBrand
+            salonName={salon.name}
+            horizontalLogoUrl={salon.horizontalLogoUrl}
+            logoAlt={`${salon.name} — logo`}
+            priority
+          />
           <nav className="hidden items-center gap-7 text-[0.82rem] font-medium text-zinc-700 md:flex">
             <a href="#about" className="transition hover:text-zinc-950">{labels.about}</a>
             <a href="#services" className="transition hover:text-zinc-950">{labels.services}</a>
@@ -96,7 +100,7 @@ export function PremiumEditorialLanding({ salon }: { salon: Salon }) {
             <p className="text-[0.68rem] font-semibold uppercase tracking-[0.22em]" style={{ color: accent }}>{labels.about}</p>
             <h2 className="mt-5 font-serif text-[2.1rem] leading-tight sm:mt-4 sm:text-5xl">{content.aboutTitle}</h2>
             {content.aboutRole ? <p className="mt-6 text-[0.68rem] font-semibold uppercase tracking-[0.16em] text-zinc-500 sm:mt-4">{content.aboutRole}</p> : null}
-            {content.aboutText ? <p className="mt-7 text-[0.92rem] leading-[1.7] text-zinc-600 sm:mt-6 sm:text-base sm:leading-7">{content.aboutText}</p> : null}
+            {content.aboutText ? <p className="mt-7 whitespace-pre-line text-[0.92rem] leading-[1.7] text-zinc-600 sm:mt-6 sm:text-base sm:leading-7">{content.aboutText}</p> : null}
           </div>
         </div>
       </section>
@@ -116,7 +120,7 @@ export function PremiumEditorialLanding({ salon }: { salon: Salon }) {
           </div>
           {(salon.bookingUrl || salon.whatsapp) ? (
             <div className="mt-6 text-center">
-              <a href={salon.whatsapp ? buildWhatsappHref(salon.whatsapp) : buildPrimaryContactHref(salon)} className="inline-flex items-center gap-2 rounded-full border border-transparent px-6 py-3 text-[0.82rem] font-semibold text-white shadow-lg transition hover:-translate-y-0.5 hover:brightness-95" style={{ backgroundColor: accent }}>
+              <a href={salon.whatsapp ? buildWhatsappHref(salon.whatsapp, salon.whatsappMessage) : buildPrimaryContactHref(salon)} className="inline-flex items-center gap-2 rounded-full border border-transparent px-6 py-3 text-[0.82rem] font-semibold text-white shadow-lg transition hover:-translate-y-0.5 hover:brightness-95" style={{ backgroundColor: accent }}>
                 {labels.bookViaWhatsapp} <ArrowUpRight className="h-4 w-4" />
               </a>
             </div>
@@ -137,10 +141,10 @@ export function PremiumEditorialLanding({ salon }: { salon: Salon }) {
           <p className="text-[0.62rem] font-semibold uppercase tracking-[0.28em] text-[#c9988d]">{labels.reservations}</p>
           <h2 className="mt-5 font-serif text-3xl leading-tight sm:text-5xl">{content.finalCtaTitle || "Secure Your Appointment"}</h2>
           <div className="mx-auto mt-7 h-px w-20 bg-[#c9988d]/60" />
-          {content.finalCtaText ? <p className="mx-auto mt-7 max-w-xl text-[0.95rem] leading-7 text-[#d8c5bd] sm:text-base">{content.finalCtaText}</p> : null}
+          {content.finalCtaText ? <p className="mx-auto mt-7 max-w-xl whitespace-pre-line text-[0.95rem] leading-7 text-[#d8c5bd] sm:text-base">{content.finalCtaText}</p> : null}
           <div className="mx-auto mt-8 grid max-w-md gap-3">
             {salon.bookingUrl ? <a href={salon.bookingUrl} target="_blank" rel="noreferrer" className="inline-flex min-h-13 items-center justify-center gap-2 rounded-full bg-[#f7eee8] px-6 py-3 text-[0.9rem] font-semibold text-[#281916] shadow-lg transition hover:-translate-y-0.5 hover:bg-white">{labels.bookOnFresha} <ArrowUpRight className="h-4 w-4" /></a> : null}
-            {salon.whatsapp ? <a href={buildWhatsappHref(salon.whatsapp)} className="inline-flex min-h-13 items-center justify-center gap-2 rounded-full border border-transparent bg-[#25D366] px-6 py-3 text-[0.9rem] font-semibold text-white shadow-[0_12px_28px_rgba(37,211,102,0.22)] transition hover:-translate-y-0.5 hover:bg-[#20bd5a]"><WhatsAppIcon /> {labels.chatOnWhatsapp}</a> : null}
+            {salon.whatsapp ? <a href={buildWhatsappHref(salon.whatsapp, salon.whatsappMessage)} className="inline-flex min-h-13 items-center justify-center gap-2 rounded-full border border-transparent bg-[#25D366] px-6 py-3 text-[0.9rem] font-semibold text-white shadow-[0_12px_28px_rgba(37,211,102,0.22)] transition hover:-translate-y-0.5 hover:bg-[#20bd5a]"><WhatsAppIcon /> {labels.chatOnWhatsapp}</a> : null}
           </div>
           <div className="mt-8 grid gap-2 text-[0.82rem] text-[#bba49b]">
             {salon.address || salon.location ? <p className="flex items-center justify-center gap-2"><MapPin className="h-4 w-4" /> {salon.address || salon.location}</p> : null}
@@ -323,13 +327,8 @@ function ImageFallback({ name }: { name: string }) {
 
 function buildPrimaryContactHref(salon: Salon) {
   if (salon.bookingUrl) return salon.bookingUrl;
-  if (salon.whatsapp) return buildWhatsappHref(salon.whatsapp);
+  if (salon.whatsapp) return buildWhatsappHref(salon.whatsapp, salon.whatsappMessage) || "#contact";
   return "#contact";
-}
-
-function buildWhatsappHref(value: string) {
-  const digits = value.replace(/\D/g, "");
-  return digits ? `https://wa.me/${digits}` : "#contact";
 }
 
 function WhatsAppIcon() {

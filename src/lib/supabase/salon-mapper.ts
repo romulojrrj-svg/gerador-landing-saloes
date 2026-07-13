@@ -142,6 +142,7 @@ export function mapSalonToSupabaseRow(
       title: completeSalon.ctaTitle,
       text: completeSalon.ctaText,
       bookingUrl: completeSalon.bookingUrl,
+      whatsappMessage: completeSalon.whatsappMessage,
     } as unknown as Json,
     seo: {
       title: completeSalon.generatedCopy?.seoTitle,
@@ -162,6 +163,8 @@ export function mapSalonToSupabaseRow(
           manualAssistantNotes: completeSalon.manualAssistantNotes,
           googleRating: completeSalon.googleRating,
           googleReviewCount: completeSalon.googleReviewCount,
+          horizontalLogoUrl: completeSalon.horizontalLogoUrl,
+          whatsappMessage: completeSalon.whatsappMessage,
           extractedBusinessInfo: completeSalon.extractedBusinessInfo,
           template: completeSalon.template,
           premiumEditorial: completeSalon.premiumEditorial,
@@ -180,6 +183,8 @@ export function mapSalonToSupabaseRow(
           manualAssistantNotes: completeSalon.manualAssistantNotes,
           googleRating: completeSalon.googleRating,
           googleReviewCount: completeSalon.googleReviewCount,
+          horizontalLogoUrl: completeSalon.horizontalLogoUrl,
+          whatsappMessage: completeSalon.whatsappMessage,
           extractedBusinessInfo: completeSalon.extractedBusinessInfo,
           template: completeSalon.template,
           premiumEditorial: completeSalon.premiumEditorial,
@@ -222,7 +227,13 @@ export function mapSupabaseRowToSalon(row: SupabaseSalonRow): Salon {
     subheadline: row.subheadline ?? metadataSalon?.subheadline ?? "",
     bookingUrl: row.booking_url ?? "",
     whatsapp: row.whatsapp ?? "",
+    whatsappMessage:
+      stringFromRecord(cta, "whatsappMessage") ??
+      metadataSalon?.whatsappMessage ??
+      metadataFallback?.whatsappMessage,
     phone: row.phone ?? "",
+    horizontalLogoUrl:
+      metadataSalon?.horizontalLogoUrl ?? metadataFallback?.horizontalLogoUrl ?? "",
     websiteUrl: row.website_url ?? "",
     instagramUrl: row.instagram_url ?? "",
     instagramProfileUrl:

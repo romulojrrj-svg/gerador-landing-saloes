@@ -1329,7 +1329,7 @@ export function getPublicContactLinks(salon: Salon): PublicContactLink[] {
   const googleMapsUrl = clean(salon.googleMapsUrl) || clean(salon.googleBusinessUrl);
   const websiteUrl = clean(salon.websiteUrl);
   const bookingUrl = clean(salon.bookingUrl);
-  const whatsappHref = buildWhatsappHref(salon.whatsapp);
+  const whatsappHref = buildWhatsappHref(salon.whatsapp, salon.whatsappMessage);
   const phoneHref = buildPhoneHref(salon.phone);
   const instagramUrl = clean(salon.instagramUrl);
 
@@ -1529,7 +1529,7 @@ export function getPrimaryContactAction(salon: Salon): PublicContactAction {
   const googleMapsUrl = salon.googleMapsUrl || salon.googleBusinessUrl;
   const href =
     clean(salon.bookingUrl) ||
-    buildWhatsappHref(salon.whatsapp) ||
+    buildWhatsappHref(salon.whatsapp, salon.whatsappMessage) ||
     buildPhoneHref(salon.phone) ||
     clean(salon.instagramUrl) ||
     clean(googleMapsUrl);
@@ -1540,14 +1540,18 @@ export function getPrimaryContactAction(salon: Salon): PublicContactAction {
   };
 }
 
-export function buildWhatsappHref(whatsapp?: string) {
+export function buildWhatsappHref(whatsapp?: string, message?: string) {
   if (!whatsapp) {
     return undefined;
   }
 
   const digits = whatsapp.replace(/\D/g, "");
+  const normalizedMessage = clean(message).replace(/\r\n/g, "\n");
+  const encodedMessage = normalizedMessage
+    ? `?${new URLSearchParams({ text: normalizedMessage }).toString()}`
+    : "";
 
-  return digits ? `https://wa.me/${digits}` : buildPhoneHref(whatsapp);
+  return digits ? `https://wa.me/${digits}${encodedMessage}` : buildPhoneHref(whatsapp);
 }
 
 function buildPhoneHref(phone?: string) {
@@ -1660,5 +1664,5 @@ function capitalize(value: string) {
 }
 
 function clean(value?: string) {
-  return typeof value === "string" ? value.trim() : "";
+  return typeof value === "string" ? value.normalize("NFC").trim() : "";
 }

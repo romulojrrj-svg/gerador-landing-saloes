@@ -171,7 +171,7 @@ function PublicSpaceSection({ salon }: { salon: Salon }) {
             {title}
           </h2>
           {description ? (
-            <p className="mt-3 text-sm leading-7 text-zinc-600 sm:text-base sm:leading-8">
+            <p className="mt-3 whitespace-pre-line text-sm leading-7 text-zinc-600 sm:text-base sm:leading-8">
               {description}
             </p>
           ) : null}
@@ -248,7 +248,7 @@ function PublicAbout({ salon }: { salon: Salon }) {
           </div>
 
           <div>
-            <p className="text-[0.98rem] leading-7 text-zinc-600 sm:text-lg sm:leading-8">
+            <p className="whitespace-pre-line text-[0.98rem] leading-7 text-zinc-600 sm:text-lg sm:leading-8">
               {aboutText}
             </p>
 

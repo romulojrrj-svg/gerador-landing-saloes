@@ -126,6 +126,7 @@ const SALON_MIGRATION_SCOPE_FIELDS: Record<
     "description",
     "heroOverlayTitle",
     "heroOverlaySubtitle",
+    "horizontalLogoUrl",
     "visualStyle",
     "brandTone",
     "businessHours",
@@ -141,6 +142,7 @@ const SALON_MIGRATION_SCOPE_FIELDS: Record<
     "websiteUrl",
     "bookingUrl",
     "whatsapp",
+    "whatsappMessage",
     "phone",
     "socialLinks",
   ],
@@ -1318,6 +1320,10 @@ function buildScopedMigrationSalon(
     };
   }
 
+  if (productionSalon?.horizontalLogoUrl && !localSalon.horizontalLogoUrl) {
+    nextSalon.horizontalLogoUrl = productionSalon.horizontalLogoUrl;
+  }
+
   if (scopes.includes("images") && productionSalon) {
     const mergedImages = mergeMigrationImages(
       localSalon.galleryImages,
@@ -1882,7 +1888,7 @@ async function fetchServerLocalRepository<TData>(
       ...init,
       cache: "no-store",
       headers: {
-        "Content-Type": "application/json",
+        "Content-Type": "application/json; charset=utf-8",
         ...(init?.headers ?? {}),
       },
     });
@@ -2146,7 +2152,7 @@ async function fetchAdminRepository<TData>(
       ...init,
       cache: "no-store",
       headers: {
-        "Content-Type": "application/json",
+        "Content-Type": "application/json; charset=utf-8",
         ...(init?.headers ?? {}),
       },
     });

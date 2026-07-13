@@ -265,6 +265,7 @@ export type SalonSocialLinks = {
   website?: string;
   booking?: string;
   whatsapp?: string;
+  whatsappMessage?: string;
   phone?: string;
 };
 
@@ -377,7 +378,9 @@ export type Salon = {
   websiteUrl?: string;
   bookingUrl?: string;
   whatsapp?: string;
+  whatsappMessage?: string;
   phone?: string;
+  horizontalLogoUrl?: string | null;
   googleRating?: number;
   googleReviewCount?: number;
 
@@ -470,7 +473,9 @@ export type SalonFormInput = {
   websiteUrl?: string;
   bookingUrl?: string;
   whatsapp?: string;
+  whatsappMessage?: string;
   phone?: string;
+  horizontalLogoUrl?: string | null;
   selectedServices: string[];
   services?: SalonService[];
   galleryImages?: SalonGalleryImage[];

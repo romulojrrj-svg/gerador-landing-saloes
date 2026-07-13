@@ -188,7 +188,7 @@ async function updateSupabaseSalon(slug: string, input: SalonFormInput) {
   const response = await fetch(`/api/admin/salons/${encodeURIComponent(slug)}`, {
     method: "PUT",
     cache: "no-store",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json; charset=utf-8" },
     body: JSON.stringify({ input }),
   });
   const payload = (await response.json().catch(() => null)) as

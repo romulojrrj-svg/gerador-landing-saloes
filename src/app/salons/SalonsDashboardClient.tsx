@@ -250,10 +250,19 @@ export function SalonsDashboardClient() {
 
     if (!result.ok) {
       setMessage(result.error);
-      return;
+      return {
+        ok: false as const,
+        message: result.error,
+      };
     }
 
-    setMessage(`Salão duplicado: ${result.salon.name}.`);
+    const successMessage = `Salão duplicado: ${result.salon.name}.`;
+    setMessage(successMessage);
+    await loadDashboard();
+    return {
+      ok: true as const,
+      message: successMessage,
+    };
   }
 
   function handleDelete(salon: Salon) {
@@ -1167,12 +1176,13 @@ function SalonRow({
     salon: Salon,
     nextCommercialStatus: SalonCommercialStatus,
   ) => Promise<{ ok: boolean; message: string }>;
-  onDuplicate: (slug: string) => void;
+  onDuplicate: (slug: string) => Promise<{ ok: boolean; message: string }>;
   onDelete: (salon: Salon) => void;
 }) {
   const [feedback, setFeedback] = useState("");
   const [isUpdatingCommercialStatus, setIsUpdatingCommercialStatus] =
     useState(false);
+  const [isDuplicating, setIsDuplicating] = useState(false);
   const readiness = calculateLandingReadiness(salon);
   const hasGeneratedCopy = Boolean(salon.copySuggestions || salon.generatedCopy);
   const hasAppliedCopy = Boolean(salon.generatedCopy?.status === "applied");
@@ -1229,6 +1239,23 @@ function SalonRow({
     const result = await onCommercialStatusChange(salon, nextCommercialStatus);
     setFeedback(result.message);
     setIsUpdatingCommercialStatus(false);
+  }
+
+  async function handleDuplicateClick() {
+    setIsDuplicating(true);
+
+    try {
+      const result = await onDuplicate(salon.slug);
+      setFeedback(result.message);
+    } catch (error) {
+      setFeedback(
+        error instanceof Error
+          ? error.message
+          : "Não foi possível duplicar este salão.",
+      );
+    } finally {
+      setIsDuplicating(false);
+    }
   }
 
   return (
@@ -1426,11 +1453,12 @@ function SalonRow({
           </button>
           <button
             type="button"
-            onClick={() => onDuplicate(salon.slug)}
-            className="btn btn-secondary min-h-10 px-4 py-2"
+            onClick={() => void handleDuplicateClick()}
+            disabled={isDuplicating}
+            className="btn btn-secondary min-h-10 px-4 py-2 disabled:cursor-not-allowed disabled:opacity-60"
           >
             <Copy className="h-4 w-4" />
-            Duplicar
+            {isDuplicating ? "Duplicando..." : "Duplicar"}
           </button>
           <button
             type="button"

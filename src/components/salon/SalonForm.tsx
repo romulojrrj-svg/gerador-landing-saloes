@@ -415,7 +415,9 @@ export function SalonForm({
     ]),
   );
   const [selectedServices, setSelectedServices] = useState<string[]>(
-    initialSalon?.selectedServices ?? [],
+    initialSalon?.selectedServices?.length
+      ? initialSalon.selectedServices
+      : (initialSalon?.services ?? []).map((service) => service.title),
   );
   const [serviceDescriptions, setServiceDescriptions] = useState<Record<string, string>>(
     () =>
@@ -432,6 +434,9 @@ export function SalonForm({
         ]),
       ),
   );
+  const [horizontalLogoUrl, setHorizontalLogoUrl] = useState(
+    initialSalon?.horizontalLogoUrl ?? "",
+  );
   const selectedVibe = initialSalon?.visualStyle ?? "Luxo suave";
   const readinessSalon = useMemo(
     () => ensureCompleteSalon(initialSalon ?? {}),
@@ -441,7 +446,6 @@ export function SalonForm({
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const startedAt = Date.now();
     logPerfEvent({
       route: "/salons/[id]/edit",
       step: "handleSubmit",
@@ -452,14 +456,6 @@ export function SalonForm({
       source: repositoryStatus.activeSource,
     });
     submitCurrentForm();
-    logPerfEvent({
-      route: "/salons/[id]/edit",
-      step: "submitCurrentForm",
-      id: initialSalon?.id,
-      slug: initialSalon?.slug,
-      ms: Date.now() - startedAt,
-      source: repositoryStatus.activeSource,
-    });
   }
 
   function submitCurrentForm(overrides?: {
@@ -476,14 +472,21 @@ export function SalonForm({
     }
 
     const formData = new FormData(currentForm);
-    const startedAt = Date.now();
     const input = formDataToInput(formData);
+    const orderedServices = buildOrderedServicesFromFormState(
+      input.language,
+      getFormFieldValue("observedServices"),
+      selectedServices,
+      serviceDescriptions,
+    );
     const payloadSize = estimatePayloadSize({
       ...input,
+      whatsappMessage: input.whatsappMessage,
+      horizontalLogoUrl,
       galleryImages: overrides?.galleryImages ?? realImages,
       layoutImagePlan: layoutImagePlan,
       testimonials: overrides?.testimonials ?? realReviews,
-      services: input.services,
+      services: orderedServices,
     });
     const nextCopySuggestion = overrides?.copySuggestion ?? copySuggestion;
     const nextAppliedCopy = overrides?.appliedCopy ?? appliedCopy;
@@ -507,11 +510,14 @@ export function SalonForm({
       imagesCount: (overrides?.galleryImages ?? realImages)?.filter((image) => image.isReal).length ?? 0,
       servicesCount: input.services?.length ?? 0,
       source: repositoryStatus.activeSource,
-      ms: Date.now() - startedAt,
     });
 
     onSubmit({
       ...input,
+      whatsappMessage: input.whatsappMessage,
+      horizontalLogoUrl,
+      selectedServices,
+      services: orderedServices,
       galleryImages: nextGalleryImages,
       imageCandidates,
       imageSelectionSummary,
@@ -603,11 +609,16 @@ export function SalonForm({
       websiteUrl: input.websiteUrl,
       bookingUrl: input.bookingUrl,
       whatsapp: input.whatsapp,
+      whatsappMessage: input.whatsappMessage,
       phone: input.phone,
-      selectedServices: input.selectedServices,
-      services:
-        input.services ??
-        selectedServicesToSalonServices(input.selectedServices, input.language),
+      horizontalLogoUrl,
+      selectedServices,
+      services: buildOrderedServicesFromFormState(
+        input.language,
+        getFormFieldValue("observedServices"),
+        selectedServices,
+        serviceDescriptions,
+      ),
       galleryImages:
         realImages.length
           ? syncImagesWithPlan(realImages, effectiveLayoutImagePlan)
@@ -819,6 +830,14 @@ export function SalonForm({
       />
 
       <ContactSection initialSalon={initialSalon} />
+
+      <HorizontalLogoSection
+        salonName={initialSalon?.name || ""}
+        salonSlug={initialSalon?.slug}
+        horizontalLogoUrl={horizontalLogoUrl}
+        supabaseConfigured={repositoryStatus.supabaseConfigured}
+        onChange={setHorizontalLogoUrl}
+      />
 
       <ServicesSection
         availableServices={availableServices}
@@ -1102,6 +1121,21 @@ function ContactSection({ initialSalon }: { initialSalon?: Salon }) {
 
       <div className="mt-7 grid gap-4 md:grid-cols-2">
         <InputField name="whatsapp" label="WhatsApp" defaultValue={initialSalon?.whatsapp} />
+        <label className="grid gap-2 md:col-span-2">
+          <span className="text-sm font-semibold text-zinc-800">
+            Mensagem personalizada do WhatsApp
+          </span>
+          <textarea
+            name="whatsappMessage"
+            rows={3}
+            defaultValue={initialSalon?.whatsappMessage ?? ""}
+            placeholder="Ex.: Ola! Vim pela landing e gostaria de agendar uma avaliacao."
+            className="resize-none rounded-2xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm leading-6 text-zinc-950 outline-none transition focus:border-teal-700 focus:bg-white"
+          />
+          <span className="text-xs leading-5 text-zinc-500">
+            Esse texto abre automaticamente quando a pessoa toca no botao do WhatsApp.
+          </span>
+        </label>
         <InputField name="phone" label="Telefone" defaultValue={initialSalon?.phone} />
         <InputField name="instagramUrl" label="Instagram" type="url" defaultValue={initialSalon?.instagramUrl} />
         <InputField name="googleMapsUrl" label="Google Maps" type="url" defaultValue={initialSalon?.googleMapsUrl} />
@@ -1111,6 +1145,164 @@ function ContactSection({ initialSalon }: { initialSalon?: Salon }) {
         <InputField name="country" label="Pais" defaultValue={initialSalon?.country} />
         <div className="md:col-span-2">
           <InputField name="address" label="Endereco" defaultValue={initialSalon?.address} />
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function HorizontalLogoSection({
+  salonName,
+  salonSlug,
+  horizontalLogoUrl,
+  supabaseConfigured,
+  onChange,
+}: {
+  salonName: string;
+  salonSlug?: string;
+  horizontalLogoUrl: string;
+  supabaseConfigured: boolean;
+  onChange: Dispatch<SetStateAction<string>>;
+}) {
+  const [isUploading, setIsUploading] = useState(false);
+  const [message, setMessage] = useState("");
+
+  async function handleFileSelected(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.currentTarget.files?.[0];
+    event.currentTarget.value = "";
+
+    if (!file) {
+      return;
+    }
+
+    const allowedTypes = ["image/png", "image/jpeg", "image/webp"];
+
+    if (!allowedTypes.includes(file.type)) {
+      setMessage("Envie a logo horizontal em PNG, JPG, JPEG ou WebP.");
+      return;
+    }
+
+    if (!supabaseConfigured) {
+      setMessage(
+        "Configure o Supabase para enviar a logo horizontal com URL permanente.",
+      );
+      return;
+    }
+
+    setIsUploading(true);
+    setMessage("");
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("salonName", salonName);
+      if (salonSlug) {
+        formData.append("salonSlug", salonSlug);
+      }
+
+      const response = await fetch("/api/admin/assets/horizontal-logo", {
+        method: "POST",
+        body: formData,
+      });
+      const payload = (await response.json().catch(() => null)) as
+        | { success?: boolean; error?: string; url?: string }
+        | null;
+
+      if (!response.ok || !payload?.success || !payload.url) {
+        setMessage(
+          payload?.error || "Nao foi possivel enviar a logo horizontal agora.",
+        );
+        return;
+      }
+
+      onChange(payload.url);
+      setMessage("Logo horizontal enviada. Salve o salao para persistir.");
+    } catch (error) {
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : "Nao foi possivel enviar a logo horizontal agora.",
+      );
+    } finally {
+      setIsUploading(false);
+    }
+  }
+
+  return (
+    <section className="rounded-[2rem] border border-zinc-200 bg-white p-6 shadow-xl shadow-zinc-950/5">
+      <div className="flex items-start gap-4">
+        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-amber-100 text-zinc-950">
+          <ImagePlus className="h-5 w-5" />
+        </span>
+        <div>
+          <h2 className="text-2xl font-semibold text-zinc-950">Logo horizontal</h2>
+          <p className="mt-1 text-sm leading-6 text-zinc-500">
+            Logo larga para ser exibida no cabecalho do site. Recomendado:
+            proporcao aproximada de 4:1, como 1200 x 300 px.
+          </p>
+          <p className="mt-1 text-xs leading-5 text-zinc-500">
+            Para melhor integracao visual, use uma logo com fundo transparente
+            ou com fundo compativel com o cabecalho.
+          </p>
+        </div>
+      </div>
+
+      <input type="hidden" name="horizontalLogoUrl" value={horizontalLogoUrl} readOnly />
+
+      <div className="mt-6 grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
+        <div className="rounded-[1.5rem] border border-dashed border-zinc-300 bg-zinc-50 p-4">
+          {horizontalLogoUrl ? (
+            <div className="rounded-[1rem] border border-zinc-200 bg-white p-4">
+              <div className="flex min-h-[84px] items-center">
+                <img
+                  src={horizontalLogoUrl}
+                  alt={`${salonName || "Salao"} - logo`}
+                  className="max-h-[72px] w-auto max-w-full object-contain object-left"
+                />
+              </div>
+            </div>
+          ) : (
+            <div className="rounded-[1rem] border border-zinc-200 bg-white px-4 py-6 text-sm text-zinc-500">
+              Nenhuma logo horizontal enviada ainda.
+            </div>
+          )}
+
+          {message ? (
+            <p className="mt-3 text-sm font-medium text-zinc-700">{message}</p>
+          ) : null}
+        </div>
+
+        <div className="grid content-start gap-3">
+          <label className="btn btn-secondary min-h-11 cursor-pointer px-4 py-3 text-sm">
+            <ImagePlus className="h-4 w-4" />
+            {isUploading ? "Enviando..." : "Enviar logo horizontal"}
+            <input
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              className="hidden"
+              disabled={isUploading}
+              onChange={(event) => void handleFileSelected(event)}
+            />
+          </label>
+
+          <button
+            type="button"
+            onClick={() => {
+              onChange("");
+              setMessage("Logo horizontal removida. Salve o salao para persistir.");
+            }}
+            disabled={!horizontalLogoUrl}
+            className="btn btn-secondary min-h-11 px-4 py-3 text-sm disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Remover logo horizontal
+          </button>
+
+          {!supabaseConfigured ? (
+            <p className="text-xs leading-5 text-amber-700">
+              O upload permanente dessa logo usa Supabase Storage. Configure o
+              Supabase para habilitar esse envio.
+            </p>
+          ) : null}
         </div>
       </div>
     </section>
@@ -1182,8 +1374,43 @@ function PremiumEditorialSection({
   function removeBeforeAfterItem(itemId: string) {
     onChange((current) => ({
       ...current,
-      beforeAfterItems: current.beforeAfterItems.filter((item) => item.id !== itemId),
+      beforeAfterItems: current.beforeAfterItems
+        .filter((item) => item.id !== itemId)
+        .map((item, index) => ({
+          ...item,
+          order: index,
+        })),
     }));
+  }
+
+  function moveBeforeAfterItem(itemId: string, direction: -1 | 1) {
+    onChange((current) => {
+      const orderedItems = [...current.beforeAfterItems].sort(
+        (first, second) => first.order - second.order,
+      );
+      const currentIndex = orderedItems.findIndex((item) => item.id === itemId);
+      const targetIndex = currentIndex + direction;
+
+      if (
+        currentIndex < 0 ||
+        targetIndex < 0 ||
+        targetIndex >= orderedItems.length
+      ) {
+        return current;
+      }
+
+      const nextItems = [...orderedItems];
+      const [movedItem] = nextItems.splice(currentIndex, 1);
+      nextItems.splice(targetIndex, 0, movedItem);
+
+      return {
+        ...current,
+        beforeAfterItems: nextItems.map((item, index) => ({
+          ...item,
+          order: index,
+        })),
+      };
+    });
   }
 
   function addFaqItem() {
@@ -1481,8 +1708,33 @@ function PremiumEditorialSection({
               <button type="button" onClick={addBeforeAfterItem} className="btn btn-secondary px-4 py-2 text-sm">Adicionar par</button>
             </div>
             <div className="mt-4 grid gap-4">
-              {premiumEditorial.beforeAfterItems.map((item) => (
+              {premiumEditorial.beforeAfterItems.map((item, index) => (
                 <div key={item.id} className="grid gap-3 rounded-2xl border border-zinc-200 bg-white p-4 md:grid-cols-2">
+                  <div className="flex items-center justify-between gap-3 md:col-span-2">
+                    <p className="text-sm font-semibold text-zinc-700">
+                      Par {index + 1}
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => moveBeforeAfterItem(item.id, -1)}
+                        disabled={index === 0}
+                        className="rounded-full border border-zinc-200 bg-white p-2 text-zinc-700 transition hover:border-teal-300 hover:text-teal-900 disabled:cursor-not-allowed disabled:opacity-40"
+                        aria-label={`Subir par ${index + 1}`}
+                      >
+                        <ArrowUp className="h-4 w-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => moveBeforeAfterItem(item.id, 1)}
+                        disabled={index === premiumEditorial.beforeAfterItems.length - 1}
+                        className="rounded-full border border-zinc-200 bg-white p-2 text-zinc-700 transition hover:border-teal-300 hover:text-teal-900 disabled:cursor-not-allowed disabled:opacity-40"
+                        aria-label={`Descer par ${index + 1}`}
+                      >
+                        <ArrowDown className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </div>
                   <PremiumInputField label="Título" value={item.title} onChange={(value) => updateBeforeAfterItem(item.id, { title: value })} />
                   <PremiumTextAreaField label="Descrição opcional" value={item.description ?? ""} onChange={(value) => updateBeforeAfterItem(item.id, { description: value })} />
                   <PremiumImageDropZone label="Foto antes" image={findPremiumImage(realImageOptions, item.beforeImageId)} onDrop={(imageId) => updateBeforeAfterItem(item.id, { beforeImageId: imageId })} onClear={() => updateBeforeAfterItem(item.id, { beforeImageId: "" })} />
@@ -1747,6 +1999,27 @@ function ServicesSection({
     });
   }
 
+  function moveSelectedService(service: string, direction: -1 | 1) {
+    onSelectedServicesChange((current) => {
+      const currentIndex = current.indexOf(service);
+
+      if (currentIndex === -1) {
+        return current;
+      }
+
+      const nextIndex = currentIndex + direction;
+
+      if (nextIndex < 0 || nextIndex >= current.length) {
+        return current;
+      }
+
+      const nextServices = [...current];
+      const [movedService] = nextServices.splice(currentIndex, 1);
+      nextServices.splice(nextIndex, 0, movedService);
+      return nextServices;
+    });
+  }
+
   return (
     <section className="rounded-[2rem] border border-zinc-200 bg-white p-6 shadow-xl shadow-zinc-950/5">
       <div className="flex items-start gap-4">
@@ -1803,6 +2076,51 @@ function ServicesSection({
           </div>
         </div>
 
+        {selectedServices.length ? (
+          <div className="grid gap-3">
+            <p className="text-sm font-semibold text-zinc-800">
+              Ordem dos servicos na landing
+            </p>
+            <div className="grid gap-2">
+              {selectedServices.map((service, index) => (
+                <div
+                  key={`selected-order-${service}`}
+                  className="flex items-center justify-between gap-3 rounded-2xl border border-zinc-200 bg-zinc-50 px-4 py-3"
+                >
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-zinc-900">
+                      {index + 1}. {service}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => moveSelectedService(service, -1)}
+                      disabled={index === 0}
+                      className="rounded-full border border-zinc-200 bg-white p-2 text-zinc-700 transition hover:border-teal-300 hover:text-teal-900 disabled:cursor-not-allowed disabled:opacity-40"
+                      aria-label={`Subir ${service}`}
+                    >
+                      <ArrowUp className="h-4 w-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => moveSelectedService(service, 1)}
+                      disabled={index === selectedServices.length - 1}
+                      className="rounded-full border border-zinc-200 bg-white p-2 text-zinc-700 transition hover:border-teal-300 hover:text-teal-900 disabled:cursor-not-allowed disabled:opacity-40"
+                      aria-label={`Descer ${service}`}
+                    >
+                      <ArrowDown className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <p className="text-xs leading-5 text-zinc-500">
+              Essa ordem sera usada na secao de servicos da landing.
+            </p>
+          </div>
+        ) : null}
+
         {editableServices.length ? (
           <div className="grid gap-3">
             <p className="text-sm font-semibold text-zinc-800">
@@ -1847,7 +2165,33 @@ function parseObservedServiceNames(value?: string) {
 }
 
 function uniqueServiceNames(values: string[]) {
-  return Array.from(new Set(values.map((value) => value.trim()).filter(Boolean)));
+  const seen = new Set<string>();
+
+  return values
+    .map((value) => value.trim())
+    .filter(Boolean)
+    .filter((value) => {
+      const normalized = value.toLocaleLowerCase("pt-BR");
+
+      if (seen.has(normalized)) {
+        return false;
+      }
+
+      seen.add(normalized);
+      return true;
+    });
+}
+
+function buildOrderedServicesFromFormState(
+  language: Salon["language"],
+  observedServicesValue: string,
+  selectedServices: string[],
+  serviceDescriptions: Record<string, string>,
+) {
+  const observedServices = parseObservedServiceNames(observedServicesValue);
+  const orderedNames = uniqueServiceNames([...selectedServices, ...observedServices]);
+
+  return selectedServicesToSalonServices(orderedNames, language, serviceDescriptions);
 }
 
 function CopyAssistantSection({

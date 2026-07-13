@@ -423,7 +423,9 @@ export function formDataToInput(formData: FormData): SalonFormInput {
     websiteUrl: getOptionalString(formData, "websiteUrl"),
     bookingUrl: getOptionalString(formData, "bookingUrl"),
     whatsapp: getOptionalString(formData, "whatsapp"),
+    whatsappMessage: getOptionalString(formData, "whatsappMessage"),
     phone: getOptionalString(formData, "phone"),
+    horizontalLogoUrl: getOptionalString(formData, "horizontalLogoUrl"),
     businessHours: getOptionalString(formData, "businessHours"),
     address: getOptionalString(formData, "address"),
     extractedBusinessInfo: {
@@ -588,7 +590,9 @@ function buildCompleteSalon(partialSalon: Partial<Salon>): Salon {
   const websiteUrl = clean(partialSalon.websiteUrl);
   const bookingUrl = clean(partialSalon.bookingUrl);
   const whatsapp = clean(partialSalon.whatsapp);
+  const whatsappMessage = clean(partialSalon.whatsappMessage);
   const phone = clean(partialSalon.phone);
+  const horizontalLogoUrl = cleanPersistentAssetUrl(partialSalon.horizontalLogoUrl);
   const notes = partialSalon.notes;
   const manualAssistantNotes = hasOwnKey(partialSalon, "manualAssistantNotes")
     ? clean(partialSalon.manualAssistantNotes)
@@ -626,7 +630,9 @@ function buildCompleteSalon(partialSalon: Partial<Salon>): Salon {
     websiteUrl,
     bookingUrl,
     whatsapp,
+    whatsappMessage,
     phone,
+    horizontalLogoUrl,
     googleRating,
     googleReviewCount,
     services,
@@ -662,6 +668,7 @@ function buildCompleteSalon(partialSalon: Partial<Salon>): Salon {
       website: websiteUrl,
       booking: bookingUrl,
       whatsapp,
+      whatsappMessage,
       phone,
     },
     status: normalizeSalonStatus(partialSalon.status),
@@ -782,7 +789,9 @@ function dataToPartialSalon(data: SalonFormInput): Partial<Salon> {
     websiteUrl: data.websiteUrl,
     bookingUrl: data.bookingUrl,
     whatsapp: data.whatsapp,
+    whatsappMessage: data.whatsappMessage,
     phone: data.phone,
+    horizontalLogoUrl: data.horizontalLogoUrl,
     selectedServices: data.selectedServices,
     services:
       data.services ??
@@ -1180,7 +1189,21 @@ function parseObservedServiceNames(value: string) {
 }
 
 function uniqueServiceNames(values: string[]) {
-  return Array.from(new Set(values.map((value) => value.trim()).filter(Boolean)));
+  const seen = new Set<string>();
+
+  return values
+    .map((value) => value.trim())
+    .filter(Boolean)
+    .filter((value) => {
+      const normalized = value.toLocaleLowerCase("pt-BR");
+
+      if (seen.has(normalized)) {
+        return false;
+      }
+
+      seen.add(normalized);
+      return true;
+    });
 }
 
 function getServicePriceLabel(language: SalonLanguage) {
@@ -1344,7 +1367,27 @@ function buildTestimonials() {
 }
 
 function clean(value: unknown) {
-  return typeof value === "string" ? value.trim() : "";
+  return typeof value === "string" ? value.normalize("NFC").trim() : "";
+}
+
+function cleanPersistentAssetUrl(value: unknown) {
+  const nextValue = clean(value);
+
+  if (!nextValue) {
+    return "";
+  }
+
+  if (
+    nextValue.startsWith("blob:") ||
+    nextValue.startsWith("data:") ||
+    nextValue.startsWith("file:") ||
+    nextValue.startsWith("http://localhost") ||
+    nextValue.startsWith("http://127.0.0.1")
+  ) {
+    return "";
+  }
+
+  return nextValue;
 }
 
 function normalizeOptionalNumber(value: unknown) {

@@ -22,7 +22,7 @@ import {
   translateStatLabel,
   type LandingCopy,
 } from "@/lib/landing-copy";
-import { getPublicGalleryImages } from "@/lib/public-landing";
+import { buildWhatsappHref, getPublicGalleryImages } from "@/lib/public-landing";
 import {
   getSalonBySlug,
   getSalonRepositoryStatus,
@@ -419,7 +419,7 @@ function buildContactLinks(salon: Salon, copy: LandingCopy) {
     links.push({
       label: "WhatsApp",
       description: salon.whatsapp,
-      href: buildWhatsappHref(salon.whatsapp),
+      href: buildWhatsappHref(salon.whatsapp, salon.whatsappMessage),
       icon: MessageCircle,
     });
   }
@@ -454,12 +454,6 @@ function buildContactLinks(salon: Salon, copy: LandingCopy) {
   }
 
   return links.slice(0, 4);
-}
-
-function buildWhatsappHref(whatsapp: string) {
-  const digits = whatsapp.replace(/\D/g, "");
-
-  return digits ? `https://wa.me/${digits}` : `tel:${whatsapp}`;
 }
 
 function PreviewLoading() {
