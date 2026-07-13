@@ -108,7 +108,7 @@ export function PremiumEditorialLanding({ salon }: { salon: Salon }) {
       <section id="services" className="bg-white px-5 py-16 sm:px-8 sm:py-24 lg:px-10">
         <div className="mx-auto max-w-6xl">
           <p className="text-xs font-semibold uppercase tracking-[0.22em]" style={{ color: accent }}>{labels.services}</p>
-          <h2 className="mt-4 max-w-2xl font-serif text-[2.35rem] leading-tight sm:text-5xl">A menu crafted for every woman</h2>
+          <h2 className="mt-4 max-w-2xl font-serif text-[2.35rem] leading-tight sm:text-5xl">{labels.servicesTitle}</h2>
           <div className="mt-7 border-y border-zinc-200">
             {services.map((service, index) => (
               <article key={service.id || service.title} className="grid grid-cols-[3rem_1fr] gap-x-3 gap-y-3 border-b border-zinc-200/80 py-7 last:border-b-0 sm:grid-cols-[5rem_1fr_auto] sm:items-start sm:gap-4 sm:py-8">

@@ -1419,6 +1419,11 @@ function PremiumEditorialSection({
                 onChange={(value) => updateField("servicesLabel", value)}
               />
               <PremiumInputField
+                label="Título da seção de serviços"
+                value={labelDefaults.servicesTitle}
+                onChange={(value) => updateField("servicesTitle", value)}
+              />
+              <PremiumInputField
                 label="Texto do menu Resultados"
                 value={labelDefaults.results}
                 onChange={(value) => updateField("resultsLabel", value)}

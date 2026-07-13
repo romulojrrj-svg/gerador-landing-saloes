@@ -93,6 +93,7 @@ export type SalonPremiumEditorial = {
   finalCtaText: string;
   aboutLabel?: string;
   servicesLabel?: string;
+  servicesTitle?: string;
   resultsLabel?: string;
   contactLabel?: string;
   bookAppointmentLabel?: string;

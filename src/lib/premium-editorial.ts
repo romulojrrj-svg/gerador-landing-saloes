@@ -12,6 +12,7 @@ import type {
 export type PremiumEditorialLabels = {
   about: string;
   services: string;
+  servicesTitle: string;
   results: string;
   contact: string;
   bookAppointment: string;
@@ -37,6 +38,7 @@ export function getPremiumEditorialLabels(
     ? {
         about: "Sobre",
         services: "Serviços",
+        servicesTitle: "Um menu pensado para cada mulher",
         results: "Resultados",
         contact: "Contato",
         bookAppointment: "Agendar atendimento",
@@ -54,6 +56,7 @@ export function getPremiumEditorialLabels(
     : {
         about: "About",
         services: "Services",
+        servicesTitle: "A menu crafted for every woman",
         results: "Results",
         contact: "Contact",
         bookAppointment: "Book an appointment",
@@ -73,6 +76,7 @@ export function getPremiumEditorialLabels(
     ...defaults,
     about: content?.aboutLabel?.trim() || defaults.about,
     services: content?.servicesLabel?.trim() || defaults.services,
+    servicesTitle: content?.servicesTitle?.trim() || defaults.servicesTitle,
     results: content?.resultsLabel?.trim() || defaults.results,
     contact: content?.contactLabel?.trim() || defaults.contact,
     bookAppointment:
@@ -148,6 +152,7 @@ export function normalizePremiumEditorial(
     ),
     aboutLabel: normalizeOptionalLabel(value?.aboutLabel),
     servicesLabel: normalizeOptionalLabel(value?.servicesLabel),
+    servicesTitle: normalizeOptionalLabel(value?.servicesTitle),
     resultsLabel: normalizeOptionalLabel(value?.resultsLabel),
     contactLabel: normalizeOptionalLabel(value?.contactLabel),
     bookAppointmentLabel: normalizeOptionalLabel(value?.bookAppointmentLabel),
