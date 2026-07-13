@@ -132,6 +132,7 @@ export function createDefaultPremiumEditorial(
       "Choose the channel that works best for you and let’s plan your visit.",
     finalCtaBackgroundColor: "#281916",
     finalWhatsappButtonColor: "#25D366",
+    finalWhatsappButtonTextColor: "#ffffff",
   };
 }
 
@@ -154,6 +155,9 @@ export function normalizePremiumEditorial(
     finalWhatsappButtonColor:
       value?.finalWhatsappButtonColor?.trim() ||
       defaults.finalWhatsappButtonColor,
+    finalWhatsappButtonTextColor:
+      value?.finalWhatsappButtonTextColor?.trim() ||
+      defaults.finalWhatsappButtonTextColor,
     reviewScreenshotImages: normalizeReviewScreenshotImages(
       value?.reviewScreenshotImages,
     ),
