@@ -387,6 +387,7 @@ export type Salon = {
   whatsappMessage?: string;
   phone?: string;
   horizontalLogoUrl?: string | null;
+  customDomain?: string | null;
   googleRating?: number;
   googleReviewCount?: number;
 
@@ -482,6 +483,7 @@ export type SalonFormInput = {
   whatsappMessage?: string;
   phone?: string;
   horizontalLogoUrl?: string | null;
+  customDomain?: string | null;
   selectedServices: string[];
   services?: SalonService[];
   galleryImages?: SalonGalleryImage[];

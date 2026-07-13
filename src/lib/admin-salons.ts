@@ -16,6 +16,7 @@ import {
 import { estimatePayloadSize, logPerfEvent } from "@/lib/perf-logs";
 import { normalizePremiumEditorial } from "@/lib/premium-editorial";
 import type { Salon, SalonFormInput } from "@/types/salon";
+import { normalizeCustomDomain } from "@/lib/custom-domain";
 
 type AdminSalonResult =
   | { ok: true; salon: Salon }
@@ -342,6 +343,12 @@ async function saveMigratedAdminSalon(
     id: (currentRow?.id as string | undefined) ?? salon.id,
     updatedAt: new Date().toISOString(),
   });
+  const domainError = await validateCustomDomainAvailability(payload);
+
+  if (domainError) {
+    return { ok: false, error: domainError };
+  }
+
   const row = mapSalonToSupabaseRow(payload, { compact: true });
 
   if (currentRow) {
@@ -414,6 +421,12 @@ async function saveAdminSalon(salon: Salon): Promise<AdminSalonResult> {
     ...salon,
     updatedAt: new Date().toISOString(),
   });
+  const domainError = await validateCustomDomainAvailability(payload);
+
+  if (domainError) {
+    return { ok: false, error: domainError };
+  }
+
   const row = mapSalonToSupabaseRow(payload, { compact: true });
   const payloadKb = estimatePayloadSize(row);
   debugAdminSalons("save-start", {
@@ -544,6 +557,37 @@ function formatSupabaseError(error: {
   return [error.message, error.details, error.hint, error.code]
     .filter(Boolean)
     .join(" | ");
+}
+
+async function validateCustomDomainAvailability(salon: Salon) {
+  const domain = normalizeCustomDomain(salon.customDomain);
+
+  if (!domain) {
+    return null;
+  }
+
+  const client = getSupabaseAdminClient();
+
+  if (!client) {
+    return "Supabase nao configurado para validar o dominio proprio.";
+  }
+
+  const { data, error } = await client
+    .from("salons")
+    .select("slug")
+    .filter("metadata->>customDomain", "eq", domain)
+    .neq("slug", salon.slug)
+    .limit(1);
+
+  if (error) {
+    return `Nao foi possivel validar o dominio proprio: ${error.message}`;
+  }
+
+  if (data?.length) {
+    return `O dominio ${domain} ja esta vinculado a outro salao.`;
+  }
+
+  return null;
 }
 
 function shouldRetryWithoutCommercialStatus(error: {

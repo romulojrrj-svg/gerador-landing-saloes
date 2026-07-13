@@ -1175,6 +1175,17 @@ function ContactSection({ initialSalon }: { initialSalon?: Salon }) {
         <InputField name="googleMapsUrl" label="Google Maps" type="url" defaultValue={initialSalon?.googleMapsUrl} />
         <InputField name="websiteUrl" label="Site" type="url" defaultValue={initialSalon?.websiteUrl} />
         <InputField name="bookingUrl" label="Link de agendamento" type="url" defaultValue={initialSalon?.bookingUrl} />
+        <div className="md:col-span-2">
+          <InputField
+            name="customDomain"
+            label="Dominio proprio (opcional)"
+            defaultValue={initialSalon?.customDomain ?? ""}
+            placeholder="ex.: drajuliammaia.com.br"
+          />
+          <p className="mt-1 text-xs leading-5 text-zinc-500">
+            Use apenas o dominio, sem https:// ou barra final. www e sem www apontam para o mesmo salao.
+          </p>
+        </div>
         <InputField name="city" label="Cidade" defaultValue={initialSalon?.city} />
         <InputField name="country" label="Pais" defaultValue={initialSalon?.country} />
         <div className="md:col-span-2">

@@ -8,8 +8,11 @@ import {
   type SupabaseSalonRow,
 } from "@/lib/supabase/salon-mapper";
 import type { Salon } from "@/types/salon";
+import { cache } from "react";
 
-export async function getPublicSalonBySlugServer(slug: string) {
+export const getPublicSalonBySlugServer = cache(async function getPublicSalonBySlugServer(
+  slug: string,
+) {
   if (isServerLocalStorageEnabled()) {
     return {
       checked: false,
@@ -34,6 +37,7 @@ export async function getPublicSalonBySlugServer(slug: string) {
       "id,slug,name,status,commercial_status,language,country,city,address,description,headline,subheadline,booking_url,whatsapp,phone,website_url,instagram_url,google_maps_url,business_hours,notes,created_at,updated_at,services,real_images,real_reviews,copy_suggestions,copy_history,generated_copy,source_profile,social_links,cta,seo,metadata",
     )
     .eq("slug", slug)
+    .eq("status", "published")
     .maybeSingle();
 
   logPerfEvent({
@@ -72,4 +76,4 @@ export async function getPublicSalonBySlugServer(slug: string) {
     checked: true,
     salon: salon satisfies Salon,
   };
-}
+});

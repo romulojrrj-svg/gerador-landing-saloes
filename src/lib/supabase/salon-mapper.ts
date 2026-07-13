@@ -1,6 +1,7 @@
 import { calculateLandingReadiness } from "@/lib/copy-generator";
 import { normalizeCommercialStatus } from "@/lib/salon-commercial-status";
 import { filterValidLandingImages } from "@/lib/salon-images";
+import { normalizeCustomDomain } from "@/lib/custom-domain";
 import { ensureCompleteSalon } from "@/lib/salon-storage";
 import type {
   Salon,
@@ -164,6 +165,7 @@ export function mapSalonToSupabaseRow(
           googleRating: completeSalon.googleRating,
           googleReviewCount: completeSalon.googleReviewCount,
           horizontalLogoUrl: completeSalon.horizontalLogoUrl,
+          customDomain: completeSalon.customDomain,
           whatsappMessage: completeSalon.whatsappMessage,
           extractedBusinessInfo: completeSalon.extractedBusinessInfo,
           template: completeSalon.template,
@@ -184,6 +186,7 @@ export function mapSalonToSupabaseRow(
           googleRating: completeSalon.googleRating,
           googleReviewCount: completeSalon.googleReviewCount,
           horizontalLogoUrl: completeSalon.horizontalLogoUrl,
+          customDomain: completeSalon.customDomain,
           whatsappMessage: completeSalon.whatsappMessage,
           extractedBusinessInfo: completeSalon.extractedBusinessInfo,
           template: completeSalon.template,
@@ -234,6 +237,9 @@ export function mapSupabaseRowToSalon(row: SupabaseSalonRow): Salon {
     phone: row.phone ?? "",
     horizontalLogoUrl:
       metadataSalon?.horizontalLogoUrl ?? metadataFallback?.horizontalLogoUrl ?? "",
+    customDomain: normalizeCustomDomain(
+      metadataSalon?.customDomain ?? metadataFallback?.customDomain,
+    ),
     websiteUrl: row.website_url ?? "",
     instagramUrl: row.instagram_url ?? "",
     instagramProfileUrl:
