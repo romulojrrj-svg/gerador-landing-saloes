@@ -64,7 +64,7 @@ export function PremiumEditorialLanding({ salon }: { salon: Salon }) {
             <a href="#contact" className="transition hover:text-zinc-950">{labels.contact}</a>
           </nav>
           <div className="flex items-center gap-2">
-            <a href={salon.bookingUrl || salon.whatsapp ? buildPrimaryContactHref(salon) : "#contact"} className="hidden rounded-full px-4 py-2 text-[0.82rem] font-semibold text-white shadow-sm transition hover:-translate-y-0.5 md:inline-flex" style={{ backgroundColor: accent }}>
+            <a href={salon.bookingUrl || salon.whatsapp ? buildPrimaryContactHref(salon) : "#contact"} className="hidden rounded-full px-4 py-2 text-[0.82rem] font-semibold shadow-sm transition hover:-translate-y-0.5 md:inline-flex" style={{ backgroundColor: accent, color: finalSecondaryButtonTextColor }}>
               {labels.bookAppointment}
             </a>
             <details className="relative md:hidden">
@@ -88,8 +88,8 @@ export function PremiumEditorialLanding({ salon }: { salon: Salon }) {
           <h1 className="mt-4 max-w-2xl font-serif text-[2.75rem] leading-[0.96] tracking-tight sm:text-6xl lg:text-[6rem]">{content.heroTitle || salon.name}</h1>
           {content.heroDescription ? <p className="mt-6 max-w-lg text-[0.95rem] leading-7 text-zinc-600 sm:text-base">{content.heroDescription}</p> : null}
           <div className="mt-7 flex flex-wrap gap-3">
-            <a href={buildPrimaryContactHref(salon)} className="inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-[0.82rem] font-semibold text-white shadow-lg transition hover:-translate-y-0.5" style={{ backgroundColor: accent }}>{labels.bookAppointment} <ArrowUpRight className="h-4 w-4" /></a>
-            {salon.instagramUrl ? <a href={salon.instagramUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 rounded-full border border-zinc-300 bg-white/70 px-5 py-2.5 text-[0.82rem] font-semibold transition hover:bg-white"><Image src="/brand/instagram-icon.png" alt="" width={18} height={18} className="rounded-[4px]" /> Instagram</a> : null}
+            <a href={buildPrimaryContactHref(salon)} className="inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-[0.82rem] font-semibold shadow-lg transition hover:-translate-y-0.5" style={{ backgroundColor: accent, color: finalSecondaryButtonTextColor }}>{labels.bookAppointment} <ArrowUpRight className="h-4 w-4" /></a>
+            {salon.instagramUrl ? <a href={salon.instagramUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 rounded-full border border-zinc-300 bg-white/70 px-5 py-2.5 text-[0.82rem] font-semibold transition hover:bg-white" style={{ color: finalSecondaryButtonTextColor }}><Image src="/brand/instagram-icon.png" alt="" width={18} height={18} className="rounded-[4px]" /> Instagram</a> : null}
           </div>
         </div>
         <div className="relative aspect-[4/5] overflow-hidden rounded-[2rem] bg-zinc-200 sm:rounded-[3rem]">
@@ -126,7 +126,7 @@ export function PremiumEditorialLanding({ salon }: { salon: Salon }) {
           </div>
           {(salon.bookingUrl || salon.whatsapp) ? (
             <div className="mt-6 text-center">
-              <a href={salon.whatsapp ? buildWhatsappHref(salon.whatsapp, salon.whatsappMessage) : buildPrimaryContactHref(salon)} className="inline-flex items-center gap-2 rounded-full border border-transparent px-6 py-3 text-[0.82rem] font-semibold text-white shadow-lg transition hover:-translate-y-0.5 hover:brightness-95" style={{ backgroundColor: accent }}>
+              <a href={salon.whatsapp ? buildWhatsappHref(salon.whatsapp, salon.whatsappMessage) : buildPrimaryContactHref(salon)} className="inline-flex items-center gap-2 rounded-full border border-transparent px-6 py-3 text-[0.82rem] font-semibold shadow-lg transition hover:-translate-y-0.5 hover:brightness-95" style={{ backgroundColor: accent, color: finalSecondaryButtonTextColor }}>
                 {labels.bookViaWhatsapp} <ArrowUpRight className="h-4 w-4" />
               </a>
             </div>
