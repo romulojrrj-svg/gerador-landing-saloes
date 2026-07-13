@@ -105,7 +105,7 @@ type SalonFormProps = {
   successMessage?: string;
   submitLabel: string;
   cancelHref: string;
-  onSubmit: (input: SalonFormInput) => void;
+  onSubmit: (input: SalonFormInput) => void | Promise<void>;
 };
 
 type ImageDestination = SalonImagePlanDestination;
@@ -402,6 +402,8 @@ export function SalonForm({
     () => initialSalon?.copyHistory ?? [],
   );
   const [copyMessage, setCopyMessage] = useState("");
+  const [submitErrorMessage, setSubmitErrorMessage] = useState("");
+  const [isPreparingSubmit, setIsPreparingSubmit] = useState(false);
   const repositoryStatus = getSalonRepositoryStatus();
   const effectiveLayoutImagePlan = useMemo(
     () => buildEffectiveLayoutImagePlan(realImages, layoutImagePlan),
@@ -444,8 +446,9 @@ export function SalonForm({
   );
   const readiness = calculateLandingReadiness(readinessSalon);
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    setSubmitErrorMessage("");
     logPerfEvent({
       route: "/salons/[id]/edit",
       step: "handleSubmit",
@@ -455,10 +458,10 @@ export function SalonForm({
       servicesCount: selectedServices?.length ?? 0,
       source: repositoryStatus.activeSource,
     });
-    submitCurrentForm();
+    await submitCurrentForm();
   }
 
-  function submitCurrentForm(overrides?: {
+  async function submitCurrentForm(overrides?: {
     copySuggestion?: SalonCopySuggestion;
     appliedCopy?: SalonCopySuggestion;
     copyHistory?: SalonCopySuggestion[];
@@ -495,7 +498,7 @@ export function SalonForm({
       overrides?.galleryImages ?? realImages,
       layoutImagePlan,
     );
-    const nextGalleryImages = syncImagesWithPlan(
+    let nextGalleryImages = syncImagesWithPlan(
       overrides?.galleryImages ?? realImages,
       nextLayoutImagePlan,
     );
@@ -512,7 +515,33 @@ export function SalonForm({
       source: repositoryStatus.activeSource,
     });
 
-    onSubmit({
+    if (
+      repositoryStatus.activeSource === "supabase" &&
+      nextGalleryImages.some((image) => isInlineImageAsset(image.url) || isInlineImageAsset(image.src))
+    ) {
+      setIsPreparingSubmit(true);
+
+      try {
+        nextGalleryImages = await persistInlineGalleryImages({
+          images: nextGalleryImages,
+          salonName: input.name,
+          salonSlug: initialSalon?.slug ?? input.name,
+        });
+        setRealImages(nextGalleryImages);
+      } catch (error) {
+        const nextError =
+          error instanceof Error
+            ? error.message
+            : "Nao foi possivel enviar as novas fotos antes de salvar no Supabase.";
+        setSubmitErrorMessage(nextError);
+        setIsPreparingSubmit(false);
+        return;
+      }
+
+      setIsPreparingSubmit(false);
+    }
+
+    await onSubmit({
       ...input,
       whatsappMessage: input.whatsappMessage,
       horizontalLogoUrl,
@@ -794,7 +823,7 @@ export function SalonForm({
     setAppliedCopy(appliedSuggestion);
     setCopyHistory(nextHistory);
     setCopyMessage("Sugestoes aplicadas e salvas na landing.");
-    submitCurrentForm({
+    void submitCurrentForm({
       copySuggestion: appliedSuggestion,
       appliedCopy: appliedSuggestion,
       copyHistory: nextHistory,
@@ -913,10 +942,10 @@ export function SalonForm({
         ) : null}
         <button
           type="submit"
-          disabled={isSubmitting}
+          disabled={isSubmitting || isPreparingSubmit}
           className="btn btn-primary px-6 py-3 disabled:cursor-not-allowed disabled:opacity-70"
         >
-          {isSubmitting ? "Salvando..." : submitLabel}
+          {isSubmitting || isPreparingSubmit ? "Salvando..." : submitLabel}
           <ArrowRight className="h-4 w-4" />
         </button>
       </div>
@@ -930,6 +959,11 @@ export function SalonForm({
       {errorMessage ? (
         <p className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-950">
           {errorMessage}
+        </p>
+      ) : null}
+      {submitErrorMessage ? (
+        <p className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-950">
+          {submitErrorMessage}
         </p>
       ) : null}
     </form>
@@ -5867,4 +5901,105 @@ async function compressImageToDataUrl(file: File) {
   const quality = outputType === "image/webp" ? 0.82 : 0.8;
 
   return canvas.toDataURL(outputType, quality);
+}
+
+async function persistInlineGalleryImages({
+  images,
+  salonName,
+  salonSlug,
+}: {
+  images: SalonGalleryImage[];
+  salonName: string;
+  salonSlug: string;
+}) {
+  const nextImages = [...images];
+
+  for (let index = 0; index < nextImages.length; index += 1) {
+    const image = nextImages[index];
+    const inlineUrl = [image.url, image.src].find(isInlineImageAsset);
+
+    if (!inlineUrl) {
+      continue;
+    }
+
+    const uploadPayload = await uploadGalleryImageAsset({
+      dataUrl: inlineUrl,
+      imageId: image.id,
+      salonName,
+      salonSlug,
+    });
+
+    nextImages[index] = {
+      ...image,
+      url: uploadPayload.url,
+      src: uploadPayload.url,
+    };
+  }
+
+  return nextImages;
+}
+
+async function uploadGalleryImageAsset({
+  dataUrl,
+  imageId,
+  salonName,
+  salonSlug,
+}: {
+  dataUrl: string;
+  imageId: string;
+  salonName: string;
+  salonSlug: string;
+}) {
+  const file = dataUrlToFile(dataUrl, imageId);
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("salonName", salonName);
+  formData.append("salonSlug", salonSlug);
+  formData.append("imageId", imageId);
+
+  const response = await fetch("/api/admin/assets/gallery-image", {
+    method: "POST",
+    body: formData,
+  });
+  const payload = (await response.json().catch(() => null)) as
+    | { success?: boolean; error?: string; url?: string }
+    | null;
+
+  if (!response.ok || !payload?.success || !payload.url) {
+    throw new Error(
+      payload?.error ||
+        "Nao foi possivel enviar uma das fotos novas para o Supabase Storage.",
+    );
+  }
+
+  return {
+    url: payload.url,
+  };
+}
+
+function isInlineImageAsset(value?: string | null) {
+  return typeof value === "string" && /^data:image\/(?:avif|gif|jpeg|png|webp);base64,/i.test(value);
+}
+
+function dataUrlToFile(dataUrl: string, fallbackName: string) {
+  const match = dataUrl.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/);
+
+  if (!match) {
+    throw new Error("Formato de imagem local invalido para upload.");
+  }
+
+  const mimeType = match[1];
+  const base64 = match[2];
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+
+  const extension = mimeType === "image/png" ? "png" : mimeType === "image/webp" ? "webp" : "jpg";
+
+  return new File([bytes], `${fallbackName}.${extension}`, {
+    type: mimeType,
+  });
 }
