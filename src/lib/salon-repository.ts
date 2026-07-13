@@ -837,8 +837,22 @@ export async function deleteSalonFromSource(
 
 export async function duplicateSalon(
   slug: string,
+  preferredSource?: SalonRepositorySource,
 ): Promise<SalonRepositoryResult> {
-  if (getSalonRepositoryStatus().activeSource === "local") {
+  const sourceToUse = preferredSource ?? getSalonRepositoryStatus().activeSource;
+
+  if (sourceToUse === "supabase" && typeof window !== "undefined") {
+    const adminResult = await fetchAdminDuplicateSalon(slug);
+
+    if (adminResult.ok) {
+      saveLocalSalon(adminResult.salon);
+      notifyRepositoryChanged();
+    }
+
+    return adminResult;
+  }
+
+  if (sourceToUse === "local") {
     const localResult = duplicateLocalSalon(slug);
     notifyRepositoryChanged();
 
@@ -2078,6 +2092,31 @@ async function fetchAdminDeleteSalon(slug: string) {
   return {
     ok: true as const,
     source: "supabase" as const,
+  };
+}
+
+async function fetchAdminDuplicateSalon(
+  slug: string,
+): Promise<SalonRepositoryResult> {
+  const response = await fetchAdminRepository<{ salon: Salon }>(
+    `/api/admin/salons/${encodeURIComponent(slug)}/duplicate`,
+    {
+      method: "POST",
+    },
+  );
+
+  if (!response.ok) {
+    return {
+      ok: false,
+      error: response.error,
+      source: "supabase",
+    };
+  }
+
+  return {
+    ok: true,
+    salon: response.data.salon,
+    source: "supabase",
   };
 }
 

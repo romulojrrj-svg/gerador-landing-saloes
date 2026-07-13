@@ -243,7 +243,10 @@ export function SalonsDashboardClient() {
 
   async function handleDuplicate(slug: string) {
     setMessage("");
-    const result = await duplicateSalon(slug);
+    const result = await duplicateSalon(
+      slug,
+      salonSourceBySlug[slug] ?? source,
+    );
 
     if (!result.ok) {
       setMessage(result.error);
