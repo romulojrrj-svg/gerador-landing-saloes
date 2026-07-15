@@ -7,7 +7,17 @@ import type {
   SalonPremiumEditorial,
   SalonPremiumReviewScreenshot,
   SalonReviewDisplayType,
+  SalonTemplateVersion,
 } from "@/types/salon";
+
+export const PREMIUM_EDITORIAL_V1: SalonTemplateVersion = "premium_editorial_v1";
+export const PREMIUM_EDITORIAL_V2: SalonTemplateVersion = "premium_editorial_v2";
+
+export function normalizePremiumEditorialVersion(
+  value?: SalonTemplateVersion | string | null,
+): SalonTemplateVersion {
+  return value === PREMIUM_EDITORIAL_V2 ? PREMIUM_EDITORIAL_V2 : PREMIUM_EDITORIAL_V1;
+}
 
 export type PremiumEditorialLabels = {
   about: string;
