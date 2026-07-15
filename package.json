@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "export:salon": "node scripts/export-salon-static.mjs",
+    "preview:salon-export": "node scripts/preview-salon-export.mjs"
   },
   "dependencies": {
     "@google/genai": "^2.10.0",

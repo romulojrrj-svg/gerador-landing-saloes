@@ -90,11 +90,13 @@ import type {
   SalonPremiumEditorial,
   SalonReviewSource,
   SalonSourceMaterial,
+  SalonTemplateVersion,
   SalonTestimonial,
 } from "@/types/salon";
 import {
   getPremiumEditorialLabels,
   normalizePremiumEditorial,
+  normalizePremiumEditorialVersion,
 } from "@/lib/premium-editorial";
 
 type SalonFormProps = {
@@ -379,6 +381,11 @@ export function SalonForm({
     SalonLayoutImagePlan | undefined
   >(() => initialEffectiveLayoutImagePlan);
   const [template, setTemplate] = useState(initialSalon?.template ?? "default");
+  const [templateVersion, setTemplateVersion] = useState<SalonTemplateVersion | undefined>(
+    initialSalon?.template === "premium_editorial"
+      ? normalizePremiumEditorialVersion(initialSalon.templateVersion)
+      : undefined,
+  );
   const [premiumEditorial, setPremiumEditorial] = useState<SalonPremiumEditorial>(
     () =>
       normalizePremiumEditorial(
@@ -552,6 +559,7 @@ export function SalonForm({
       imageSelectionSummary,
       layoutImagePlan: nextLayoutImagePlan,
       template,
+      templateVersion,
       premiumEditorial,
       testimonials: nextTestimonials,
       sourceMaterials: buildSourceMaterials(
@@ -656,6 +664,7 @@ export function SalonForm({
       imageSelectionSummary,
       layoutImagePlan: effectiveLayoutImagePlan,
       template,
+      templateVersion,
       premiumEditorial,
       testimonials: realReviews,
       businessHours: input.businessHours,
@@ -854,6 +863,8 @@ export function SalonForm({
         images={realImages}
         language={initialSalon?.landingLanguage ?? initialSalon?.language}
         onTemplateChange={setTemplate}
+        templateVersion={templateVersion}
+        onTemplateVersionChange={setTemplateVersion}
         onChange={setPremiumEditorial}
         onUploadReviewScreenshots={handleReviewScreenshotUpload}
       />
@@ -1360,6 +1371,8 @@ function PremiumEditorialSection({
   images,
   language,
   onTemplateChange,
+  templateVersion,
+  onTemplateVersionChange,
   onChange,
   onUploadReviewScreenshots,
 }: {
@@ -1368,6 +1381,8 @@ function PremiumEditorialSection({
   images: SalonGalleryImage[];
   language?: Salon["language"];
   onTemplateChange: (value: "default" | "premium_editorial") => void;
+  templateVersion?: SalonTemplateVersion;
+  onTemplateVersionChange: (value: SalonTemplateVersion | undefined) => void;
   onChange: Dispatch<SetStateAction<SalonPremiumEditorial>>;
   onUploadReviewScreenshots: (
     files: File[],
@@ -1609,14 +1624,24 @@ function PremiumEditorialSection({
         <label className="grid gap-2">
           <span className="text-sm font-semibold text-zinc-800">Template</span>
           <select
-            value={template}
-            onChange={(event) =>
-              onTemplateChange(event.target.value as "default" | "premium_editorial")
-            }
+            value={template === "premium_editorial" ? templateVersion ?? "premium_editorial_v1" : "default"}
+            onChange={(event) => {
+              const value = event.target.value;
+
+              if (value === "default") {
+                onTemplateChange("default");
+                onTemplateVersionChange(undefined);
+                return;
+              }
+
+              onTemplateChange("premium_editorial");
+              onTemplateVersionChange(value as SalonTemplateVersion);
+            }}
             className="rounded-2xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-950 outline-none focus:border-teal-700 focus:bg-white"
           >
             <option value="default">Padrão atual</option>
-            <option value="premium_editorial">Premium editorial</option>
+            <option value="premium_editorial_v1">Premium Editorial 1</option>
+            <option value="premium_editorial_v2">Premium Editorial 2</option>
           </select>
         </label>
       </div>

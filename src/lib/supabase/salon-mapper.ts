@@ -169,6 +169,7 @@ export function mapSalonToSupabaseRow(
           whatsappMessage: completeSalon.whatsappMessage,
           extractedBusinessInfo: completeSalon.extractedBusinessInfo,
           template: completeSalon.template,
+          templateVersion: completeSalon.templateVersion,
           premiumEditorial: completeSalon.premiumEditorial,
         } as unknown as Json)
       : ({
@@ -190,6 +191,7 @@ export function mapSalonToSupabaseRow(
           whatsappMessage: completeSalon.whatsappMessage,
           extractedBusinessInfo: completeSalon.extractedBusinessInfo,
           template: completeSalon.template,
+          templateVersion: completeSalon.templateVersion,
           premiumEditorial: completeSalon.premiumEditorial,
         } as unknown as Json),
   };
@@ -271,6 +273,8 @@ export function mapSupabaseRowToSalon(row: SupabaseSalonRow): Salon {
       stringFromRecord(cta, "secondary") ?? metadataSalon?.ctaSecondary,
     ctaTitle: stringFromRecord(cta, "title") ?? metadataSalon?.ctaTitle,
     ctaText: stringFromRecord(cta, "text") ?? metadataSalon?.ctaText,
+    templateVersion:
+      metadataSalon?.templateVersion ?? metadataFallback?.templateVersion,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   });

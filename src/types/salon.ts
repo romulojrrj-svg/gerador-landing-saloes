@@ -40,6 +40,10 @@ export type SalonCopyStatus = "draft" | "applied" | "ignored";
 
 export type SalonTemplate = "default" | "premium_editorial";
 
+export type SalonTemplateVersion =
+  | "premium_editorial_v1"
+  | "premium_editorial_v2";
+
 export type SalonFaqItem = {
   id: string;
   question: string;
@@ -458,6 +462,7 @@ export type Salon = {
   ctaTitle: string;
   ctaText: string;
   template: SalonTemplate;
+  templateVersion?: SalonTemplateVersion;
   premiumEditorial: SalonPremiumEditorial;
 };
 
@@ -498,6 +503,7 @@ export type SalonFormInput = {
   manualAssistantNotes?: string;
   notes?: string;
   template?: SalonTemplate;
+  templateVersion?: SalonTemplateVersion;
   premiumEditorial?: SalonPremiumEditorial;
   copySuggestions?: SalonCopySuggestion;
   generatedCopy?: SalonCopySuggestion;

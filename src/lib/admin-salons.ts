@@ -173,6 +173,7 @@ export async function duplicateAdminSalonAsPremium(slug: string): Promise<AdminS
     name,
     status: "draft",
     template: "premium_editorial",
+    templateVersion: existing.salon.templateVersion,
     premiumEditorial: normalizePremiumEditorial(existing.salon.premiumEditorial, {
       ...existing.salon,
       name,
