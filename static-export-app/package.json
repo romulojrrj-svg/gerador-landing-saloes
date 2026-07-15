@@ -1,0 +1,8 @@
+{
+  "name": "salon-static-export-app",
+  "private": true,
+  "scripts": {
+    "build": "next build",
+    "start": "next start"
+  }
+}

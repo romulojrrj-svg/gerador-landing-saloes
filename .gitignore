@@ -34,3 +34,17 @@ node_modules/
 devserver.log
 temp-upload-image.*
 tsconfig.tsbuildinfo
+
+# Local static salon exports
+exports/
+static-export-app/.next/
+static-export-app/out/
+static-export-app/node_modules/
+static-export-app/next-env.d.ts
+static-export-app/data/salon.json
+static-export-app/public/assets/
+static-export-app/public/_headers
+static-export-app/public/robots.txt
+static-export-app/public/sitemap.xml
+static-export-app/public/site.webmanifest
+static-export-app/public/favicon.ico
