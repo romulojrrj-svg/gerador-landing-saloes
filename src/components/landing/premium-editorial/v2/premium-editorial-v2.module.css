@@ -1,0 +1,383 @@
+.root {
+  --pe2-accent: #9b7353;
+  --pe2-background: #f8f5f0;
+}
+
+.section {
+  padding: 4.75rem 1.25rem;
+}
+
+.sectionInner {
+  width: min(100%, 72rem);
+  margin-inline: auto;
+}
+
+.servicesSection {
+  background:
+    linear-gradient(
+      180deg,
+      rgb(255 255 255 / 0) 0%,
+      rgb(255 255 255 / 0.34) 100%
+    ),
+    var(--pe2-background);
+}
+
+.servicesHeader {
+  display: grid;
+  gap: 1rem;
+}
+
+.eyebrow {
+  color: var(--pe2-accent);
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.235em;
+  line-height: 1.5;
+  text-transform: uppercase;
+}
+
+.servicesTitle {
+  max-width: 20ch;
+  font-family: ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
+  font-size: clamp(2.2rem, 8vw, 4.2rem);
+  font-weight: 500;
+  letter-spacing: -0.035em;
+  line-height: 1.03;
+  text-wrap: balance;
+}
+
+.serviceList {
+  margin-top: 2.25rem;
+  border-top: 1px solid rgb(24 24 27 / 0.16);
+  border-bottom: 1px solid rgb(24 24 27 / 0.16);
+}
+
+.serviceRow {
+  position: relative;
+  display: grid;
+  grid-template-columns: 2.6rem minmax(0, 1fr);
+  gap: 0.85rem;
+  align-items: start;
+  border-bottom: 1px solid rgb(24 24 27 / 0.12);
+  padding: 1.5rem 0.35rem;
+  transition:
+    background-color 220ms ease,
+    padding 220ms ease;
+}
+
+.serviceRow:last-child {
+  border-bottom: 0;
+}
+
+.serviceRow:hover {
+  padding-inline: 0.75rem;
+  background: color-mix(in srgb, var(--pe2-accent) 6%, transparent);
+}
+
+.serviceNumber {
+  padding-top: 0.15rem;
+  color: color-mix(in srgb, var(--pe2-accent) 72%, #8a7d77);
+  font-family: ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
+  font-size: 0.9rem;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
+}
+
+.serviceName {
+  font-family: ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
+  font-size: 1.35rem;
+  font-weight: 500;
+  line-height: 1.12;
+}
+
+.serviceDescription {
+  max-width: 44rem;
+  margin-top: 0.55rem;
+  color: #6b635e;
+  font-size: 0.83rem;
+  line-height: 1.65;
+}
+
+.serviceLink {
+  grid-column: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  color: var(--pe2-accent);
+  font-size: 0.75rem;
+  font-weight: 700;
+  transition: gap 180ms ease;
+}
+
+.serviceRow:hover .serviceLink {
+  gap: 0.5rem;
+}
+
+.serviceFooter {
+  margin-top: 2rem;
+  text-align: center;
+}
+
+.primaryButton {
+  display: inline-flex;
+  min-height: 3rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
+  border-radius: 999px;
+  padding: 0.78rem 1.25rem;
+  font-size: 0.82rem;
+  font-weight: 700;
+  line-height: 1;
+  box-shadow: 0 14px 30px rgb(63 39 29 / 0.16);
+  transition:
+    transform 180ms ease,
+    filter 180ms ease;
+}
+
+.primaryButton:hover {
+  filter: brightness(0.97);
+  transform: translateY(-2px);
+}
+
+.faqList {
+  margin-top: 2rem;
+  border-top: 1px solid rgb(24 24 27 / 0.18);
+  border-bottom: 1px solid rgb(24 24 27 / 0.18);
+}
+
+.faqItem {
+  border-bottom: 1px solid rgb(24 24 27 / 0.14);
+}
+
+.faqItem:last-child {
+  border-bottom: 0;
+}
+
+.faqButton {
+  display: flex;
+  width: 100%;
+  min-height: 4.5rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+  padding: 1rem 0;
+  text-align: left;
+}
+
+.faqButton:focus-visible {
+  border-radius: 0.25rem;
+  outline: 2px solid var(--pe2-accent);
+  outline-offset: 4px;
+}
+
+.faqQuestion {
+  max-width: 44rem;
+  font-family: ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
+  font-size: 1.15rem;
+  font-weight: 500;
+  line-height: 1.3;
+}
+
+.faqIcon {
+  position: relative;
+  width: 1.5rem;
+  height: 1.5rem;
+  flex: 0 0 auto;
+  color: var(--pe2-accent);
+  transition: transform 240ms ease;
+}
+
+.faqIcon::before,
+.faqIcon::after {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0.9rem;
+  height: 1px;
+  content: "";
+  background: currentColor;
+  transform: translate(-50%, -50%);
+}
+
+.faqIcon::after {
+  transform: translate(-50%, -50%) rotate(90deg);
+  transition: opacity 180ms ease;
+}
+
+.faqButton[aria-expanded="true"] .faqIcon {
+  transform: rotate(180deg);
+}
+
+.faqButton[aria-expanded="true"] .faqIcon::after {
+  opacity: 0;
+}
+
+.faqAnswerGrid {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 300ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.faqAnswerGrid[data-open="true"] {
+  grid-template-rows: 1fr;
+}
+
+.faqAnswerClip {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.faqAnswer {
+  max-width: 44rem;
+  padding: 0 2.75rem 1.35rem 0;
+  color: #665f5a;
+  font-size: 0.87rem;
+  line-height: 1.75;
+  opacity: 0;
+  transform: translateY(-0.25rem);
+  transition:
+    opacity 220ms ease,
+    transform 220ms ease;
+}
+
+.faqAnswerGrid[data-open="true"] .faqAnswer {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.faqFallback {
+  margin-top: 2rem;
+  border-top: 1px solid rgb(24 24 27 / 0.18);
+  border-bottom: 1px solid rgb(24 24 27 / 0.18);
+}
+
+.faqFallbackItem {
+  border-bottom: 1px solid rgb(24 24 27 / 0.14);
+  padding-block: 1.15rem;
+}
+
+.faqFallbackItem:last-child {
+  border-bottom: 0;
+}
+
+.faqFallbackQuestion {
+  font-family: ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
+  font-size: 1.15rem;
+  font-weight: 500;
+}
+
+.faqFallbackAnswer {
+  max-width: 44rem;
+  margin-top: 0.65rem;
+  color: #665f5a;
+  font-size: 0.87rem;
+  line-height: 1.75;
+}
+
+.reveal {
+  --pe2-delay: 0ms;
+}
+
+.reveal[data-enhanced="true"][data-visible="false"] {
+  opacity: 0.72;
+  transform: translateY(1rem) scale(0.992);
+}
+
+.reveal[data-enhanced="true"] {
+  transition:
+    opacity 680ms cubic-bezier(0.22, 1, 0.36, 1) var(--pe2-delay),
+    transform 680ms cubic-bezier(0.22, 1, 0.36, 1) var(--pe2-delay),
+    clip-path 780ms cubic-bezier(0.22, 1, 0.36, 1) var(--pe2-delay);
+}
+
+.reveal[data-enhanced="true"][data-visible="true"] {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+.reveal[data-enhanced="true"][data-variant="image"][data-visible="false"] {
+  clip-path: inset(0 0 9% 0 round 1.5rem);
+  transform: translateY(1.2rem) scale(0.985);
+}
+
+.reveal[data-enhanced="true"][data-variant="image"][data-visible="true"] {
+  clip-path: inset(0 0 0 0 round 0);
+}
+
+@media (min-width: 390px) {
+  .section {
+    padding-inline: 1.5rem;
+  }
+}
+
+@media (min-width: 640px) {
+  .section {
+    padding: 6rem 2rem;
+  }
+
+  .serviceRow {
+    grid-template-columns: 4rem minmax(0, 1fr) auto;
+    gap: 1.25rem;
+    align-items: center;
+    padding-block: 1.8rem;
+  }
+
+  .serviceName {
+    font-size: 1.6rem;
+  }
+
+  .serviceLink {
+    grid-column: auto;
+  }
+
+  .faqQuestion {
+    font-size: 1.35rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .section {
+    padding: 8rem 2.5rem;
+  }
+
+  .servicesHeader {
+    grid-template-columns: minmax(0, 1fr) minmax(18rem, 0.65fr);
+    align-items: end;
+  }
+
+  .serviceRow {
+    grid-template-columns: 5rem minmax(0, 1fr) auto;
+    padding-block: 2rem;
+  }
+}
+
+@media (max-width: 374px) {
+  .section {
+    padding-inline: 1rem;
+  }
+
+  .serviceRow {
+    grid-template-columns: 2.2rem minmax(0, 1fr);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .root *,
+  .root *::before,
+  .root *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    transition-delay: 0ms !important;
+  }
+
+  .reveal,
+  .reveal[data-enhanced="true"][data-visible="false"],
+  .reveal[data-enhanced="true"][data-visible="true"] {
+    opacity: 1;
+    clip-path: none;
+    transform: none;
+  }
+}

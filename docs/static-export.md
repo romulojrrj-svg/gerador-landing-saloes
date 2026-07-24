@@ -14,6 +14,13 @@ Este fluxo cria um pacote completamente estatico para um unico salao publicado. 
 npm run export:salon -- --slug dra-julia-maia-2 --source supabase --version 1.0.1
 ```
 
+Quando o dominio ainda nao estiver salvo no cadastro, use `--domain` somente para
+gerar os metadados do pacote, sem alterar o salao no Supabase:
+
+```powershell
+npm run export:salon -- --slug nome-do-salao --source supabase --domain exemplo.com.br --version 1.0.0
+```
+
 Sem `--version`, o comando gera uma versao local baseada em data e hora. Cada execucao cria uma nova pasta em `exports/<slug>/`; nunca substitui uma versao anterior. Tambem atualiza `exports/<slug>/latest/` para facilitar o preview local.
 
 O exportador le somente o salao solicitado, prepara um DTO publico minimo e baixa exclusivamente imagens efetivamente usadas pelo template. Fotos sao convertidas para WebP responsivo; logos PNG, JPEG, WebP e SVG sao preservadas no formato apropriado. Nenhuma URL do Supabase Storage, Instagram, Vercel, `blob:` ou `localhost` permanece como dependencia em runtime.

@@ -30,14 +30,20 @@ async function main() {
   const slug = requireSlug(args.slug);
   const version = normalizeVersion(args.version) ?? createVersion();
   const source = args.source ?? "supabase";
+  const domainOverride = args.domain
+    ? normalizeDomain(args.domain)
+    : "";
 
   if (source !== "supabase") {
     throw new Error("Esta primeira versao suporta apenas --source supabase.");
   }
+  if (args.domain && !domainOverride) {
+    throw new Error("Use --domain com um dominio valido, sem https:// ou barra final.");
+  }
 
   const env = await loadLocalEnv();
   const salonRow = await loadSalonFromSupabase(env, slug);
-  const prepared = await prepareExport(salonRow, slug, version);
+  const prepared = await prepareExport(salonRow, slug, version, domainOverride);
   const output = await buildStaticSite(prepared, slug, version);
   await validateExport(output.siteDir);
   const zipPath = await createZip(output.siteDir, output.versionDir, slug, version);
@@ -126,7 +132,7 @@ async function loadSalonFromSupabase(env, slug) {
   return data;
 }
 
-async function prepareExport(row, slug, version) {
+async function prepareExport(row, slug, version, domainOverride = "") {
   const metadata = record(row.metadata);
   const legacySalon = record(metadata.salon);
   const fields = { ...legacySalon, ...metadata };
@@ -137,11 +143,15 @@ async function prepareExport(row, slug, version) {
   if (sourceTemplate !== "premium_editorial") {
     throw new Error("Esta exportacao isolada suporta apenas o template premium atual.");
   }
-  if (sourceTemplateVersion && sourceTemplateVersion !== "premium_v1") {
+  if (
+    sourceTemplateVersion &&
+    sourceTemplateVersion !== "premium_v1" &&
+    sourceTemplateVersion !== "premium_editorial_v1"
+  ) {
     throw new Error(`O templateVersion ${sourceTemplateVersion} nao possui exportador estatico registrado.`);
   }
 
-  const customDomain = normalizeDomain(fields.customDomain);
+  const customDomain = domainOverride || normalizeDomain(fields.customDomain);
   if (!customDomain) throw new Error("O salao precisa ter um dominio proprio valido para gerar canonical e sitemap.");
   const premium = sanitizePremiumEditorial(record(fields.premiumEditorial));
   const sourceImages = array(row.real_images).length
