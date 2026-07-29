@@ -70,6 +70,7 @@ export type StaticPremiumEditorial = {
   finalWhatsappButtonTextColor?: string;
   bookingButtonTextColor?: string;
   instagramButtonTextColor?: string;
+  finalSecondaryButtonTextColor?: string;
   aboutLabel?: string;
   servicesLabel?: string;
   servicesTitle?: string;
@@ -88,7 +89,7 @@ export type StaticSalon = {
   language: string;
   customDomain: string;
   template: "premium";
-  templateVersion: "premium_v1";
+  templateVersion: "premium_v1" | "premium_editorial_v2";
   updatedAt: string;
   location: string;
   address: string;

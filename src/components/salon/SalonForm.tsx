@@ -94,6 +94,8 @@ import type {
   SalonTestimonial,
 } from "@/types/salon";
 import {
+  PREMIUM_EDITORIAL_V2,
+  createPremiumEditorialV2Preset,
   getPremiumEditorialLabels,
   normalizePremiumEditorial,
   normalizePremiumEditorialVersion,
@@ -416,13 +418,6 @@ export function SalonForm({
     () => buildEffectiveLayoutImagePlan(realImages, layoutImagePlan),
     [realImages, layoutImagePlan],
   );
-  const availableServices = Array.from(
-    new Set([
-      ...serviceOptions,
-      ...(initialSalon?.selectedServices ?? []),
-      ...((initialSalon?.services ?? []).map((service) => service.title)),
-    ]),
-  );
   const [selectedServices, setSelectedServices] = useState<string[]>(
     initialSalon?.selectedServices?.length
       ? initialSalon.selectedServices
@@ -443,6 +438,14 @@ export function SalonForm({
         ]),
       ),
   );
+  const availableServices = Array.from(
+    new Set([
+      ...serviceOptions,
+      ...selectedServices,
+      ...(initialSalon?.selectedServices ?? []),
+      ...((initialSalon?.services ?? []).map((service) => service.title)),
+    ]),
+  );
   const [horizontalLogoUrl, setHorizontalLogoUrl] = useState(
     initialSalon?.horizontalLogoUrl ?? "",
   );
@@ -452,6 +455,42 @@ export function SalonForm({
     [initialSalon],
   );
   const readiness = calculateLandingReadiness(readinessSalon);
+
+  function applyPremiumEditorialV2Preset() {
+    if (mode !== "create") {
+      return;
+    }
+
+    const preset = createPremiumEditorialV2Preset();
+    setPremiumEditorial(preset.premiumEditorial);
+    setSelectedServices(preset.selectedServices);
+    setServiceDescriptions(preset.serviceDescriptions);
+
+    const form = formRef.current;
+    if (!form) {
+      return;
+    }
+
+    Object.entries(preset.fields).forEach(([name, value]) => {
+      const field = form.elements.namedItem(name);
+
+      if (
+        field instanceof HTMLInputElement ||
+        field instanceof HTMLTextAreaElement ||
+        field instanceof HTMLSelectElement
+      ) {
+        field.value = value;
+      }
+    });
+  }
+
+  function handleTemplateVersionChange(value: SalonTemplateVersion | undefined) {
+    setTemplateVersion(value);
+
+    if (value === PREMIUM_EDITORIAL_V2) {
+      applyPremiumEditorialV2Preset();
+    }
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -864,7 +903,7 @@ export function SalonForm({
         language={initialSalon?.landingLanguage ?? initialSalon?.language}
         onTemplateChange={setTemplate}
         templateVersion={templateVersion}
-        onTemplateVersionChange={setTemplateVersion}
+        onTemplateVersionChange={handleTemplateVersionChange}
         onChange={setPremiumEditorial}
         onUploadReviewScreenshots={handleReviewScreenshotUpload}
       />

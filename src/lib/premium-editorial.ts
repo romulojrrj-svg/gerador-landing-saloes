@@ -13,6 +13,183 @@ import type {
 export const PREMIUM_EDITORIAL_V1: SalonTemplateVersion = "premium_editorial_v1";
 export const PREMIUM_EDITORIAL_V2: SalonTemplateVersion = "premium_editorial_v2";
 
+export type PremiumEditorialV2Preset = {
+  fields: Record<string, string>;
+  selectedServices: string[];
+  serviceDescriptions: Record<string, string>;
+  premiumEditorial: SalonPremiumEditorial;
+};
+
+const premiumEditorialV2PresetFields = {
+  location: "Alvorada, RS",
+  city: "Alvorada",
+  country: "RS",
+  language: "pt-BR",
+  positioningLine: "",
+  description: "",
+  heroOverlayTitle: "",
+  heroOverlaySubtitle: "",
+  visualStyle: "Luxo suave",
+  brandTone: "Premium e acolhedor",
+  whatsappMessage:
+    "Ol\u00e1!\nVim pelo site e gostaria de marcar uma avalia\u00e7\u00e3o com a Dra. Kerollem",
+  googleMapsUrl: "",
+  websiteUrl: "",
+  bookingUrl: "",
+  businessHours: "",
+  address: "",
+  observedServices:
+    "Harmoniza\u00e7\u00e3o Facial Full Face, Perfiloplastia, Preenchimento Labial, Hiperpigmenta\u00e7\u00e3o, Avalia\u00e7\u00e3o Facial Personalizada",
+  differentiators: "",
+  visualNotes: "",
+  manualAssistantNotes: "",
+  notes: "",
+} as const;
+
+const premiumEditorialV2PresetServices = [
+  "Harmoniza\u00e7\u00e3o Facial Full Face",
+  "Perfiloplastia",
+  "Preenchimento Labial",
+  "Hiperpigmenta\u00e7\u00e3o",
+  "Avalia\u00e7\u00e3o Facial Personalizada",
+];
+
+const premiumEditorialV2PresetContent: SalonPremiumEditorial = {
+  accentColor: "#9b7353",
+  backgroundColor: "#f8f5f0",
+  heroEyebrow: "Harmoniza\u00e7\u00e3o Facial com Naturalidade",
+  heroTitle: "Realce sua beleza sem mudar quem voc\u00ea \u00e9",
+  heroDescription:
+    "Tratamentos personalizados para valorizar seus tra\u00e7os, preservar sua identidade e alcan\u00e7ar resultados naturais e harmoniosos.",
+  heroImageId: undefined,
+  aboutImageId: undefined,
+  aboutTitle: "Beleza, cuidado e naturalidade",
+  aboutRole:
+    "Dra. Kerollem Oliveira - Especialista em Harmoniza\u00e7\u00e3o Facial e Melasma",
+  aboutText:
+    "Cada paciente possui tra\u00e7os, necessidades e expectativas pr\u00f3prias. Por isso, o atendimento \u00e9 planejado de forma personalizada, considerando a harmonia facial e aquilo que a pessoa deseja valorizar.\n\nO objetivo \u00e9 proporcionar resultados sutis e equilibrados, que realcem a beleza de maneira natural, sem apagar a ess\u00eancia e a individualidade de cada paciente.",
+  methodEyebrow: "Atendimento personalizado",
+  methodTitle: "Cada detalhe pensado para voc\u00ea",
+  methodText:
+    "Desde a avalia\u00e7\u00e3o inicial at\u00e9 o acompanhamento ap\u00f3s o procedimento, cada etapa \u00e9 conduzida com aten\u00e7\u00e3o e cuidado. O objetivo \u00e9 compreender suas expectativas e indicar tratamentos que proporcionem resultados naturais, seguros e compat\u00edveis com o seu rosto.",
+  beforeAfterItems: [
+    {
+      id: "premium-v2-before-after-1",
+      order: 0,
+      title: "Hiperpigmenta\u00e7\u00e3o",
+      description: "",
+      beforeImageId: "",
+      afterImageId: "",
+      enabled: true,
+    },
+    {
+      id: "premium-v2-before-after-2",
+      order: 1,
+      title: "Harmoniza\u00e7\u00e3o Full Face",
+      description: "",
+      beforeImageId: "",
+      afterImageId: "",
+      enabled: true,
+    },
+    {
+      id: "premium-v2-before-after-3",
+      order: 2,
+      title: "Preenchimento Labial",
+      description: "",
+      beforeImageId: "",
+      afterImageId: "",
+      enabled: true,
+    },
+    {
+      id: "premium-v2-before-after-4",
+      order: 3,
+      title: "Clareamento e remo\u00e7\u00e3o de manchas",
+      description: "",
+      beforeImageId: "",
+      afterImageId: "",
+      enabled: true,
+    },
+  ],
+  faqItems: [
+    {
+      id: "premium-v2-faq-1",
+      order: 0,
+      answer:
+        "A melhor op\u00e7\u00e3o \u00e9 realizar uma avalia\u00e7\u00e3o personalizada. Nela, a Dra. Kerollem analisa suas caracter\u00edsticas e entende o resultado que voc\u00ea deseja antes de indicar qualquer procedimento.",
+      enabled: true,
+      question: "Como saber qual procedimento \u00e9 indicado para mim?",
+    },
+    {
+      id: "premium-v2-faq-2",
+      order: 1,
+      answer:
+        "Os atendimentos s\u00e3o realizados no consult\u00f3rio da Dra. Kerollem, em Alvorada. O endere\u00e7o e a disponibilidade podem ser confirmados pelo WhatsApp no momento do agendamento.",
+      enabled: true,
+      question: "Onde s\u00e3o realizados os atendimentos?",
+    },
+    {
+      id: "premium-v2-faq-3",
+      order: 2,
+      answer:
+        "Voc\u00ea pode entrar em contato diretamente pelo bot\u00e3o do WhatsApp dispon\u00edvel na p\u00e1gina para tirar d\u00favidas, consultar hor\u00e1rios e solicitar o agendamento.",
+      enabled: true,
+      question: "Como posso agendar uma avalia\u00e7\u00e3o?",
+    },
+    {
+      id: "premium-v2-faq-4",
+      order: 3,
+      answer:
+        "A avalia\u00e7\u00e3o \u00e9 realizada de forma individual, considerando as caracter\u00edsticas do seu rosto, suas propor\u00e7\u00f5es, necessidades e objetivos. A partir disso, a Dra. Kerollem indica o melhor protocolo para o seu rosto.",
+      enabled: true,
+      question: "Como funciona a avalia\u00e7\u00e3o facial personalizada?",
+    },
+  ],
+  reviewDisplayType: "google",
+  reviewEyebrow: "O que dizem as pacientes",
+  reviewTitle: "Experi\u00eancias que refletem nosso cuidado",
+  reviewDescription:
+    "Confira alguns relatos de pacientes que compartilharam suas experi\u00eancias ap\u00f3s o atendimento.",
+  reviewScreenshotImages: [],
+  finalCtaTitle: "Ready for your next appointment?",
+  finalCtaText:
+    "Agende sua avalia\u00e7\u00e3o com a Dra. Beatriz Dias e descubra quais tratamentos s\u00e3o mais indicados para voc\u00ea.",
+  finalCtaBackgroundColor: "#281916",
+  finalWhatsappButtonColor: "#25D366",
+  finalWhatsappButtonTextColor: "#ffffff",
+  bookingButtonTextColor: "#ffffff",
+  instagramButtonTextColor: "#281916",
+  finalSecondaryButtonTextColor: "#281916",
+  aboutLabel: "Sobre",
+  servicesLabel: "Procedimentos",
+  servicesTitle: "Tratamentos pensados para valorizar voc\u00ea",
+  resultsLabel: "Resultados",
+  contactLabel: "Contato",
+  bookAppointmentLabel: "Agendar avalia\u00e7\u00e3o",
+  bookViaWhatsappLabel: "Agendar pelo WhatsApp",
+  reservationsLabel: "Agendamento",
+  chatOnWhatsappLabel: "Falar com a Dra.Kerollem",
+  bookOnFreshaLabel: "B",
+};
+
+export function createPremiumEditorialV2Preset(): PremiumEditorialV2Preset {
+  return {
+    fields: { ...premiumEditorialV2PresetFields },
+    selectedServices: [...premiumEditorialV2PresetServices],
+    serviceDescriptions: Object.fromEntries(
+      premiumEditorialV2PresetServices.map((service) => [service, ""]),
+    ),
+    premiumEditorial: {
+      ...premiumEditorialV2PresetContent,
+      beforeAfterItems: premiumEditorialV2PresetContent.beforeAfterItems.map(
+        (item) => ({ ...item }),
+      ),
+      faqItems: premiumEditorialV2PresetContent.faqItems.map((item) => ({
+        ...item,
+      })),
+    },
+  };
+}
+
 export function normalizePremiumEditorialVersion(
   value?: SalonTemplateVersion | string | null,
 ): SalonTemplateVersion {

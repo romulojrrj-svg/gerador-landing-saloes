@@ -146,7 +146,8 @@ async function prepareExport(row, slug, version, domainOverride = "") {
   if (
     sourceTemplateVersion &&
     sourceTemplateVersion !== "premium_v1" &&
-    sourceTemplateVersion !== "premium_editorial_v1"
+    sourceTemplateVersion !== "premium_editorial_v1" &&
+    sourceTemplateVersion !== "premium_editorial_v2"
   ) {
     throw new Error(`O templateVersion ${sourceTemplateVersion} nao possui exportador estatico registrado.`);
   }
@@ -154,6 +155,9 @@ async function prepareExport(row, slug, version, domainOverride = "") {
   const customDomain = domainOverride || normalizeDomain(fields.customDomain);
   if (!customDomain) throw new Error("O salao precisa ter um dominio proprio valido para gerar canonical e sitemap.");
   const premium = sanitizePremiumEditorial(record(fields.premiumEditorial));
+  const exportTemplateVersion = sourceTemplateVersion === "premium_editorial_v2"
+    ? "premium_editorial_v2"
+    : "premium_v1";
   const sourceImages = array(row.real_images).length
     ? array(row.real_images)
     : array(legacySalon.realImages).length
@@ -209,7 +213,7 @@ async function prepareExport(row, slug, version, domainOverride = "") {
     language: string(row.language) || "pt-BR",
     customDomain,
     template: "premium",
-    templateVersion: "premium_v1",
+    templateVersion: exportTemplateVersion,
     updatedAt: string(row.updated_at),
     location: string(legacySalon.location) || [string(row.city), string(row.country)].filter(Boolean).join(", "),
     address: string(row.address),
@@ -232,6 +236,7 @@ async function prepareExport(row, slug, version, domainOverride = "") {
   await fs.mkdir(path.join(staticApp, "data"), { recursive: true });
   await fs.writeFile(path.join(staticApp, "data", "salon.json"), `${JSON.stringify(dto, null, 2)}\n`, "utf8");
   await writeStaticPublicFiles(dto);
+  await copyStaticBrandAssets();
 
   return {
     dto,
@@ -246,6 +251,14 @@ async function prepareExport(row, slug, version, domainOverride = "") {
   };
 }
 
+async function copyStaticBrandAssets() {
+  const source = path.join(root, "public", "brand", "instagram-icon.png");
+  if (!await exists(source)) return;
+  const targetDir = path.join(staticApp, "public", "brand");
+  await fs.mkdir(targetDir, { recursive: true });
+  await fs.copyFile(source, path.join(targetDir, "instagram-icon.png"));
+}
+
 function sanitizePremiumEditorial(value) {
   return {
     accentColor: string(value.accentColor) || "#9b7353",
@@ -257,7 +270,7 @@ function sanitizePremiumEditorial(value) {
     reviewDisplayType: value.reviewDisplayType === "screenshots" ? "screenshots" : "google",
     reviewEyebrow: string(value.reviewEyebrow), reviewTitle: string(value.reviewTitle), reviewDescription: string(value.reviewDescription),
     reviewScreenshotImages: array(value.reviewScreenshotImages).map((item, index) => ({ id: string(item.id) || `review-screenshot-${index + 1}`, imageId: string(item.imageId) || undefined, imageUrl: string(item.imageUrl) || undefined, imageAlt: string(item.imageAlt) || "Feedback de paciente", order: numberOrUndefined(item.order) ?? index })).filter((item) => item.imageId || item.imageUrl),
-    finalCtaTitle: string(value.finalCtaTitle), finalCtaText: string(value.finalCtaText), finalCtaBackgroundColor: string(value.finalCtaBackgroundColor) || undefined, finalWhatsappButtonColor: string(value.finalWhatsappButtonColor) || undefined, finalWhatsappButtonTextColor: string(value.finalWhatsappButtonTextColor) || undefined, bookingButtonTextColor: string(value.bookingButtonTextColor) || undefined, instagramButtonTextColor: string(value.instagramButtonTextColor) || undefined,
+    finalCtaTitle: string(value.finalCtaTitle), finalCtaText: string(value.finalCtaText), finalCtaBackgroundColor: string(value.finalCtaBackgroundColor) || undefined, finalWhatsappButtonColor: string(value.finalWhatsappButtonColor) || undefined, finalWhatsappButtonTextColor: string(value.finalWhatsappButtonTextColor) || undefined, bookingButtonTextColor: string(value.bookingButtonTextColor) || undefined, instagramButtonTextColor: string(value.instagramButtonTextColor) || undefined, finalSecondaryButtonTextColor: string(value.finalSecondaryButtonTextColor) || undefined,
     aboutLabel: string(value.aboutLabel) || undefined, servicesLabel: string(value.servicesLabel) || undefined, servicesTitle: string(value.servicesTitle) || undefined, resultsLabel: string(value.resultsLabel) || undefined, contactLabel: string(value.contactLabel) || undefined, bookAppointmentLabel: string(value.bookAppointmentLabel) || undefined, bookViaWhatsappLabel: string(value.bookViaWhatsappLabel) || undefined, reservationsLabel: string(value.reservationsLabel) || undefined, chatOnWhatsappLabel: string(value.chatOnWhatsappLabel) || undefined, bookOnFreshaLabel: string(value.bookOnFreshaLabel) || undefined,
   };
 }
@@ -381,5 +394,6 @@ function gitCommit() { try { return execFileSync("git", ["rev-parse", "HEAD"], {
 async function hashFile(file) { const buffer = await fs.readFile(file); return createHash("sha256").update(buffer).digest("hex"); }
 async function listFiles(directory) { const entries = await fs.readdir(directory, { withFileTypes: true }); const files = await Promise.all(entries.map(async (entry) => entry.isDirectory() ? listFiles(path.join(directory, entry.name)) : [path.join(directory, entry.name)])); return files.flat(); }
 async function directorySize(directory) { return (await listFiles(directory)).reduce(async (totalPromise, file) => (await totalPromise) + (await fs.stat(file)).size, Promise.resolve(0)); }
+async function exists(file) { try { await fs.access(file); return true; } catch { return false; } }
 
 main().catch((error) => { console.error(`\n[export:salon] ${error instanceof Error ? error.message : String(error)}`); process.exitCode = 1; });
