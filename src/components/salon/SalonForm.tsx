@@ -457,10 +457,6 @@ export function SalonForm({
   const readiness = calculateLandingReadiness(readinessSalon);
 
   function applyPremiumEditorialV2Preset() {
-    if (mode !== "create") {
-      return;
-    }
-
     const preset = createPremiumEditorialV2Preset();
     setPremiumEditorial(preset.premiumEditorial);
     setSelectedServices(preset.selectedServices);
@@ -485,9 +481,12 @@ export function SalonForm({
   }
 
   function handleTemplateVersionChange(value: SalonTemplateVersion | undefined) {
+    const isExplicitSwitchToV2 =
+      value === PREMIUM_EDITORIAL_V2 && templateVersion !== PREMIUM_EDITORIAL_V2;
+
     setTemplateVersion(value);
 
-    if (value === PREMIUM_EDITORIAL_V2) {
+    if (isExplicitSwitchToV2) {
       applyPremiumEditorialV2Preset();
     }
   }
@@ -927,20 +926,21 @@ export function SalonForm({
         onServiceDescriptionsChange={setServiceDescriptions}
       />
 
+      <RealImagesSection
+        images={realImages}
+        salonName={initialSalon?.name}
+        getFieldValue={getFormFieldValue}
+        candidates={imageCandidates}
+        selectionSummary={imageSelectionSummary}
+        layoutImagePlan={layoutImagePlan}
+        onChange={setRealImages}
+        onCandidatesChange={setImageCandidates}
+        onSelectionChange={setImageSelectionSummary}
+        onLayoutPlanChange={setLayoutImagePlan}
+      />
+
       {mode === "edit" || isDevelopment ? (
         <>
-          <RealImagesSection
-            images={realImages}
-            salonName={initialSalon?.name}
-            getFieldValue={getFormFieldValue}
-            candidates={imageCandidates}
-            selectionSummary={imageSelectionSummary}
-            layoutImagePlan={layoutImagePlan}
-            onChange={setRealImages}
-            onCandidatesChange={setImageCandidates}
-            onSelectionChange={setImageSelectionSummary}
-            onLayoutPlanChange={setLayoutImagePlan}
-          />
           {template !== "premium_editorial" ||
           premiumEditorial.reviewDisplayType === "google" ? (
             <RealReviewsSection reviews={realReviews} onChange={setRealReviews} />
