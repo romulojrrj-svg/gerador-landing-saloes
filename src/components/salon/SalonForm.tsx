@@ -100,6 +100,8 @@ import {
   normalizePremiumEditorial,
   normalizePremiumEditorialVersion,
 } from "@/lib/premium-editorial";
+import { InteractiveQuizBuilder } from "@/components/salon/InteractiveQuizBuilder";
+import { createPremiumEditorialV2DefaultQuizConfig } from "@/lib/interactive-quiz";
 
 type SalonFormProps = {
   mode: "create" | "edit";
@@ -457,8 +459,15 @@ export function SalonForm({
   const readiness = calculateLandingReadiness(readinessSalon);
 
   function applyPremiumEditorialV2Preset() {
-    const preset = createPremiumEditorialV2Preset();
-    setPremiumEditorial(preset.premiumEditorial);
+    const preset = createPremiumEditorialV2Preset(
+      getFormFieldValue("name") || initialSalon?.name,
+    );
+    setPremiumEditorial({
+      ...preset.premiumEditorial,
+      ...(!initialSalon
+        ? { interactiveQuiz: createPremiumEditorialV2DefaultQuizConfig() }
+        : {}),
+    });
     setSelectedServices(preset.selectedServices);
     setServiceDescriptions(preset.serviceDescriptions);
 
@@ -905,6 +914,7 @@ export function SalonForm({
         onTemplateVersionChange={handleTemplateVersionChange}
         onChange={setPremiumEditorial}
         onUploadReviewScreenshots={handleReviewScreenshotUpload}
+        salonSlug={initialSalon?.slug}
       />
 
       <ContactSection initialSalon={initialSalon} />
@@ -1414,6 +1424,7 @@ function PremiumEditorialSection({
   onTemplateVersionChange,
   onChange,
   onUploadReviewScreenshots,
+  salonSlug,
 }: {
   template: "default" | "premium_editorial";
   premiumEditorial: SalonPremiumEditorial;
@@ -1426,6 +1437,7 @@ function PremiumEditorialSection({
   onUploadReviewScreenshots: (
     files: File[],
   ) => Promise<SalonGalleryImage[]>;
+  salonSlug?: string;
 }) {
   const realImageOptions = images.filter((image) => image.isReal && image.src);
   const labelDefaults = getPremiumEditorialLabels({ language }, premiumEditorial);
@@ -1684,6 +1696,16 @@ function PremiumEditorialSection({
           </select>
         </label>
       </div>
+
+      {templateVersion === PREMIUM_EDITORIAL_V2 ? (
+        <div className="mt-6 border-t border-zinc-100 pt-6">
+          <InteractiveQuizBuilder
+            config={premiumEditorial.interactiveQuiz}
+            onChange={(value) => updateField("interactiveQuiz", value)}
+            salonSlug={salonSlug}
+          />
+        </div>
+      ) : null}
 
       {template === "premium_editorial" ? (
         <div className="mt-6 grid gap-5 border-t border-zinc-100 pt-6">
@@ -2020,6 +2042,7 @@ function PremiumEditorialSection({
           </div>
         </div>
       ) : null}
+
     </section>
   );
 }

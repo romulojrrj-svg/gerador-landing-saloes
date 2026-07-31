@@ -6,6 +6,7 @@ import {
   getSalonBySlug as getLocalSalonBySlug,
   getSalonIndex,
   getSalonStorageChangedEvent,
+  initializeNewSalonInteractiveQuiz,
   listSalons as listLocalSalons,
   mergeSalonUpdates,
   normalizeSlug,
@@ -1429,7 +1430,7 @@ function createLocalSalonFromInput(data: SalonFormInput): SalonRepositoryResult 
 function buildSalonForCreate(data: SalonFormInput, slug: string) {
   const now = new Date().toISOString();
 
-  return createSalonDefaults({
+  return initializeNewSalonInteractiveQuiz(createSalonDefaults({
     ...salonFormInputToPartialSalon(data),
     id: createId(),
     slug,
@@ -1438,7 +1439,7 @@ function buildSalonForCreate(data: SalonFormInput, slug: string) {
     generationStatus: "idle",
     createdAt: now,
     updatedAt: now,
-  });
+  }));
 }
 
 async function generateUniqueRepositorySlug(name: string, currentSlug?: string) {

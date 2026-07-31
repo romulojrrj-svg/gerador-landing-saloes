@@ -52,6 +52,90 @@ export type SalonFaqItem = {
   enabled: boolean;
 };
 
+export type SalonInteractiveQuizQuestionType =
+  | "short_text"
+  | "long_text"
+  | "single_choice"
+  | "multiple_choice"
+  | "scale"
+  | "yes_no";
+
+export type SalonInteractiveQuizPosition =
+  | "after_services"
+  | "after_results"
+  | "before_faq"
+  | "before_cta";
+
+export type SalonInteractiveQuizOption = {
+  id: string;
+  label: string;
+  order: number;
+};
+
+export type SalonInteractiveQuizQuestion = {
+  id: string;
+  type: SalonInteractiveQuizQuestionType;
+  category?: string;
+  prompt: string;
+  helperText?: string;
+  placeholder?: string;
+  maxLength?: number;
+  showCharacterCount?: boolean;
+  autoGrow?: boolean;
+  autoAdvance?: boolean;
+  autoAdvanceDelay?: number;
+  required: boolean;
+  options: SalonInteractiveQuizOption[];
+  minSelections?: number;
+  maxSelections?: number;
+  scaleMin?: number;
+  scaleMax?: number;
+  scaleMinLabel?: string;
+  scaleMaxLabel?: string;
+  scaleInitial?: number;
+  scaleShowValue?: boolean;
+  requireInteraction?: boolean;
+};
+
+export type SalonInteractiveQuizTheme = {
+  mode?: "inherit" | "custom";
+  primary?: string;
+  accent?: string;
+  background?: string;
+  surface?: string;
+  text?: string;
+};
+
+export type SalonInteractiveQuizConfig = {
+  enabled: boolean;
+  introEyebrow?: string;
+  introNotice?: string;
+  title: string;
+  subtitle: string;
+  introText: string;
+  estimatedTime: string;
+  startButtonLabel: string;
+  flowTitle: string;
+  contactIntro: string;
+  contactSubmitLabel?: string;
+  confirmationTitle: string;
+  confirmationText: string;
+  consentText: string;
+  contactCityEnabled?: boolean;
+  contactCityRequired?: boolean;
+  contactConsentRequired?: boolean;
+  notificationEnabled?: boolean;
+  notificationRecipientEmail?: string;
+  hideProgressMeta?: boolean;
+  privacyUrl?: string;
+  position: SalonInteractiveQuizPosition;
+  contactNameRequired: boolean;
+  defaultCountryCode: string;
+  submitEndpoint?: string;
+  quizTheme?: SalonInteractiveQuizTheme;
+  questions: SalonInteractiveQuizQuestion[];
+};
+
 export type SalonBeforeAfterItem = {
   id: string;
   title: string;
@@ -111,6 +195,7 @@ export type SalonPremiumEditorial = {
   reservationsLabel?: string;
   chatOnWhatsappLabel?: string;
   bookOnFreshaLabel?: string;
+  interactiveQuiz?: SalonInteractiveQuizConfig;
 };
 
 export type SalonImageSource =

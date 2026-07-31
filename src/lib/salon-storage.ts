@@ -27,6 +27,7 @@ import {
   normalizePremiumEditorialVersion,
 } from "./premium-editorial";
 import { normalizeCustomDomain } from "./custom-domain";
+import { createPremiumEditorialV2DefaultQuizConfig } from "./interactive-quiz";
 
 const STORAGE_PREFIX = "salon-lg:salons:";
 const STORAGE_INDEX_KEY = "salon-lg:salons:index";
@@ -385,6 +386,20 @@ export function mergeSalonUpdates(
 
 export function createSalonDefaults(partialSalon: Partial<Salon> = {}) {
   return buildCompleteSalon(partialSalon);
+}
+
+export function initializeNewSalonInteractiveQuiz(salon: Salon) {
+  if (salon.templateVersion !== "premium_editorial_v2" || salon.premiumEditorial.interactiveQuiz) {
+    return salon;
+  }
+
+  return {
+    ...salon,
+    premiumEditorial: {
+      ...salon.premiumEditorial,
+      interactiveQuiz: createPremiumEditorialV2DefaultQuizConfig(),
+    },
+  };
 }
 
 export function ensureCompleteSalon(partialSalon: Partial<Salon>) {

@@ -6,6 +6,7 @@ import { LandingImage } from "./LandingImage";
 import { SalonHeaderBrand } from "./SalonHeaderBrand";
 import { BeforeAfterSlider } from "./BeforeAfterSlider";
 import { FeedbackScreenshotCarousel } from "./FeedbackScreenshotCarousel";
+import { InteractiveQuizSection } from "./InteractiveQuizSection";
 import { PremiumFaq } from "./PremiumFaq";
 import { Reveal } from "./Reveal";
 import styles from "./premium-editorial-v2.module.css";
@@ -58,6 +59,11 @@ export function PremiumEditorialLanding({ salon }: { salon: Salon }) {
     "#281916";
   const labels = getPremiumEditorialLabels(salon, content);
   const contactHref = buildPrimaryContactHref(salon);
+  const interactiveQuiz = content.interactiveQuiz;
+  const quizAt = (position: NonNullable<typeof interactiveQuiz>["position"]) =>
+    interactiveQuiz?.enabled && interactiveQuiz.questions.length && interactiveQuiz.position === position ? (
+      <InteractiveQuizSection salon={salon} config={interactiveQuiz} />
+    ) : null;
   const rootStyle = {
     backgroundColor: background,
     "--pe2-accent": accent,
@@ -359,6 +365,8 @@ export function PremiumEditorialLanding({ salon }: { salon: Salon }) {
         </section>
       ) : null}
 
+      {quizAt("after_services")}
+
       {beforeAfterItems.length ? (
         <section
           id="results"
@@ -412,9 +420,13 @@ export function PremiumEditorialLanding({ salon }: { salon: Salon }) {
         </section>
       ) : null}
 
+      {quizAt("after_results")}
+
       <PremiumReviews salon={salon} accent={accent} />
 
       <PremiumPersonalizedCare content={content} accent={accent} />
+
+      {quizAt("before_faq")}
 
       {faqItems.length ? (
         <section className="px-5 pb-8 pt-10 sm:px-8 md:py-24 lg:px-10">
@@ -429,6 +441,8 @@ export function PremiumEditorialLanding({ salon }: { salon: Salon }) {
           </Reveal>
         </section>
       ) : null}
+
+      {quizAt("before_cta")}
 
       <section
         id="contact"

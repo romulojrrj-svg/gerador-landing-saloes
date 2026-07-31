@@ -1,4 +1,5 @@
 import { getValidImageUrl } from "@/lib/salon-images";
+import { normalizeInteractiveQuizConfig } from "@/lib/interactive-quiz";
 import type {
   Salon,
   SalonBeforeAfterItem,
@@ -171,21 +172,50 @@ const premiumEditorialV2PresetContent: SalonPremiumEditorial = {
   bookOnFreshaLabel: "B",
 };
 
-export function createPremiumEditorialV2Preset(): PremiumEditorialV2Preset {
+function getPremiumEditorialV2NameParts(name?: string) {
+  const fullName = name?.trim() || "Dra. Kerollem Oliveira";
+  const nameWithoutTitle = fullName.replace(/^(?:dra|dr)\.?\s*/i, "").trim();
+  const firstName = nameWithoutTitle.split(/\s+/)[0] || "Kerollem";
+
   return {
-    fields: { ...premiumEditorialV2PresetFields },
+    fullName,
+    shortName: `Dra. ${firstName}`,
+  };
+}
+
+export function createPremiumEditorialV2Preset(
+  salonName?: string,
+): PremiumEditorialV2Preset {
+  const { fullName, shortName } = getPremiumEditorialV2NameParts(salonName);
+
+  return {
+    fields: {
+      ...premiumEditorialV2PresetFields,
+      whatsappMessage:
+        `Olá!\nVim pelo site e gostaria de marcar uma avaliação com a ${shortName}`,
+    },
     selectedServices: [...premiumEditorialV2PresetServices],
     serviceDescriptions: Object.fromEntries(
       premiumEditorialV2PresetServices.map((service) => [service, ""]),
     ),
     premiumEditorial: {
       ...premiumEditorialV2PresetContent,
-      beforeAfterItems: premiumEditorialV2PresetContent.beforeAfterItems.map(
-        (item) => ({ ...item }),
+      aboutRole: premiumEditorialV2PresetContent.aboutRole.replace(
+        "Dra. Kerollem Oliveira",
+        fullName,
       ),
       faqItems: premiumEditorialV2PresetContent.faqItems.map((item) => ({
         ...item,
+        answer: item.answer.replaceAll("Dra. Kerollem", shortName),
       })),
+      finalCtaTitle: "Pronta para valorizar sua beleza?",
+      finalCtaText: premiumEditorialV2PresetContent.finalCtaText
+        .replace("Dra. Beatriz Dias", shortName)
+        .replace("Dra. Kerollem", shortName),
+      chatOnWhatsappLabel: `Falar com a ${shortName}`,
+      beforeAfterItems: premiumEditorialV2PresetContent.beforeAfterItems.map(
+        (item) => ({ ...item }),
+      ),
     },
   };
 }
@@ -331,10 +361,12 @@ export function normalizePremiumEditorial(
   salon?: Partial<Salon>,
 ) {
   const defaults = createDefaultPremiumEditorial(salon);
+  const interactiveQuiz = normalizeInteractiveQuizConfig(value?.interactiveQuiz);
 
   return {
     ...defaults,
     ...value,
+    ...(interactiveQuiz ? { interactiveQuiz } : {}),
     reviewDisplayType: normalizeReviewDisplayType(value?.reviewDisplayType),
     reviewEyebrow: value?.reviewEyebrow?.trim() || defaults.reviewEyebrow,
     reviewTitle: value?.reviewTitle?.trim() || defaults.reviewTitle,

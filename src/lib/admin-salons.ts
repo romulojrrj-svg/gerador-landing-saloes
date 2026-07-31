@@ -9,6 +9,7 @@ import {
 import {
   createSalonDefaults,
   ensureCompleteSalon,
+  initializeNewSalonInteractiveQuiz,
   mergeSalonUpdates,
   normalizeSlug,
   salonFormInputToPartialSalon,
@@ -136,7 +137,7 @@ export async function createAdminSalonFromInput(
 
   const slug = await generateUniqueAdminSlug(input.name);
   const now = new Date().toISOString();
-  const salon = createSalonDefaults({
+  const salon = initializeNewSalonInteractiveQuiz(createSalonDefaults({
     ...salonFormInputToPartialSalon(input),
     id: crypto.randomUUID(),
     slug,
@@ -145,7 +146,7 @@ export async function createAdminSalonFromInput(
     generationStatus: "idle",
     createdAt: now,
     updatedAt: now,
-  });
+  }));
 
   return saveAdminSalon(salon);
 }
