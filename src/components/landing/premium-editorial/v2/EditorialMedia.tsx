@@ -89,7 +89,7 @@ export function EditorialGallerySection({
             ) : null}
           </div>
 
-          <div className="mt-8 grid gap-4 md:auto-rows-[12rem] md:grid-cols-12">
+          <div className="mt-8 grid min-w-0 grid-cols-1 gap-4 md:auto-rows-[12rem] md:grid-cols-12">
             {items.map((resolved, index) => {
               const isFeatured = items.length > 1 && index === 0;
               const alt =
@@ -102,14 +102,14 @@ export function EditorialGallerySection({
                   key={resolved.item.id}
                   className={
                     isFeatured
-                      ? "md:col-span-7 md:row-span-2"
-                      : "md:col-span-5"
+                      ? "min-w-0 md:col-span-7 md:row-span-2"
+                      : "min-w-0 md:col-span-5"
                   }
                 >
                   <button
                     type="button"
                     onClick={(event) => openImage(event, resolved)}
-                    className="group relative block h-full min-h-64 w-full overflow-hidden rounded-[1.75rem] bg-zinc-100 text-left focus:outline-none focus:ring-2 focus:ring-offset-4"
+                    className="group relative block aspect-[4/3] w-full min-w-0 overflow-hidden rounded-[1.75rem] bg-zinc-100 text-left focus:outline-none focus:ring-2 focus:ring-offset-4 md:aspect-auto md:h-full md:min-h-64"
                     style={{ outlineColor: accent }}
                     aria-label={
                       resolved.item.caption?.trim() ||
