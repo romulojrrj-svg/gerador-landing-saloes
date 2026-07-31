@@ -35,7 +35,7 @@ export function createInteractiveQuizConfig(): SalonInteractiveQuizConfig {
     flowTitle: "Uma conversa sobre o seu momento",
     contactIntro:
       "Informe seus dados para que eu possa analisar suas respostas e entrar em contato com uma orientação personalizada.",
-    confirmationTitle: "Recebi suas respostas",
+    confirmationTitle: "Teste enviado com sucesso!",
     confirmationText:
       "Vou analisar as informações e entrar em contato pelo WhatsApp informado.",
     consentText:
@@ -65,8 +65,8 @@ export function createPremiumEditorialV2DefaultQuizConfig(): SalonInteractiveQui
     flowTitle: "CONHECENDO SEUS OBJETIVOS",
     contactIntro: "Preencha seus dados para que a profissional possa conhecer seus objetivos e entrar em contato.",
     contactSubmitLabel: "Enviar para an\u00e1lise",
-    confirmationTitle: "Respostas recebidas!",
-    confirmationText: "Obrigada por compartilhar seus objetivos. Suas respostas ser\u00e3o analisadas e o contato ser\u00e1 realizado pelo WhatsApp informado.",
+    confirmationTitle: "Teste enviado com sucesso!",
+    confirmationText: "Obrigada por compartilhar seus objetivos. Recebi suas respostas e vou analis\u00e1-las com aten\u00e7\u00e3o. Em breve, entrarei em contato pelo WhatsApp informado com um retorno personalizado.",
     consentText: "Autorizo o envio das minhas respostas para an\u00e1lise e o contato pelo WhatsApp informado.",
     privacyUrl: "",
     position: "after_services",

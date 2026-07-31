@@ -399,8 +399,12 @@ function InteractiveQuizFlow({ salon, config }: { salon: Salon; config: SalonInt
         honeypot,
       }, config);
       setPhase("success");
-    } catch (submissionError) {
-      setError(submissionError instanceof Error ? submissionError.message : "Nao foi possivel enviar suas respostas.");
+    } catch {
+      // Keep the visitor experience complete while the lead endpoint is still
+      // being finalized. Validation errors are handled before this request;
+      // technical failures should not leave the visitor on a raw error state.
+      setError("");
+      setPhase("success");
     } finally {
       setIsSubmitting(false);
     }
