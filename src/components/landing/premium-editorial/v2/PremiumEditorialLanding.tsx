@@ -7,6 +7,11 @@ import { SalonHeaderBrand } from "./SalonHeaderBrand";
 import { BeforeAfterSlider } from "./BeforeAfterSlider";
 import { FeedbackScreenshotCarousel } from "./FeedbackScreenshotCarousel";
 import { InteractiveQuizSection } from "./InteractiveQuizSection";
+import {
+  EditorialGallerySection,
+  EditorialTestimonialsSection,
+  type EditorialTestimonialItem,
+} from "./EditorialMedia";
 import { PremiumFaq } from "./PremiumFaq";
 import { Reveal } from "./Reveal";
 import styles from "./premium-editorial-v2.module.css";
@@ -16,7 +21,12 @@ import {
   getPremiumImage,
 } from "@/lib/premium-editorial";
 import { buildWhatsappHref, getPublicReviewMetrics } from "@/lib/public-landing";
-import type { Salon, SalonGalleryImage, SalonService } from "@/types/salon";
+import type {
+  Salon,
+  SalonGalleryImage,
+  SalonPremiumEditorialGalleryPosition,
+  SalonService,
+} from "@/types/salon";
 
 export function PremiumEditorialLanding({ salon }: { salon: Salon }) {
   const content = salon.premiumEditorial;
@@ -60,10 +70,37 @@ export function PremiumEditorialLanding({ salon }: { salon: Salon }) {
   const labels = getPremiumEditorialLabels(salon, content);
   const contactHref = buildPrimaryContactHref(salon);
   const interactiveQuiz = content.interactiveQuiz;
+  const editorialTestimonials: EditorialTestimonialItem[] = (
+    content.editorialTestimonials ?? []
+  )
+    .map((testimonial) => ({
+      testimonial,
+      src: testimonial.originalImageId
+        ? imageMap.get(testimonial.originalImageId)?.src ||
+          testimonial.originalImageUrl
+        : testimonial.originalImageUrl,
+    }))
+    .filter(
+      (item) =>
+        Boolean(item.testimonial.quote?.trim()) ||
+        Boolean(item.src && item.testimonial.showOriginalImage),
+    );
   const quizAt = (position: NonNullable<typeof interactiveQuiz>["position"]) =>
     interactiveQuiz?.enabled && interactiveQuiz.questions.length && interactiveQuiz.position === position ? (
       <InteractiveQuizSection salon={salon} config={interactiveQuiz} />
-    ) : null;
+      ) : null;
+  const galleryAt = (position: SalonPremiumEditorialGalleryPosition) => (
+    <EditorialGallerySection
+      section={
+        content.gallerySection?.position === position
+          ? content.gallerySection
+          : undefined
+      }
+      images={imageMap}
+      salonSlug={salon.slug}
+      accent={accent}
+    />
+  );
   const rootStyle = {
     backgroundColor: background,
     "--pe2-accent": accent,
@@ -284,6 +321,8 @@ export function PremiumEditorialLanding({ salon }: { salon: Salon }) {
         </div>
       </section>
 
+      {galleryAt("after_about")}
+
       {services.length ? (
         <section
           id="services"
@@ -366,6 +405,7 @@ export function PremiumEditorialLanding({ salon }: { salon: Salon }) {
       ) : null}
 
       {quizAt("after_services")}
+      {galleryAt("after_services")}
 
       {beforeAfterItems.length ? (
         <section
@@ -422,9 +462,16 @@ export function PremiumEditorialLanding({ salon }: { salon: Salon }) {
 
       {quizAt("after_results")}
 
-      <PremiumReviews salon={salon} accent={accent} />
+      {galleryAt("before_reviews")}
+      <PremiumReviews
+        salon={salon}
+        accent={accent}
+        editorialTestimonials={editorialTestimonials}
+      />
 
       <PremiumPersonalizedCare content={content} accent={accent} />
+      {galleryAt("after_method")}
+      {galleryAt("before_quiz")}
 
       {quizAt("before_faq")}
 
@@ -442,6 +489,7 @@ export function PremiumEditorialLanding({ salon }: { salon: Salon }) {
         </section>
       ) : null}
 
+      {galleryAt("before_cta")}
       {quizAt("before_cta")}
 
       <section
@@ -529,7 +577,27 @@ function firstUsableImage(
   );
 }
 
-function PremiumReviews({ salon, accent }: { salon: Salon; accent: string }) {
+function PremiumReviews({
+  salon,
+  accent,
+  editorialTestimonials,
+}: {
+  salon: Salon;
+  accent: string;
+  editorialTestimonials: EditorialTestimonialItem[];
+}) {
+  if (editorialTestimonials.length) {
+    return (
+      <EditorialTestimonialsSection
+        items={editorialTestimonials}
+        eyebrow={salon.premiumEditorial.reviewEyebrow}
+        title={salon.premiumEditorial.reviewTitle}
+        description={salon.premiumEditorial.reviewDescription}
+        accent={accent}
+      />
+    );
+  }
+
   if (salon.premiumEditorial.reviewDisplayType === "screenshots") {
     return <PremiumScreenshotReviews salon={salon} accent={accent} />;
   }

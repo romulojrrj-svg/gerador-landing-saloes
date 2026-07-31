@@ -6,6 +6,9 @@ import type {
   SalonFaqItem,
   SalonGalleryImage,
   SalonPremiumEditorial,
+  SalonPremiumEditorialGalleryItem,
+  SalonPremiumEditorialGalleryPosition,
+  SalonPremiumEditorialTestimonial,
   SalonPremiumReviewScreenshot,
   SalonReviewDisplayType,
   SalonTemplateVersion,
@@ -367,6 +370,16 @@ export function normalizePremiumEditorial(
     ...defaults,
     ...value,
     ...(interactiveQuiz ? { interactiveQuiz } : {}),
+    ...(value?.gallerySection
+      ? { gallerySection: normalizeGallerySection(value.gallerySection) }
+      : {}),
+    ...(value?.editorialTestimonials
+      ? {
+          editorialTestimonials: normalizeEditorialTestimonials(
+            value.editorialTestimonials,
+          ),
+        }
+      : {}),
     reviewDisplayType: normalizeReviewDisplayType(value?.reviewDisplayType),
     reviewEyebrow: value?.reviewEyebrow?.trim() || defaults.reviewEyebrow,
     reviewTitle: value?.reviewTitle?.trim() || defaults.reviewTitle,
@@ -486,6 +499,74 @@ function normalizeReviewDisplayType(
 
 function normalizeOptionalLabel(value: string | undefined) {
   return value?.trim() || undefined;
+}
+
+function normalizeGallerySection(
+  value: SalonPremiumEditorial["gallerySection"],
+) {
+  const items = Array.isArray(value?.items)
+    ? value.items
+        .filter((item): item is SalonPremiumEditorialGalleryItem => Boolean(item && typeof item === "object"))
+        .map((item, index) => ({
+          id: item.id?.trim() || `editorial-gallery-${index + 1}`,
+          imageId: item.imageId?.trim() || undefined,
+          imageUrl: item.imageUrl?.trim() || undefined,
+          alt: item.alt?.trim() || undefined,
+          caption: item.caption?.trim() || undefined,
+          order:
+            typeof item.order === "number" && Number.isFinite(item.order)
+              ? item.order
+              : index,
+        }))
+        .filter((item) => item.imageId || item.imageUrl)
+        .sort((first, second) => first.order - second.order)
+    : [];
+
+  const position: SalonPremiumEditorialGalleryPosition =
+    value?.position === "after_about" ||
+    value?.position === "after_services" ||
+    value?.position === "after_method" ||
+    value?.position === "before_reviews" ||
+    value?.position === "before_quiz" ||
+    value?.position === "before_cta"
+      ? value.position
+      : "before_reviews";
+
+  return {
+    enabled: value?.enabled === true,
+    eyebrow: value?.eyebrow?.trim() || undefined,
+    title: value?.title?.trim() || undefined,
+    description: value?.description?.trim() || undefined,
+    position,
+    items,
+  };
+}
+
+function normalizeEditorialTestimonials(
+  value: SalonPremiumEditorialTestimonial[] | undefined,
+) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .filter((item): item is SalonPremiumEditorialTestimonial => Boolean(item && typeof item === "object"))
+    .map((item, index) => ({
+      id: item.id?.trim() || `editorial-testimonial-${index + 1}`,
+      quote: item.quote?.trim() || undefined,
+      authorName: item.authorName?.trim() || undefined,
+      authorRole: item.authorRole?.trim() || undefined,
+      originalImageId: item.originalImageId?.trim() || undefined,
+      originalImageUrl: item.originalImageUrl?.trim() || undefined,
+      originalImageAlt: item.originalImageAlt?.trim() || undefined,
+      showOriginalImage: item.showOriginalImage === true,
+      featured: item.featured === true,
+      order:
+        typeof item.order === "number" && Number.isFinite(item.order)
+          ? item.order
+          : index,
+    }))
+    .sort((first, second) => first.order - second.order);
 }
 
 function normalizeReviewScreenshotImages(

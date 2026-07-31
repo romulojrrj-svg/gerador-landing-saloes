@@ -88,6 +88,9 @@ import type {
   SalonImageType,
   SalonLayoutImagePlan,
   SalonPremiumEditorial,
+  SalonPremiumEditorialGalleryItem,
+  SalonPremiumEditorialGalleryPosition,
+  SalonPremiumEditorialTestimonial,
   SalonReviewSource,
   SalonSourceMaterial,
   SalonTemplateVersion,
@@ -1444,6 +1447,9 @@ function PremiumEditorialSection({
   const [isUploadingReviewScreenshots, setIsUploadingReviewScreenshots] =
     useState(false);
   const [reviewScreenshotMessage, setReviewScreenshotMessage] = useState("");
+  const [isUploadingEditorialMedia, setIsUploadingEditorialMedia] =
+    useState(false);
+  const [editorialMediaMessage, setEditorialMediaMessage] = useState("");
 
   function updateField<K extends keyof SalonPremiumEditorial>(
     key: K,
@@ -1608,6 +1614,249 @@ function PremiumEditorialSection({
     });
   }
 
+  function updateGallerySection(
+    patch: Partial<NonNullable<SalonPremiumEditorial["gallerySection"]>>,
+  ) {
+    onChange((current) => ({
+      ...current,
+      gallerySection: {
+        ...(current.gallerySection ?? {}),
+        ...patch,
+      },
+    }));
+  }
+
+  function updateGalleryItem(
+    itemId: string,
+    patch: Partial<SalonPremiumEditorialGalleryItem>,
+  ) {
+    onChange((current) => ({
+      ...current,
+      gallerySection: {
+        ...(current.gallerySection ?? {}),
+        items: (current.gallerySection?.items ?? []).map((item) =>
+          item.id === itemId ? { ...item, ...patch } : item,
+        ),
+      },
+    }));
+  }
+
+  function addGalleryItem() {
+    onChange((current) => ({
+      ...current,
+      gallerySection: {
+        ...(current.gallerySection ?? {}),
+        items: [
+          ...(current.gallerySection?.items ?? []),
+          {
+            id: `editorial-gallery-${Date.now().toString(36)}`,
+            imageId: "",
+            alt: "",
+            caption: "",
+            order: current.gallerySection?.items?.length ?? 0,
+          },
+        ],
+      },
+    }));
+  }
+
+  function removeGalleryItem(itemId: string) {
+    onChange((current) => ({
+      ...current,
+      gallerySection: {
+        ...(current.gallerySection ?? {}),
+        items: (current.gallerySection?.items ?? [])
+          .filter((item) => item.id !== itemId)
+          .map((item, index) => ({ ...item, order: index })),
+      },
+    }));
+  }
+
+  function moveGalleryItem(itemId: string, direction: -1 | 1) {
+    onChange((current) => {
+      const ordered = [...(current.gallerySection?.items ?? [])].sort(
+        (first, second) => (first.order ?? 0) - (second.order ?? 0),
+      );
+      const currentIndex = ordered.findIndex((item) => item.id === itemId);
+      const targetIndex = currentIndex + direction;
+
+      if (
+        currentIndex < 0 ||
+        targetIndex < 0 ||
+        targetIndex >= ordered.length
+      ) {
+        return current;
+      }
+
+      [ordered[currentIndex], ordered[targetIndex]] = [
+        ordered[targetIndex],
+        ordered[currentIndex],
+      ];
+
+      return {
+        ...current,
+        gallerySection: {
+          ...(current.gallerySection ?? {}),
+          items: ordered.map((item, index) => ({ ...item, order: index })),
+        },
+      };
+    });
+  }
+
+  function updateEditorialTestimonial(
+    testimonialId: string,
+    patch: Partial<SalonPremiumEditorialTestimonial>,
+  ) {
+    onChange((current) => ({
+      ...current,
+      editorialTestimonials: (current.editorialTestimonials ?? []).map((item) =>
+        item.id === testimonialId ? { ...item, ...patch } : item,
+      ),
+    }));
+  }
+
+  function addEditorialTestimonial() {
+    onChange((current) => ({
+      ...current,
+      editorialTestimonials: [
+        ...(current.editorialTestimonials ?? []),
+        {
+          id: `editorial-testimonial-${Date.now().toString(36)}`,
+          quote: "",
+          authorName: "",
+          authorRole: "",
+          originalImageAlt: "",
+          showOriginalImage: false,
+          featured: false,
+          order: current.editorialTestimonials?.length ?? 0,
+        },
+      ],
+    }));
+  }
+
+  function removeEditorialTestimonial(testimonialId: string) {
+    onChange((current) => ({
+      ...current,
+      editorialTestimonials: (current.editorialTestimonials ?? [])
+        .filter((item) => item.id !== testimonialId)
+        .map((item, index) => ({ ...item, order: index })),
+    }));
+  }
+
+  function moveEditorialTestimonial(testimonialId: string, direction: -1 | 1) {
+    onChange((current) => {
+      const ordered = [...(current.editorialTestimonials ?? [])].sort(
+        (first, second) => (first.order ?? 0) - (second.order ?? 0),
+      );
+      const currentIndex = ordered.findIndex(
+        (item) => item.id === testimonialId,
+      );
+      const targetIndex = currentIndex + direction;
+
+      if (
+        currentIndex < 0 ||
+        targetIndex < 0 ||
+        targetIndex >= ordered.length
+      ) {
+        return current;
+      }
+
+      [ordered[currentIndex], ordered[targetIndex]] = [
+        ordered[targetIndex],
+        ordered[currentIndex],
+      ];
+
+      return {
+        ...current,
+        editorialTestimonials: ordered.map((item, index) => ({
+          ...item,
+          order: index,
+        })),
+      };
+    });
+  }
+
+  async function handleEditorialGalleryFiles(
+    event: ChangeEvent<HTMLInputElement>,
+  ) {
+    const files = Array.from(event.currentTarget.files ?? []);
+    event.currentTarget.value = "";
+    if (!files.length) return;
+
+    setIsUploadingEditorialMedia(true);
+    setEditorialMediaMessage("");
+
+    try {
+      const createdImages = await onUploadReviewScreenshots(files);
+      if (!createdImages.length) return;
+
+      onChange((current) => {
+        const existingItems = current.gallerySection?.items ?? [];
+        const startOrder = existingItems.length;
+        return {
+          ...current,
+          gallerySection: {
+            ...(current.gallerySection ?? {}),
+            items: [
+              ...existingItems,
+              ...createdImages.map((image, index) => ({
+                id: `editorial-gallery-${image.id}`,
+                imageId: image.id,
+                alt: "",
+                caption: "",
+                order: startOrder + index,
+              })),
+            ],
+          },
+        };
+      });
+      setEditorialMediaMessage(
+        `${createdImages.length} foto(s) adicionada(s) à galeria editorial.`,
+      );
+    } catch (error) {
+      setEditorialMediaMessage(
+        error instanceof Error
+          ? error.message
+          : "Não foi possível adicionar as fotos.",
+      );
+    } finally {
+      setIsUploadingEditorialMedia(false);
+    }
+  }
+
+  async function handleEditorialTestimonialFile(
+    event: ChangeEvent<HTMLInputElement>,
+    testimonialId: string,
+  ) {
+    const file = event.currentTarget.files?.[0];
+    event.currentTarget.value = "";
+    if (!file) return;
+
+    setIsUploadingEditorialMedia(true);
+    setEditorialMediaMessage("");
+
+    try {
+      const createdImages = await onUploadReviewScreenshots([file]);
+      const image = createdImages[0];
+      if (!image) return;
+
+      updateEditorialTestimonial(testimonialId, {
+        originalImageId: image.id,
+        originalImageUrl: undefined,
+        showOriginalImage: true,
+      });
+      setEditorialMediaMessage("Print original adicionado ao depoimento.");
+    } catch (error) {
+      setEditorialMediaMessage(
+        error instanceof Error
+          ? error.message
+          : "Não foi possível adicionar o print.",
+      );
+    } finally {
+      setIsUploadingEditorialMedia(false);
+    }
+  }
+
   async function handleReviewScreenshotFiles(
     event: ChangeEvent<HTMLInputElement>,
   ) {
@@ -1762,6 +2011,197 @@ function PremiumEditorialSection({
             <PremiumImageDropZone label="Foto principal" image={findPremiumImage(realImageOptions, premiumEditorial.heroImageId)} onDrop={(imageId) => updateField("heroImageId", imageId)} onClear={() => updateField("heroImageId", undefined)} />
             <PremiumImageDropZone label="Foto Sobre" image={findPremiumImage(realImageOptions, premiumEditorial.aboutImageId)} onDrop={(imageId) => updateField("aboutImageId", imageId)} onClear={() => updateField("aboutImageId", undefined)} emptyText="Usar foto principal automaticamente" />
           </div>
+
+          {templateVersion === PREMIUM_EDITORIAL_V2 ? (
+            <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-4">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <h3 className="font-semibold text-zinc-950">Galeria editorial</h3>
+                  <p className="mt-1 max-w-2xl text-xs leading-5 text-zinc-600">
+                    Seção opcional para exibir cursos, eventos, bastidores, turmas ou outros momentos profissionais.
+                  </p>
+                </div>
+                <label className="flex items-center gap-2 text-sm font-semibold text-zinc-700">
+                  <input
+                    type="checkbox"
+                    checked={premiumEditorial.gallerySection?.enabled === true}
+                    onChange={(event) =>
+                      updateGallerySection({ enabled: event.target.checked })
+                    }
+                  />
+                  Ativar galeria
+                </label>
+              </div>
+
+              <div className="mt-4 grid gap-4 md:grid-cols-2">
+                <PremiumInputField
+                  label="Etiqueta"
+                  value={premiumEditorial.gallerySection?.eyebrow ?? ""}
+                  onChange={(value) => updateGallerySection({ eyebrow: value })}
+                />
+                <PremiumInputField
+                  label="Título"
+                  value={premiumEditorial.gallerySection?.title ?? ""}
+                  onChange={(value) => updateGallerySection({ title: value })}
+                />
+                <PremiumTextAreaField
+                  label="Descrição opcional"
+                  value={premiumEditorial.gallerySection?.description ?? ""}
+                  onChange={(value) => updateGallerySection({ description: value })}
+                />
+                <label className="grid gap-2">
+                  <span className="text-sm font-semibold text-zinc-800">Posição na landing</span>
+                  <select
+                    value={premiumEditorial.gallerySection?.position ?? "before_reviews"}
+                    onChange={(event) =>
+                      updateGallerySection({
+                        position: event.target.value as SalonPremiumEditorialGalleryPosition,
+                      })
+                    }
+                    className="rounded-2xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-950 outline-none focus:border-teal-700 focus:bg-white"
+                  >
+                    <option value="after_about">Depois de Sobre</option>
+                    <option value="after_services">Depois de Serviços</option>
+                    <option value="after_method">Depois do Método</option>
+                    <option value="before_reviews">Antes dos depoimentos</option>
+                    <option value="before_quiz">Antes do teste interativo</option>
+                    <option value="before_cta">Antes do CTA final</option>
+                  </select>
+                </label>
+              </div>
+
+              <div className="mt-4 grid gap-3 rounded-2xl border border-dashed border-zinc-300 bg-white p-4">
+                <label className="grid gap-2 text-sm font-semibold text-zinc-800">
+                  <span>Adicionar fotos</span>
+                  <span className="text-xs font-normal leading-5 text-zinc-500">
+                    Você pode selecionar fotos existentes no editor ou enviar novas imagens para esta galeria.
+                  </span>
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    multiple
+                    onChange={(event) => void handleEditorialGalleryFiles(event)}
+                    disabled={isUploadingEditorialMedia}
+                    className="block w-full rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs font-normal disabled:cursor-not-allowed disabled:opacity-60"
+                  />
+                </label>
+                <button
+                  type="button"
+                  onClick={addGalleryItem}
+                  className="justify-self-start rounded-full border border-zinc-300 bg-white px-4 py-2 text-xs font-semibold text-zinc-800 transition hover:border-zinc-500"
+                >
+                  Adicionar espaço para uma foto existente
+                </button>
+                {editorialMediaMessage ? (
+                  <p className="rounded-xl border border-teal-100 bg-teal-50 px-3 py-2 text-xs font-semibold text-teal-950">
+                    {editorialMediaMessage}
+                  </p>
+                ) : null}
+              </div>
+
+              <div className="mt-4 grid gap-3">
+                {[...(premiumEditorial.gallerySection?.items ?? [])]
+                  .sort((first, second) => (first.order ?? 0) - (second.order ?? 0))
+                  .map((item, index, orderedItems) => (
+                    <div key={item.id} className="grid gap-3 rounded-2xl border border-zinc-200 bg-white p-4 md:grid-cols-[minmax(0,1fr)_auto]">
+                      <div className="grid gap-3 md:grid-cols-2">
+                        <label className="grid gap-2 text-sm font-semibold text-zinc-800 md:col-span-2">
+                          <span>Foto</span>
+                          <select
+                            value={item.imageId ?? ""}
+                            onChange={(event) =>
+                              updateGalleryItem(item.id, {
+                                imageId: event.target.value || undefined,
+                                imageUrl: undefined,
+                              })
+                            }
+                            className="rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm font-normal text-zinc-950 outline-none focus:border-teal-700 focus:bg-white"
+                          >
+                            <option value="">Selecione uma foto da biblioteca</option>
+                            {realImageOptions.map((image) => (
+                              <option key={image.id} value={image.id}>
+                                {image.title || image.alt || image.id}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                        <PremiumInputField
+                          label="Texto alternativo opcional"
+                          value={item.alt ?? ""}
+                          onChange={(value) => updateGalleryItem(item.id, { alt: value })}
+                        />
+                        <PremiumInputField
+                          label="Legenda opcional"
+                          value={item.caption ?? ""}
+                          onChange={(value) => updateGalleryItem(item.id, { caption: value })}
+                        />
+                      </div>
+                      <div className="flex items-start gap-2 md:flex-col">
+                        <button type="button" onClick={() => moveGalleryItem(item.id, -1)} disabled={index === 0} aria-label="Subir foto da galeria" className="rounded-lg border border-zinc-200 px-2 py-1 text-sm disabled:cursor-not-allowed disabled:opacity-30"><ArrowUp className="h-4 w-4" /></button>
+                        <button type="button" onClick={() => moveGalleryItem(item.id, 1)} disabled={index === orderedItems.length - 1} aria-label="Descer foto da galeria" className="rounded-lg border border-zinc-200 px-2 py-1 text-sm disabled:cursor-not-allowed disabled:opacity-30"><ArrowDown className="h-4 w-4" /></button>
+                        <button type="button" onClick={() => removeGalleryItem(item.id)} className="text-xs font-semibold text-rose-700 hover:text-rose-900">Remover</button>
+                      </div>
+                    </div>
+                  ))}
+                {premiumEditorial.gallerySection?.enabled && !(premiumEditorial.gallerySection.items ?? []).some((item) => item.imageId || item.imageUrl) ? (
+                  <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-5 text-amber-950">
+                    A galeria está ativa, mas ainda não possui imagens válidas. Ela não aparecerá publicamente até que uma foto seja adicionada.
+                  </p>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
+
+          {templateVersion === PREMIUM_EDITORIAL_V2 ? (
+            <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-4">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <h3 className="font-semibold text-zinc-950">Depoimentos editoriais</h3>
+                  <p className="mt-1 max-w-2xl text-xs leading-5 text-zinc-600">
+                    Use texto, print original ou os dois. O print é opcional e não precisa ser transcrito.
+                  </p>
+                </div>
+                <button type="button" onClick={addEditorialTestimonial} className="btn btn-secondary px-4 py-2 text-sm">Adicionar depoimento</button>
+              </div>
+              <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-950">
+                O print original é opcional. Antes de publicar, confirme se números, fotos, nomes ou outras informações pessoais podem ser exibidos.
+              </p>
+              <div className="mt-4 grid gap-4">
+                {[...(premiumEditorial.editorialTestimonials ?? [])]
+                  .sort((first, second) => (first.order ?? 0) - (second.order ?? 0))
+                  .map((item, index, orderedItems) => (
+                    <div key={item.id} className="grid gap-3 rounded-2xl border border-zinc-200 bg-white p-4">
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <span className="text-sm font-semibold text-zinc-700">Depoimento {index + 1}</span>
+                        <div className="flex items-center gap-2">
+                          <button type="button" onClick={() => moveEditorialTestimonial(item.id, -1)} disabled={index === 0} aria-label="Subir depoimento" className="rounded-lg border border-zinc-200 px-2 py-1 text-sm disabled:cursor-not-allowed disabled:opacity-30"><ArrowUp className="h-4 w-4" /></button>
+                          <button type="button" onClick={() => moveEditorialTestimonial(item.id, 1)} disabled={index === orderedItems.length - 1} aria-label="Descer depoimento" className="rounded-lg border border-zinc-200 px-2 py-1 text-sm disabled:cursor-not-allowed disabled:opacity-30"><ArrowDown className="h-4 w-4" /></button>
+                          <button type="button" onClick={() => removeEditorialTestimonial(item.id)} className="text-xs font-semibold text-rose-700 hover:text-rose-900">Remover</button>
+                        </div>
+                      </div>
+                      <PremiumTextAreaField label="Texto do depoimento opcional" value={item.quote ?? ""} onChange={(value) => updateEditorialTestimonial(item.id, { quote: value })} />
+                      <div className="grid gap-3 md:grid-cols-2">
+                        <PremiumInputField label="Nome opcional" value={item.authorName ?? ""} onChange={(value) => updateEditorialTestimonial(item.id, { authorName: value })} />
+                        <PremiumInputField label="Profissão ou identificação opcional" value={item.authorRole ?? ""} onChange={(value) => updateEditorialTestimonial(item.id, { authorRole: value })} />
+                      </div>
+                      <div className="grid gap-3 md:grid-cols-2">
+                        <label className="grid gap-2 text-sm font-semibold text-zinc-800">
+                          <span>Print original opcional</span>
+                          <input type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => void handleEditorialTestimonialFile(event, item.id)} disabled={isUploadingEditorialMedia} className="block w-full rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs font-normal disabled:cursor-not-allowed disabled:opacity-60" />
+                        </label>
+                        <PremiumInputField label="Texto alternativo do print" value={item.originalImageAlt ?? ""} onChange={(value) => updateEditorialTestimonial(item.id, { originalImageAlt: value })} />
+                      </div>
+                      <div className="flex flex-wrap gap-4 text-sm font-semibold text-zinc-700">
+                        <label className="flex items-center gap-2"><input type="checkbox" checked={item.showOriginalImage === true} onChange={(event) => updateEditorialTestimonial(item.id, { showOriginalImage: event.target.checked })} /> Exibir print original</label>
+                        <label className="flex items-center gap-2"><input type="checkbox" checked={item.featured === true} onChange={(event) => updateEditorialTestimonial(item.id, { featured: event.target.checked })} /> Destacar depoimento</label>
+                      </div>
+                      {item.originalImageId ? <p className="text-xs text-teal-800">Print adicionado. Ele será aberto em uma visualização ampliada no site.</p> : null}
+                    </div>
+                  ))}
+                {!premiumEditorial.editorialTestimonials?.length ? <p className="rounded-xl border border-dashed border-zinc-300 bg-white p-4 text-sm text-zinc-500">Nenhum depoimento editorial adicionado.</p> : null}
+              </div>
+            </div>
+          ) : null}
 
           <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-4">
             <div>

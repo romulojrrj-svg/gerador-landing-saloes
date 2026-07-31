@@ -156,6 +156,45 @@ export type SalonPremiumReviewScreenshot = {
   order: number;
 };
 
+export type SalonPremiumEditorialGalleryPosition =
+  | "after_about"
+  | "after_services"
+  | "after_method"
+  | "before_reviews"
+  | "before_quiz"
+  | "before_cta";
+
+export type SalonPremiumEditorialGalleryItem = {
+  id: string;
+  imageId?: string;
+  imageUrl?: string;
+  alt?: string;
+  caption?: string;
+  order?: number;
+};
+
+export type SalonPremiumEditorialGallerySection = {
+  enabled?: boolean;
+  eyebrow?: string;
+  title?: string;
+  description?: string;
+  position?: SalonPremiumEditorialGalleryPosition;
+  items?: SalonPremiumEditorialGalleryItem[];
+};
+
+export type SalonPremiumEditorialTestimonial = {
+  id: string;
+  quote?: string;
+  authorName?: string;
+  authorRole?: string;
+  originalImageId?: string;
+  originalImageUrl?: string;
+  originalImageAlt?: string;
+  showOriginalImage?: boolean;
+  featured?: boolean;
+  order?: number;
+};
+
 export type SalonPremiumEditorial = {
   accentColor: string;
   backgroundColor: string;
@@ -177,6 +216,8 @@ export type SalonPremiumEditorial = {
   reviewTitle: string;
   reviewDescription: string;
   reviewScreenshotImages: SalonPremiumReviewScreenshot[];
+  gallerySection?: SalonPremiumEditorialGallerySection;
+  editorialTestimonials?: SalonPremiumEditorialTestimonial[];
   finalCtaTitle: string;
   finalCtaText: string;
   finalCtaBackgroundColor?: string;
