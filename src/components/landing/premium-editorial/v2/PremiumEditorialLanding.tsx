@@ -70,6 +70,17 @@ export function PremiumEditorialLanding({ salon }: { salon: Salon }) {
   const labels = getPremiumEditorialLabels(salon, content);
   const contactHref = buildPrimaryContactHref(salon);
   const interactiveQuiz = content.interactiveQuiz;
+  const hasInteractiveQuiz = Boolean(
+    interactiveQuiz?.enabled && interactiveQuiz.questions.length,
+  );
+  const hasEditorialGallery = Boolean(
+    content.gallerySection?.enabled &&
+      content.gallerySection.items?.some(
+        (item) =>
+          Boolean(item.imageUrl?.trim()) ||
+          Boolean(item.imageId && imageMap.has(item.imageId)),
+      ),
+  );
   const editorialTestimonials: EditorialTestimonialItem[] = (
     content.editorialTestimonials ?? []
   )
@@ -141,6 +152,16 @@ export function PremiumEditorialLanding({ salon }: { salon: Salon }) {
                 {labels.results}
               </a>
             ) : null}
+            {hasEditorialGallery ? (
+              <a href="#editorial-gallery" className="transition hover:text-zinc-950">
+                Galeria
+              </a>
+            ) : null}
+            {hasInteractiveQuiz ? (
+              <a href="#interactive-quiz" className="transition hover:text-zinc-950">
+                Teste
+              </a>
+            ) : null}
             <a
               href="#contact"
               className="transition hover:text-zinc-950"
@@ -184,6 +205,22 @@ export function PremiumEditorialLanding({ salon }: { salon: Salon }) {
                     className="rounded-xl px-3 py-2 hover:bg-zinc-50"
                   >
                     {labels.results}
+                  </a>
+                ) : null}
+                {hasEditorialGallery ? (
+                  <a
+                    href="#editorial-gallery"
+                    className="rounded-xl px-3 py-2 hover:bg-zinc-50"
+                  >
+                    Galeria
+                  </a>
+                ) : null}
+                {hasInteractiveQuiz ? (
+                  <a
+                    href="#interactive-quiz"
+                    className="rounded-xl px-3 py-2 hover:bg-zinc-50"
+                  >
+                    Teste
                   </a>
                 ) : null}
                 <a
