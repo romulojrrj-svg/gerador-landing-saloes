@@ -114,7 +114,7 @@ export function EditorialGallerySection({
                   <button
                     type="button"
                     onClick={(event) => openImage(event, resolved)}
-                    className="group relative block aspect-[4/3] w-full min-w-0 overflow-hidden rounded-[1.75rem] bg-zinc-100 text-left focus:outline-none focus:ring-2 focus:ring-offset-4 md:aspect-auto md:h-full md:min-h-64"
+                    className="group relative block aspect-[4/3] w-full min-w-0 overflow-hidden rounded-[1.75rem] bg-zinc-100 text-left focus:outline-none focus:ring-2 focus:ring-offset-4 md:aspect-auto md:h-full md:min-h-0"
                     style={{ outlineColor: accent }}
                     aria-label={
                       resolved.item.caption?.trim() ||
