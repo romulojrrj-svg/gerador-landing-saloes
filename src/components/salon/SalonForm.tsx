@@ -1443,6 +1443,7 @@ function PremiumEditorialSection({
   salonSlug?: string;
 }) {
   const realImageOptions = images.filter((image) => image.isReal && image.src);
+  const galleryItems = premiumEditorial.gallerySection?.items ?? [];
   const labelDefaults = getPremiumEditorialLabels({ language }, premiumEditorial);
   const [isUploadingReviewScreenshots, setIsUploadingReviewScreenshots] =
     useState(false);
@@ -1641,23 +1642,34 @@ function PremiumEditorialSection({
     }));
   }
 
-  function addGalleryItem() {
-    onChange((current) => ({
+  function addGalleryItem(imageId?: string) {
+    onChange((current) => {
+      const existingItems = current.gallerySection?.items ?? [];
+
+      if (
+        imageId &&
+        existingItems.some((item) => item.imageId === imageId)
+      ) {
+        return current;
+      }
+
+      return {
       ...current,
       gallerySection: {
         ...(current.gallerySection ?? {}),
         items: [
-          ...(current.gallerySection?.items ?? []),
+          ...existingItems,
           {
             id: `editorial-gallery-${Date.now().toString(36)}`,
-            imageId: "",
+            imageId: imageId ?? "",
             alt: "",
             caption: "",
-            order: current.gallerySection?.items?.length ?? 0,
+            order: existingItems.length,
           },
         ],
       },
-    }));
+      };
+    });
   }
 
   function removeGalleryItem(itemId: string) {
@@ -2087,11 +2099,54 @@ function PremiumEditorialSection({
                 </label>
                 <button
                   type="button"
-                  onClick={addGalleryItem}
+                  onClick={() => addGalleryItem()}
                   className="justify-self-start rounded-full border border-zinc-300 bg-white px-4 py-2 text-xs font-semibold text-zinc-800 transition hover:border-zinc-500"
                 >
                   Adicionar espaço para uma foto existente
                 </button>
+                {realImageOptions.length ? (
+                  <div className="grid gap-2">
+                    <span className="text-xs font-semibold text-zinc-800">
+                      Escolher uma foto existente
+                    </span>
+                    <div className="grid grid-cols-3 gap-2 sm:grid-cols-5 lg:grid-cols-7">
+                      {realImageOptions.map((image) => {
+                        const alreadyAdded = galleryItems.some(
+                          (item) => item.imageId === image.id,
+                        );
+
+                        return (
+                          <button
+                            key={image.id}
+                            type="button"
+                            onClick={() => addGalleryItem(image.id)}
+                            disabled={alreadyAdded}
+                            className="group overflow-hidden rounded-xl border border-zinc-200 bg-white text-left shadow-sm transition hover:border-teal-400 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-45"
+                            title={
+                              alreadyAdded
+                                ? "Foto já adicionada à galeria"
+                                : "Adicionar esta foto à galeria"
+                            }
+                          >
+                            <div className="relative aspect-square bg-zinc-200">
+                              <Image
+                                src={image.src}
+                                alt={image.alt || image.title || "Foto do salão"}
+                                fill
+                                unoptimized
+                                sizes="120px"
+                                className="object-cover transition group-hover:scale-105"
+                              />
+                            </div>
+                            <p className="truncate px-2 py-1.5 text-[10px] text-zinc-600">
+                              {alreadyAdded ? "Adicionada" : image.title || image.alt || "Usar foto"}
+                            </p>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ) : null}
                 {editorialMediaMessage ? (
                   <p className="rounded-xl border border-teal-100 bg-teal-50 px-3 py-2 text-xs font-semibold text-teal-950">
                     {editorialMediaMessage}
@@ -2105,26 +2160,33 @@ function PremiumEditorialSection({
                   .map((item, index, orderedItems) => (
                     <div key={item.id} className="grid gap-3 rounded-2xl border border-zinc-200 bg-white p-4 md:grid-cols-[minmax(0,1fr)_auto]">
                       <div className="grid gap-3 md:grid-cols-2">
-                        <label className="grid gap-2 text-sm font-semibold text-zinc-800 md:col-span-2">
-                          <span>Foto</span>
-                          <select
-                            value={item.imageId ?? ""}
-                            onChange={(event) =>
+                        <div className="md:col-span-2">
+                          <EditorialGalleryImagePicker
+                            item={item}
+                            index={index}
+                            images={realImageOptions.filter(
+                              (image) =>
+                                image.id === item.imageId ||
+                                !galleryItems.some(
+                                  (other) =>
+                                    other.id !== item.id &&
+                                    other.imageId === image.id,
+                                ),
+                            )}
+                            onSelect={(imageId) =>
                               updateGalleryItem(item.id, {
-                                imageId: event.target.value || undefined,
+                                imageId,
                                 imageUrl: undefined,
                               })
                             }
-                            className="rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm font-normal text-zinc-950 outline-none focus:border-teal-700 focus:bg-white"
-                          >
-                            <option value="">Selecione uma foto da biblioteca</option>
-                            {realImageOptions.map((image) => (
-                              <option key={image.id} value={image.id}>
-                                {image.title || image.alt || image.id}
-                              </option>
-                            ))}
-                          </select>
-                        </label>
+                            onClear={() =>
+                              updateGalleryItem(item.id, {
+                                imageId: undefined,
+                                imageUrl: undefined,
+                              })
+                            }
+                          />
+                        </div>
                         <PremiumInputField
                           label="Texto alternativo opcional"
                           value={item.alt ?? ""}
@@ -2493,6 +2555,113 @@ function PremiumInputField({ label, value, onChange }: { label: string; value?: 
 
 function PremiumTextAreaField({ label, value, onChange }: { label: string; value?: string; onChange: (value: string) => void }) {
   return <label className="grid gap-2 md:col-span-2"><span className="text-sm font-semibold text-zinc-800">{label}</span><textarea rows={3} value={value ?? ""} onChange={(event) => onChange(event.target.value)} className="resize-none rounded-2xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm leading-6 text-zinc-950 outline-none focus:border-teal-700 focus:bg-white" /></label>;
+}
+
+function EditorialGalleryImagePicker({
+  item,
+  index,
+  images,
+  onSelect,
+  onClear,
+}: {
+  item: SalonPremiumEditorialGalleryItem;
+  index: number;
+  images: SalonGalleryImage[];
+  onSelect: (imageId: string) => void;
+  onClear: () => void;
+}) {
+  const selectedImage = item.imageId
+    ? images.find((image) => image.id === item.imageId)
+    : undefined;
+  const selectedSrc = selectedImage?.src || item.imageUrl;
+  const selectedLabel =
+    selectedImage?.title || selectedImage?.alt || item.imageUrl || "Foto selecionada";
+
+  return (
+    <div className="grid gap-2">
+      <span className="text-sm font-semibold text-zinc-800">Foto {index + 1}</span>
+      <div
+        onDragOver={(event) => {
+          event.preventDefault();
+          event.dataTransfer.dropEffect = "copy";
+        }}
+        onDrop={(event) => {
+          event.preventDefault();
+          const imageId = event.dataTransfer.getData("text/plain");
+          if (imageId && images.some((image) => image.id === imageId)) {
+            onSelect(imageId);
+          }
+        }}
+        className={`flex min-h-28 items-center gap-3 rounded-2xl border-2 border-dashed p-2 transition ${selectedSrc ? "border-teal-300 bg-teal-50/40" : "border-zinc-300 bg-zinc-50"}`}
+      >
+        {selectedSrc ? (
+          <>
+            <div className="relative h-24 w-28 shrink-0 overflow-hidden rounded-xl bg-zinc-200">
+              <Image
+                src={selectedSrc}
+                alt={item.alt || item.caption || "Foto da galeria editorial"}
+                fill
+                unoptimized
+                sizes="112px"
+                className="object-cover"
+              />
+            </div>
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold text-zinc-900">{selectedLabel}</p>
+              <p className="mt-1 text-xs text-teal-800">Foto selecionada</p>
+              <button
+                type="button"
+                onClick={onClear}
+                className="mt-3 text-xs font-semibold text-rose-700 hover:text-rose-900"
+              >
+                Remover seleção
+              </button>
+            </div>
+          </>
+        ) : (
+          <div className="flex min-h-24 flex-1 items-center justify-center text-center text-xs font-medium text-zinc-500">
+            Arraste uma miniatura para cá ou escolha uma foto abaixo.
+          </div>
+        )}
+      </div>
+
+      <details className="rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2">
+        <summary className="cursor-pointer text-xs font-semibold text-zinc-700">
+          Escolher outra foto
+        </summary>
+        <div className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-5">
+          {images.length ? (
+            images.map((image) => (
+              <button
+                key={image.id}
+                type="button"
+                onClick={() => onSelect(image.id)}
+                className={`group overflow-hidden rounded-xl border bg-white text-left shadow-sm transition hover:border-teal-400 hover:shadow-md ${image.id === item.imageId ? "border-teal-500 ring-2 ring-teal-100" : "border-zinc-200"}`}
+              >
+                <div className="relative aspect-square bg-zinc-200">
+                  <Image
+                    src={image.src}
+                    alt={image.alt || image.title || "Foto do salão"}
+                    fill
+                    unoptimized
+                    sizes="120px"
+                    className="object-cover transition group-hover:scale-105"
+                  />
+                </div>
+                <p className="truncate px-2 py-1.5 text-[10px] text-zinc-600">
+                  {image.id === item.imageId ? "Selecionada" : image.title || image.alt || "Usar foto"}
+                </p>
+              </button>
+            ))
+          ) : (
+            <p className="col-span-full py-3 text-xs text-zinc-500">
+              Nenhuma foto real disponível na biblioteca.
+            </p>
+          )}
+        </div>
+      </details>
+    </div>
+  );
 }
 
 function PremiumImageDropZone({

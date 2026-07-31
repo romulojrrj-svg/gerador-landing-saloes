@@ -95,6 +95,12 @@ export function EditorialGallerySection({
           <div className="mt-8 grid min-w-0 grid-cols-1 gap-4 md:auto-rows-[12rem] md:grid-cols-12">
             {items.map((resolved, index) => {
               const isFeatured = items.length > 1 && index === 0;
+              const itemClassName =
+                items.length === 1
+                  ? "min-w-0 md:col-span-12 md:row-span-2"
+                  : isFeatured
+                    ? "min-w-0 md:col-span-7 md:row-span-2"
+                    : "min-w-0 md:col-span-5";
               const alt =
                 resolved.item.alt?.trim() ||
                 resolved.item.caption?.trim() ||
@@ -103,11 +109,7 @@ export function EditorialGallerySection({
               return (
                 <figure
                   key={resolved.item.id}
-                  className={
-                    isFeatured
-                      ? "min-w-0 md:col-span-7 md:row-span-2"
-                      : "min-w-0 md:col-span-5"
-                  }
+                  className={itemClassName}
                 >
                   <button
                     type="button"

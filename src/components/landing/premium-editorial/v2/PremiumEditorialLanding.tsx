@@ -16,11 +16,10 @@ import { PremiumFaq } from "./PremiumFaq";
 import { Reveal } from "./Reveal";
 import styles from "./premium-editorial-v2.module.css";
 import {
-  getPremiumEditorialImages,
   getPremiumEditorialLabels,
-  getPremiumImage,
 } from "@/lib/premium-editorial";
 import { buildWhatsappHref, getPublicReviewMetrics } from "@/lib/public-landing";
+import { getValidImageUrl } from "@/lib/salon-images";
 import type {
   Salon,
   SalonGalleryImage,
@@ -30,12 +29,13 @@ import type {
 
 export function PremiumEditorialLanding({ salon }: { salon: Salon }) {
   const content = salon.premiumEditorial;
-  const imageMap = getPremiumEditorialImages(salon);
+  const imageMap = getPremiumEditorialV2Images(salon);
   const services = getPremiumServices(salon);
   const heroImage =
-    getPremiumImage(salon, content.heroImageId) ??
+    imageMap.get(content.heroImageId ?? "") ??
     firstUsableImage(imageMap, salon);
-  const aboutImage = getPremiumImage(salon, content.aboutImageId) ?? heroImage;
+  const aboutImage =
+    imageMap.get(content.aboutImageId ?? "") ?? heroImage;
   const beforeAfterItems = content.beforeAfterItems
     .filter((item) => item.enabled)
     .map((item) => ({
@@ -601,6 +601,22 @@ export function PremiumEditorialLanding({ salon }: { salon: Salon }) {
   );
 }
 
+function getPremiumEditorialV2Images(salon: Salon) {
+  const byId = new Map<string, SalonGalleryImage>();
+
+  for (const image of [
+    ...salon.realImages,
+    ...salon.galleryImages,
+    ...salon.gallery,
+  ]) {
+    if (!byId.has(image.id) && getValidImageUrl(image)) {
+      byId.set(image.id, image);
+    }
+  }
+
+  return byId;
+}
+
 function firstUsableImage(
   imageMap: Map<string, SalonGalleryImage>,
   salon: Salon,
@@ -765,7 +781,7 @@ function PremiumScreenshotReviews({
   salon: Salon;
   accent: string;
 }) {
-  const imageMap = getPremiumEditorialImages(salon);
+  const imageMap = getPremiumEditorialV2Images(salon);
   const screenshots = salon.premiumEditorial.reviewScreenshotImages
     .map((screenshot) => ({
       screenshot,
