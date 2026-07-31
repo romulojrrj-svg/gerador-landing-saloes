@@ -557,7 +557,30 @@ function ContactStep({ config, visitorName, visitorWhatsapp, error, isSubmitting
   return <div><div className="flex items-center justify-between gap-4"><span className="text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500">Última etapa</span><span className="text-xs text-zinc-500">{Math.round(progress)}%</span></div><div className="mt-3 h-1.5 overflow-hidden rounded-full bg-zinc-200"><div className="h-full w-full rounded-full bg-[#9b7353]" /></div><h2 id="interactive-quiz-dialog-title" ref={headingRef} tabIndex={-1} className="mt-8 font-serif text-3xl leading-tight text-zinc-950 outline-none sm:text-4xl">{config.contactIntro}</h2><div className="mt-7 grid gap-4"><label className="grid gap-2 text-sm font-semibold text-zinc-800">Nome{config.contactNameRequired ? " *" : ""}<input className="rounded-2xl border border-zinc-200 bg-white px-4 py-4 text-base outline-none focus:border-[#9b7353]" value={visitorName} onChange={(event) => onName(event.target.value)} autoComplete="name" /></label><label className="grid gap-2 text-sm font-semibold text-zinc-800">WhatsApp *<input className="rounded-2xl border border-zinc-200 bg-white px-4 py-4 text-base outline-none focus:border-[#9b7353]" value={visitorWhatsapp} onChange={(event) => onWhatsapp(formatWhatsappInput(event.target.value))} autoComplete="tel" inputMode="tel" placeholder="(21)99..." /></label><label className="absolute -left-[9999px] h-px w-px overflow-hidden" aria-hidden="true">Nao preencher<input tabIndex={-1} autoComplete="off" value="" onChange={(event) => onHoneypot(event.target.value)} /></label></div>{error ? <p role="alert" className="mt-4 text-sm font-semibold text-rose-700">{error}</p> : null}<div className="mt-8 flex flex-wrap justify-between gap-3"><button type="button" onClick={onBack} disabled={isSubmitting} className="inline-flex min-h-11 items-center gap-2 rounded-full border border-zinc-300 bg-white px-5 py-2.5 text-sm font-semibold text-zinc-800"><ArrowLeft className="h-4 w-4" aria-hidden="true" />Voltar</button><button type="button" onClick={onSubmit} disabled={isSubmitting} className="inline-flex min-h-11 items-center gap-2 rounded-full bg-zinc-950 px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-60">{isSubmitting ? <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Check className="h-4 w-4" aria-hidden="true" />}Enviar respostas</button></div></div>;
 }
 
+function getQuizContactLabel(name: string) {
+  const trimmed = name.trim();
+  if (!trimmed) return "A profissional";
+  if (/^a\s+/i.test(trimmed)) return trimmed;
+  if (/^(dra\.?|dr\.?|doutora|doutor)\b/i.test(trimmed)) return `A ${trimmed}`;
+  return `A equipe de ${trimmed}`;
+}
+
 function SuccessStep({ salon, config, headingRef, onClose }: { salon: Salon; config: SalonInteractiveQuizConfig; headingRef: React.RefObject<HTMLHeadingElement | null>; onClose: () => void }) {
   const whatsappHref = salon.whatsapp ? buildWhatsappHref(salon.whatsapp, "Ola! Acabei de responder ao teste no seu site e gostaria de conversar sobre minhas respostas.") : "";
-  return <div className="text-center"><div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-[#9b7353]/15 text-[#9b7353]"><Check className="h-7 w-7" aria-hidden="true" /></div><h2 id="interactive-quiz-dialog-title" ref={headingRef} tabIndex={-1} className="mt-6 font-serif text-3xl leading-tight text-zinc-950 outline-none sm:text-4xl">{config.confirmationTitle}</h2><p className="mx-auto mt-4 max-w-xl text-base leading-7 text-zinc-600">{config.confirmationText}</p><div className="mt-7 flex flex-wrap justify-center gap-3"><button type="button" onClick={onClose} className="inline-flex min-h-11 items-center rounded-full border border-zinc-300 bg-white px-5 py-2.5 text-sm font-semibold text-zinc-800">Voltar para o site</button>{whatsappHref ? <a href={whatsappHref} className="inline-flex min-h-11 items-center rounded-full bg-zinc-950 px-5 py-2.5 text-sm font-semibold text-white">Falar agora pelo WhatsApp</a> : null}</div></div>;
+  const titleKey = config.confirmationTitle.trim().toLocaleLowerCase();
+  const confirmationTitle = titleKey === "respostas recebidas!" || titleKey === "recebi suas respostas"
+    ? "Teste enviado com sucesso!"
+    : config.confirmationTitle;
+  const contactLine = `${getQuizContactLabel(salon.name)} entrar\u00e1 em contato pelo WhatsApp informado.`;
+
+  return <div className="text-center">
+    <div aria-live="polite" className="mx-auto inline-flex items-center gap-3 rounded-full border border-[var(--quiz-border)] bg-[var(--quiz-selected-background)] px-4 py-2 text-[var(--quiz-accent)]">
+      <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[var(--quiz-accent)] text-[var(--quiz-primary-contrast)]"><Check className="h-4 w-4" aria-hidden="true" /></span>
+      <span className="text-xs font-semibold uppercase tracking-[0.16em]">Enviado com sucesso</span>
+    </div>
+    <h2 id="interactive-quiz-dialog-title" ref={headingRef} tabIndex={-1} className="mt-7 font-serif text-3xl leading-tight text-zinc-950 outline-none sm:text-4xl">{confirmationTitle}</h2>
+    <p className="mx-auto mt-4 max-w-xl text-base leading-7 text-zinc-600">{config.confirmationText}</p>
+    <p className="mx-auto mt-4 max-w-xl text-base font-semibold leading-7 text-zinc-800">{contactLine}</p>
+    <div className="mt-8 flex flex-wrap justify-center gap-3"><button type="button" onClick={onClose} className="inline-flex min-h-11 items-center rounded-full border border-zinc-300 bg-white px-5 py-2.5 text-sm font-semibold text-zinc-800">Voltar para o site</button>{whatsappHref ? <a href={whatsappHref} className="inline-flex min-h-11 items-center rounded-full bg-zinc-950 px-5 py-2.5 text-sm font-semibold text-white">Falar agora pelo WhatsApp</a> : null}</div>
+  </div>;
 }
