@@ -105,6 +105,7 @@ import {
 } from "@/lib/premium-editorial";
 import { InteractiveQuizBuilder } from "@/components/salon/InteractiveQuizBuilder";
 import { BeforeAfterFrameEditor } from "@/components/salon/BeforeAfterFrameEditor";
+import { BeforeAfterSlider } from "@/components/landing/premium-editorial/v2/BeforeAfterSlider";
 import { createPremiumEditorialV2DefaultQuizConfig } from "@/lib/interactive-quiz";
 
 type SalonFormProps = {
@@ -119,6 +120,25 @@ type SalonFormProps = {
 };
 
 type ImageDestination = SalonImagePlanDestination;
+
+const SALON_IMAGE_DRAG_TYPE = "application/x-salon-image-id";
+
+function setSalonImageDragData(
+  event: DragEvent<HTMLElement>,
+  imageId: string,
+  effect: "copy" | "move",
+) {
+  event.dataTransfer.effectAllowed = effect;
+  event.dataTransfer.setData(SALON_IMAGE_DRAG_TYPE, imageId);
+  event.dataTransfer.setData("text/plain", imageId);
+}
+
+function getSalonImageDragData(event: DragEvent<HTMLElement>) {
+  return (
+    event.dataTransfer.getData(SALON_IMAGE_DRAG_TYPE) ||
+    event.dataTransfer.getData("text/plain")
+  );
+}
 
 const serviceOptions = [
   "Cabelo",
@@ -2001,14 +2021,13 @@ function PremiumEditorialSection({
                     key={image.id}
                     draggable
                     onDragStart={(event) => {
-                      event.dataTransfer.effectAllowed = "copy";
-                      event.dataTransfer.setData("text/plain", image.id);
+                      setSalonImageDragData(event, image.id, "copy");
                     }}
                     className="group cursor-grab overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm active:cursor-grabbing"
                     title={image.title || image.alt || image.id}
                   >
                     <div className="relative aspect-square bg-zinc-200">
-                      <Image src={image.src} alt={image.alt || image.title || "Foto do salão"} fill unoptimized sizes="120px" className="object-cover transition group-hover:scale-105" />
+                      <Image src={image.src} alt={image.alt || image.title || "Foto do salão"} fill unoptimized sizes="120px" className="object-cover transition group-hover:scale-105" draggable={false} />
                     </div>
                     <p className="truncate px-2 py-1.5 text-[10px] text-zinc-600">{image.title || image.alt || image.id}</p>
                   </div>
@@ -2152,6 +2171,7 @@ function PremiumEditorialSection({
                                 unoptimized
                                 sizes="120px"
                                 className="object-cover transition group-hover:scale-105"
+                                draggable={false}
                               />
                             </div>
                             <p className="truncate px-2 py-1.5 text-[10px] text-zinc-600">
@@ -2391,10 +2411,44 @@ function PremiumEditorialSection({
                   </div>
                   <PremiumInputField label="Título" value={item.title} onChange={(value) => updateBeforeAfterItem(item.id, { title: value })} />
                   <PremiumTextAreaField label="Descrição opcional" value={item.description ?? ""} onChange={(value) => updateBeforeAfterItem(item.id, { description: value })} />
-                  <PremiumImageDropZone label="Foto antes" image={findPremiumImage(realImageOptions, item.beforeImageId)} onDrop={(imageId) => updateBeforeAfterItem(item.id, { beforeImageId: imageId })} onClear={() => updateBeforeAfterItem(item.id, { beforeImageId: "" })} />
-                  <PremiumImageDropZone label="Foto depois" image={findPremiumImage(realImageOptions, item.afterImageId)} onDrop={(imageId) => updateBeforeAfterItem(item.id, { afterImageId: imageId })} onClear={() => updateBeforeAfterItem(item.id, { afterImageId: "" })} />
+                  <PremiumImageDropZone label="Foto antes" image={findPremiumImage(realImageOptions, item.beforeImageId)} imageOptions={templateVersion === PREMIUM_EDITORIAL_V2 ? realImageOptions : undefined} onDrop={(imageId) => updateBeforeAfterItem(item.id, { beforeImageId: imageId })} onClear={() => updateBeforeAfterItem(item.id, { beforeImageId: "" })} />
+                  <PremiumImageDropZone label="Foto depois" image={findPremiumImage(realImageOptions, item.afterImageId)} imageOptions={templateVersion === PREMIUM_EDITORIAL_V2 ? realImageOptions : undefined} onDrop={(imageId) => updateBeforeAfterItem(item.id, { afterImageId: imageId })} onClear={() => updateBeforeAfterItem(item.id, { afterImageId: "" })} />
                   {templateVersion === PREMIUM_EDITORIAL_V2 ? (
-                    <div className="md:col-span-2">
+                    <div className="grid gap-3 md:col-span-2">
+                      {(() => {
+                        const beforeImage = findPremiumImage(
+                          realImageOptions,
+                          item.beforeImageId,
+                        );
+                        const afterImage = findPremiumImage(
+                          realImageOptions,
+                          item.afterImageId,
+                        );
+
+                        return beforeImage && afterImage ? (
+                          <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-3 sm:p-4">
+                            <p className="mb-3 text-xs font-semibold uppercase tracking-[0.14em] text-teal-800">
+                              Prévia do comparador oficial
+                            </p>
+                            <div className="max-w-xl">
+                              <BeforeAfterSlider
+                                beforeImage={beforeImage}
+                                afterImage={afterImage}
+                                salonSlug={salonSlug ?? "admin-preview"}
+                                title={item.title}
+                                beforeLabel="Antes"
+                                afterLabel="Depois"
+                                adjustLabel="Ajustar divisor"
+                                beforeAdjustment={item.beforeAdjustment}
+                                afterAdjustment={item.afterAdjustment}
+                              />
+                            </div>
+                            <p className="mt-3 text-xs leading-5 text-zinc-500">
+                              Arraste o divisor aqui para conferir o resultado. Use o ajuste de enquadramento para mover ou ampliar cada foto.
+                            </p>
+                          </div>
+                        ) : null;
+                      })()}
                       <BeforeAfterFrameEditor
                         title={item.title}
                         beforeImage={findPremiumImage(realImageOptions, item.beforeImageId)}
@@ -2617,7 +2671,7 @@ function EditorialGalleryImagePicker({
         }}
         onDrop={(event) => {
           event.preventDefault();
-          const imageId = event.dataTransfer.getData("text/plain");
+          const imageId = getSalonImageDragData(event);
           if (imageId && images.some((image) => image.id === imageId)) {
             onSelect(imageId);
           }
@@ -2697,12 +2751,14 @@ function EditorialGalleryImagePicker({
 function PremiumImageDropZone({
   label,
   image,
+  imageOptions,
   onDrop,
   onClear,
   emptyText = "Arraste uma foto para cá",
 }: {
   label: string;
   image?: SalonGalleryImage;
+  imageOptions?: SalonGalleryImage[];
   onDrop: (imageId: string) => void;
   onClear: () => void;
   emptyText?: string;
@@ -2717,7 +2773,7 @@ function PremiumImageDropZone({
         }}
         onDrop={(event) => {
           event.preventDefault();
-          const imageId = event.dataTransfer.getData("text/plain");
+          const imageId = getSalonImageDragData(event);
           if (imageId) onDrop(imageId);
         }}
         className={`relative min-h-28 overflow-hidden rounded-2xl border-2 border-dashed p-2 transition ${image ? "border-teal-300 bg-teal-50/40" : "border-zinc-300 bg-zinc-50 hover:border-teal-400 hover:bg-teal-50/30"}`}
@@ -2737,6 +2793,36 @@ function PremiumImageDropZone({
           <div className="flex min-h-24 items-center justify-center text-center text-xs font-medium text-zinc-500">{emptyText}</div>
         )}
       </div>
+      {imageOptions?.length ? (
+        <details className="rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2">
+          <summary className="cursor-pointer text-xs font-semibold text-zinc-700">
+            Escolher foto diretamente
+          </summary>
+          <div className="mt-3 grid grid-cols-4 gap-2 sm:grid-cols-6">
+            {imageOptions.map((option) => (
+              <button
+                key={option.id}
+                type="button"
+                onClick={() => onDrop(option.id)}
+                className={`overflow-hidden rounded-lg border bg-white text-left transition hover:border-teal-400 ${option.id === image?.id ? "border-teal-500 ring-2 ring-teal-100" : "border-zinc-200"}`}
+                title={option.title || option.alt || option.id}
+              >
+                <div className="relative aspect-square bg-zinc-200">
+                  <Image
+                    src={option.src}
+                    alt={option.alt || option.title || "Foto disponível"}
+                    fill
+                    unoptimized
+                    sizes="72px"
+                    className="object-cover"
+                    draggable={false}
+                  />
+                </div>
+              </button>
+            ))}
+          </div>
+        </details>
+      ) : null}
     </div>
   );
 }
@@ -3492,8 +3578,7 @@ function RealImagesSection({
     setDraggedImageId(imageId);
     setDragOverDestination(null);
     setDragOverIndex(null);
-    event.dataTransfer.effectAllowed = "move";
-    event.dataTransfer.setData("text/plain", imageId);
+    setSalonImageDragData(event, imageId, "move");
   }
 
   function clearDragState() {
@@ -3555,7 +3640,7 @@ function RealImagesSection({
   ) {
     event.preventDefault();
     event.stopPropagation();
-    const imageId = event.dataTransfer.getData("text/plain") || draggedImageId;
+    const imageId = getSalonImageDragData(event) || draggedImageId;
 
     if (!imageId) {
       return;
@@ -3589,7 +3674,7 @@ function RealImagesSection({
     event.preventDefault();
     event.stopPropagation();
 
-    const imageId = event.dataTransfer.getData("text/plain") || draggedImageId;
+    const imageId = getSalonImageDragData(event) || draggedImageId;
 
     if (!imageId || imageId === targetImageId) {
       clearDragState();
@@ -5106,6 +5191,7 @@ function RealImagesSection({
                                 fill
                                 sizes="(max-width: 1024px) 45vw, (max-width: 1536px) 18rem, 16rem"
                                 className="object-cover transition duration-200 group-hover:scale-[1.02]"
+                                draggable={false}
                               />
                               <div className="absolute inset-x-0 top-0 flex items-start justify-between gap-2 p-2">
                                 <div className="flex flex-wrap gap-1.5">
