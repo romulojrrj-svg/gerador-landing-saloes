@@ -482,6 +482,7 @@ export function PremiumEditorialLanding({ salon }: { salon: Salon }) {
                       adjustLabel={labels.adjustComparison}
                       beforeAdjustment={item.beforeAdjustment}
                       afterAdjustment={item.afterAdjustment}
+                      imageFit="contain"
                     />
                     <div className="p-4">
                       <h3 className="font-serif text-xl">{item.title}</h3>

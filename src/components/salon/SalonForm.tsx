@@ -2794,33 +2794,42 @@ function PremiumImageDropZone({
           <div className="flex min-h-24 items-center justify-center text-center text-xs font-medium text-zinc-500">{emptyText}</div>
         )}
       </div>
-      {imageOptions?.length ? (
+      {imageOptions ? (
         <details className="rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2">
           <summary className="cursor-pointer text-xs font-semibold text-zinc-700">
-            Escolher foto diretamente
+            Escolher outra foto
           </summary>
-          <div className="mt-3 grid grid-cols-4 gap-2 sm:grid-cols-6">
-            {imageOptions.map((option) => (
-              <button
-                key={option.id}
-                type="button"
-                onClick={() => onDrop(option.id)}
-                className={`overflow-hidden rounded-lg border bg-white text-left transition hover:border-teal-400 ${option.id === image?.id ? "border-teal-500 ring-2 ring-teal-100" : "border-zinc-200"}`}
-                title={option.title || option.alt || option.id}
-              >
-                <div className="relative aspect-square bg-zinc-200">
-                  <Image
-                    src={option.src}
-                    alt={option.alt || option.title || "Foto disponível"}
-                    fill
-                    unoptimized
-                    sizes="72px"
-                    className="object-cover"
-                    draggable={false}
-                  />
-                </div>
-              </button>
-            ))}
+          <div className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-5 lg:grid-cols-7">
+            {imageOptions.length ? (
+              imageOptions.map((option) => (
+                <button
+                  key={option.id}
+                  type="button"
+                  onClick={() => onDrop(option.id)}
+                  className={`group overflow-hidden rounded-xl border bg-white text-left shadow-sm transition hover:border-teal-400 hover:shadow-md ${option.id === image?.id ? "border-teal-500 ring-2 ring-teal-100" : "border-zinc-200"}`}
+                  title={option.title || option.alt || option.id}
+                >
+                  <div className="relative aspect-square bg-zinc-200">
+                    <Image
+                      src={option.src}
+                      alt={option.alt || option.title || "Foto disponível"}
+                      fill
+                      unoptimized
+                      sizes="120px"
+                      className="object-cover transition group-hover:scale-105"
+                      draggable={false}
+                    />
+                  </div>
+                  <p className="truncate px-2 py-1.5 text-[10px] text-zinc-600">
+                    {option.id === image?.id ? "Selecionada" : option.title || option.alt || "Usar foto"}
+                  </p>
+                </button>
+              ))
+            ) : (
+              <p className="col-span-full py-3 text-xs text-zinc-500">
+                Nenhuma foto real disponível na biblioteca.
+              </p>
+            )}
           </div>
         </details>
       ) : null}
