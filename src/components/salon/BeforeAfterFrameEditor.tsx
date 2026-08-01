@@ -429,7 +429,7 @@ export function BeforeAfterFrameEditor({
                   </span>
                 </div>
                 <p className="mt-3 text-center text-xs leading-5 text-zinc-500">
-                  Arraste a imagem selecionada. Use as setas do teclado para ajustes finos ou a roda do mouse para zoom.
+                  Aumente o zoom para criar o recorte e arraste a imagem selecionada nos dois eixos. Use as setas para ajustes finos ou a roda do mouse para zoom.
                 </p>
               </div>
 

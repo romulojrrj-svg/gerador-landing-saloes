@@ -60,9 +60,18 @@ export function getImageFrameStyle(
     return undefined;
   }
 
+  const hasZoom = adjustment.zoom > IMAGE_FRAME_MIN_ZOOM;
+  const panAmount = (adjustment.zoom - IMAGE_FRAME_MIN_ZOOM) * 50;
+
   return {
-    objectPosition: `${50 + adjustment.offsetX * 50}% ${50 + adjustment.offsetY * 50}%`,
-    transform: `scale(${adjustment.zoom})`,
+    // Keep the original object-position behavior at 1x. Once the image is
+    // zoomed, translation provides a stable crop on both axes.
+    objectPosition: hasZoom
+      ? "50% 50%"
+      : `${50 + adjustment.offsetX * 50}% ${50 + adjustment.offsetY * 50}%`,
+    transform: hasZoom
+      ? `translate(${adjustment.offsetX * panAmount}%, ${adjustment.offsetY * panAmount}%) scale(${adjustment.zoom})`
+      : undefined,
     transformOrigin: "center center",
   };
 }
