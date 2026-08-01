@@ -142,8 +142,17 @@ export type SalonBeforeAfterItem = {
   description?: string;
   beforeImageId: string;
   afterImageId: string;
+  beforeAdjustment?: SalonImageFrameAdjustment;
+  afterAdjustment?: SalonImageFrameAdjustment;
   order: number;
   enabled: boolean;
+};
+
+export type SalonImageFrameAdjustment = {
+  version: 1;
+  zoom: number;
+  offsetX: number;
+  offsetY: number;
 };
 
 export type SalonReviewDisplayType = "google" | "screenshots";

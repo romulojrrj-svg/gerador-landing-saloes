@@ -1,5 +1,6 @@
 import { getValidImageUrl } from "@/lib/salon-images";
 import { normalizeInteractiveQuizConfig } from "@/lib/interactive-quiz";
+import { normalizeImageFrameAdjustment } from "@/lib/image-frame-adjustment";
 import type {
   Salon,
   SalonBeforeAfterItem,
@@ -458,15 +459,26 @@ function normalizeBeforeAfterItems(value: SalonBeforeAfterItem[] | undefined) {
       (item): item is SalonBeforeAfterItem =>
         Boolean(item && typeof item === "object"),
     )
-    .map((item, index) => ({
-      id: item.id || `before-after-${index + 1}`,
-      title: item.title?.trim() || `Transformation ${index + 1}`,
-      description: item.description?.trim() || undefined,
-      beforeImageId: item.beforeImageId?.trim() || "",
-      afterImageId: item.afterImageId?.trim() || "",
-      order: Number.isFinite(item.order) ? item.order : index,
-      enabled: item.enabled !== false,
-    }))
+    .map((item, index) => {
+      const beforeAdjustment = normalizeImageFrameAdjustment(
+        item.beforeAdjustment,
+      );
+      const afterAdjustment = normalizeImageFrameAdjustment(
+        item.afterAdjustment,
+      );
+
+      return {
+        id: item.id || `before-after-${index + 1}`,
+        title: item.title?.trim() || `Transformation ${index + 1}`,
+        description: item.description?.trim() || undefined,
+        beforeImageId: item.beforeImageId?.trim() || "",
+        afterImageId: item.afterImageId?.trim() || "",
+        ...(beforeAdjustment ? { beforeAdjustment } : {}),
+        ...(afterAdjustment ? { afterAdjustment } : {}),
+        order: Number.isFinite(item.order) ? item.order : index,
+        enabled: item.enabled !== false,
+      };
+    })
     .sort((a, b) => a.order - b.order);
 }
 

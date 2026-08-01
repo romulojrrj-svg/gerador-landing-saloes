@@ -480,6 +480,8 @@ export function PremiumEditorialLanding({ salon }: { salon: Salon }) {
                       beforeLabel={labels.before}
                       afterLabel={labels.after}
                       adjustLabel={labels.adjustComparison}
+                      beforeAdjustment={item.beforeAdjustment}
+                      afterAdjustment={item.afterAdjustment}
                     />
                     <div className="p-4">
                       <h3 className="font-serif text-xl">{item.title}</h3>

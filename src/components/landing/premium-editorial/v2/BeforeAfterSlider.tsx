@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { LandingImage } from "./LandingImage";
-import type { SalonGalleryImage } from "@/types/salon";
+import { getImageFrameStyle } from "@/lib/image-frame-adjustment";
+import type { SalonGalleryImage, SalonImageFrameAdjustment } from "@/types/salon";
 
 type BeforeAfterSliderProps = {
   beforeImage: SalonGalleryImage;
@@ -13,6 +14,8 @@ type BeforeAfterSliderProps = {
   beforeLabel: string;
   afterLabel: string;
   adjustLabel: string;
+  beforeAdjustment?: SalonImageFrameAdjustment;
+  afterAdjustment?: SalonImageFrameAdjustment;
 };
 
 export function BeforeAfterSlider({
@@ -23,6 +26,8 @@ export function BeforeAfterSlider({
   beforeLabel,
   afterLabel,
   adjustLabel,
+  beforeAdjustment,
+  afterAdjustment,
 }: BeforeAfterSliderProps) {
   const [position, setPosition] = useState(50);
 
@@ -67,6 +72,7 @@ export function BeforeAfterSlider({
           fill
           sizes="(min-width: 1024px) 42vw, 100vw"
           className="pointer-events-none select-none object-cover object-center"
+          style={getImageFrameStyle(afterAdjustment)}
           draggable={false}
         />
         <div
@@ -83,6 +89,7 @@ export function BeforeAfterSlider({
             fill
             sizes="(min-width: 1024px) 42vw, 100vw"
             className="pointer-events-none select-none object-cover object-center"
+            style={getImageFrameStyle(beforeAdjustment)}
             draggable={false}
           />
         </div>

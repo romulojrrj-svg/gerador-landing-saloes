@@ -104,6 +104,7 @@ import {
   normalizePremiumEditorialVersion,
 } from "@/lib/premium-editorial";
 import { InteractiveQuizBuilder } from "@/components/salon/InteractiveQuizBuilder";
+import { BeforeAfterFrameEditor } from "@/components/salon/BeforeAfterFrameEditor";
 import { createPremiumEditorialV2DefaultQuizConfig } from "@/lib/interactive-quiz";
 
 type SalonFormProps = {
@@ -1483,9 +1484,24 @@ function PremiumEditorialSection({
   ) {
     onChange((current) => ({
       ...current,
-      beforeAfterItems: current.beforeAfterItems.map((item) =>
-        item.id === itemId ? { ...item, ...patch } : item,
-      ),
+      beforeAfterItems: current.beforeAfterItems.map((item) => {
+        if (item.id !== itemId) return item;
+
+        const next = { ...item, ...patch };
+        if (
+          "beforeImageId" in patch &&
+          patch.beforeImageId !== item.beforeImageId
+        ) {
+          next.beforeAdjustment = undefined;
+        }
+        if (
+          "afterImageId" in patch &&
+          patch.afterImageId !== item.afterImageId
+        ) {
+          next.afterAdjustment = undefined;
+        }
+        return next;
+      }),
     }));
   }
 
@@ -2377,6 +2393,20 @@ function PremiumEditorialSection({
                   <PremiumTextAreaField label="Descrição opcional" value={item.description ?? ""} onChange={(value) => updateBeforeAfterItem(item.id, { description: value })} />
                   <PremiumImageDropZone label="Foto antes" image={findPremiumImage(realImageOptions, item.beforeImageId)} onDrop={(imageId) => updateBeforeAfterItem(item.id, { beforeImageId: imageId })} onClear={() => updateBeforeAfterItem(item.id, { beforeImageId: "" })} />
                   <PremiumImageDropZone label="Foto depois" image={findPremiumImage(realImageOptions, item.afterImageId)} onDrop={(imageId) => updateBeforeAfterItem(item.id, { afterImageId: imageId })} onClear={() => updateBeforeAfterItem(item.id, { afterImageId: "" })} />
+                  {templateVersion === PREMIUM_EDITORIAL_V2 ? (
+                    <div className="md:col-span-2">
+                      <BeforeAfterFrameEditor
+                        title={item.title}
+                        beforeImage={findPremiumImage(realImageOptions, item.beforeImageId)}
+                        afterImage={findPremiumImage(realImageOptions, item.afterImageId)}
+                        beforeAdjustment={item.beforeAdjustment}
+                        afterAdjustment={item.afterAdjustment}
+                        onApply={(adjustments) =>
+                          updateBeforeAfterItem(item.id, adjustments)
+                        }
+                      />
+                    </div>
+                  ) : null}
                   <label className="flex items-center gap-2 text-sm font-semibold text-zinc-700"><input type="checkbox" checked={item.enabled} onChange={(event) => updateBeforeAfterItem(item.id, { enabled: event.target.checked })} /> Exibir este comparador</label>
                   <button type="button" onClick={() => removeBeforeAfterItem(item.id)} className="justify-self-start text-sm font-semibold text-rose-700 hover:text-rose-900">Excluir par</button>
                 </div>
