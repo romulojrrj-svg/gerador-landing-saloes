@@ -31,6 +31,7 @@ type FrameSide = "before" | "after";
 type PreviewMode = "compare" | "overlay";
 type PreviewSize = "desktop" | "mobile";
 type DragMode = "image" | "divider";
+type ImageFit = "cover" | "contain";
 
 type BeforeAfterFrameEditorProps = {
   title: string;
@@ -79,6 +80,7 @@ export function BeforeAfterFrameEditor({
   const [dividerPosition, setDividerPosition] = useState(50);
   const [previewMode, setPreviewMode] = useState<PreviewMode>("compare");
   const [previewSize, setPreviewSize] = useState<PreviewSize>("desktop");
+  const [imageFit, setImageFit] = useState<ImageFit>("contain");
   const [overlayOpacity, setOverlayOpacity] = useState(50);
   const [showGuides, setShowGuides] = useState(false);
   const [showGrid, setShowGrid] = useState(false);
@@ -143,6 +145,7 @@ export function BeforeAfterFrameEditor({
     setActiveSide(side);
     setDividerPosition(50);
     setPreviewMode("compare");
+    setImageFit("contain");
     setShowGuides(false);
     setShowGrid(false);
     setIsOpen(true);
@@ -368,6 +371,26 @@ export function BeforeAfterFrameEditor({
                   </div>
                 </div>
 
+                <div className="mb-4 flex flex-wrap items-center gap-2 text-xs font-semibold text-zinc-700">
+                  <span>Visualização:</span>
+                  <button
+                    type="button"
+                    onClick={() => setImageFit("contain")}
+                    aria-pressed={imageFit === "contain"}
+                    className={`rounded-full border px-3 py-1.5 ${imageFit === "contain" ? "border-teal-500 bg-teal-50 text-teal-900" : "border-zinc-200 bg-white text-zinc-600"}`}
+                  >
+                    Foto inteira
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setImageFit("cover")}
+                    aria-pressed={imageFit === "cover"}
+                    className={`rounded-full border px-3 py-1.5 ${imageFit === "cover" ? "border-teal-500 bg-teal-50 text-teal-900" : "border-zinc-200 bg-white text-zinc-600"}`}
+                  >
+                    Moldura final
+                  </button>
+                </div>
+
                 <div
                   ref={previewRef}
                   tabIndex={0}
@@ -380,17 +403,17 @@ export function BeforeAfterFrameEditor({
                   className={`relative mx-auto aspect-[4/5] w-full touch-none select-none overflow-hidden rounded-[1.5rem] bg-zinc-200 outline-none ring-offset-4 focus-visible:ring-2 focus-visible:ring-teal-600 ${frameWidth}`}
                   aria-label="Prévia do comparador. Use as setas para mover a imagem selecionada."
                 >
-                  <EditorImage image={afterImage} adjustment={draft.after} alt={`${title} depois`} />
+                  <EditorImage image={afterImage} adjustment={draft.after} alt={`${title} depois`} imageFit={imageFit} />
                   {previewMode === "compare" ? (
                     <div
                       className="absolute inset-0 overflow-hidden"
                       style={{ clipPath: `inset(0 ${100 - dividerPosition}% 0 0)` }}
                     >
-                      <EditorImage image={beforeImage} adjustment={draft.before} alt={`${title} antes`} />
+                      <EditorImage image={beforeImage} adjustment={draft.before} alt={`${title} antes`} imageFit={imageFit} />
                     </div>
                   ) : (
                     <div className="absolute inset-0" style={{ opacity: overlayOpacity / 100 }}>
-                      <EditorImage image={beforeImage} adjustment={draft.before} alt={`${title} antes`} />
+                      <EditorImage image={beforeImage} adjustment={draft.before} alt={`${title} antes`} imageFit={imageFit} />
                     </div>
                   )}
 
@@ -567,10 +590,12 @@ function EditorImage({
   image,
   adjustment,
   alt,
+  imageFit,
 }: {
   image?: SalonGalleryImage;
   adjustment?: SalonImageFrameAdjustment;
   alt: string;
+  imageFit: ImageFit;
 }) {
   const [imageAspectRatio, setImageAspectRatio] = useState<number>();
 
@@ -589,10 +614,10 @@ function EditorImage({
       fill
       unoptimized
       sizes="(max-width: 1024px) 100vw, 60vw"
-      className="pointer-events-none select-none object-cover object-center"
+      className={`pointer-events-none select-none ${imageFit === "contain" ? "object-contain" : "object-cover"} object-center`}
       style={getImageFrameStyle(adjustment, {
         imageAspectRatio,
-        objectFit: "cover",
+        objectFit: imageFit,
       })}
       onLoad={(event) => {
         const { naturalWidth, naturalHeight } = event.currentTarget;
