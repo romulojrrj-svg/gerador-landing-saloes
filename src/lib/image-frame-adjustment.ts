@@ -12,6 +12,12 @@ export const DEFAULT_IMAGE_FRAME_ADJUSTMENT: SalonImageFrameAdjustment = {
   offsetY: 0,
 };
 
+type ImageFrameStyleOptions = {
+  imageAspectRatio?: number;
+  frameAspectRatio?: number;
+  objectFit?: "cover" | "contain";
+};
+
 function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
 }
@@ -53,6 +59,7 @@ export function normalizeImageFrameAdjustment(
 
 export function getImageFrameStyle(
   value: Partial<SalonImageFrameAdjustment> | null | undefined,
+  options: ImageFrameStyleOptions = {},
 ): CSSProperties | undefined {
   const adjustment = normalizeImageFrameAdjustment(value);
 
@@ -60,18 +67,44 @@ export function getImageFrameStyle(
     return undefined;
   }
 
+  const hasAspectRatio =
+    typeof options.imageAspectRatio === "number" &&
+    Number.isFinite(options.imageAspectRatio) &&
+    options.imageAspectRatio > 0;
+  const frameAspectRatio = options.frameAspectRatio ?? 4 / 5;
+  const objectFit = options.objectFit ?? "cover";
+  const baseWidthRatio = hasAspectRatio
+    ? objectFit === "contain"
+      ? Math.min(1, options.imageAspectRatio! / frameAspectRatio)
+      : Math.max(1, options.imageAspectRatio! / frameAspectRatio)
+    : 1;
+  const baseHeightRatio = hasAspectRatio
+    ? objectFit === "contain"
+      ? Math.min(1, frameAspectRatio / options.imageAspectRatio!)
+      : Math.max(1, frameAspectRatio / options.imageAspectRatio!)
+    : 1;
+  const maxTranslationX = Math.max(
+    0,
+    baseWidthRatio * adjustment.zoom - 1,
+  ) / 2;
+  const maxTranslationY = Math.max(
+    0,
+    baseHeightRatio * adjustment.zoom - 1,
+  ) / 2;
+  const canUseMeasuredPan = hasAspectRatio;
   const hasZoom = adjustment.zoom > IMAGE_FRAME_MIN_ZOOM;
-  const panAmount = (adjustment.zoom - IMAGE_FRAME_MIN_ZOOM) * 50;
+  const fallbackPanAmount = (adjustment.zoom - IMAGE_FRAME_MIN_ZOOM) / 2;
 
   return {
-    // Keep the original object-position behavior at 1x. Once the image is
-    // zoomed, translation provides a stable crop on both axes.
-    objectPosition: hasZoom
-      ? "50% 50%"
-      : `${50 + adjustment.offsetX * 50}% ${50 + adjustment.offsetY * 50}%`,
-    transform: hasZoom
-      ? `translate(${adjustment.offsetX * panAmount}%, ${adjustment.offsetY * panAmount}%) scale(${adjustment.zoom})`
-      : undefined,
+    objectPosition:
+      canUseMeasuredPan || hasZoom
+        ? "50% 50%"
+        : `${50 + adjustment.offsetX * 50}% ${50 + adjustment.offsetY * 50}%`,
+    transform: canUseMeasuredPan
+      ? `translate(${adjustment.offsetX * maxTranslationX * 100}%, ${adjustment.offsetY * maxTranslationY * 100}%) scale(${adjustment.zoom})`
+      : hasZoom
+        ? `translate(${adjustment.offsetX * fallbackPanAmount * 100}%, ${adjustment.offsetY * fallbackPanAmount * 100}%) scale(${adjustment.zoom})`
+        : undefined,
     transformOrigin: "center center",
   };
 }

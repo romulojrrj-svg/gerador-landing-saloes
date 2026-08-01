@@ -33,6 +33,22 @@ export function BeforeAfterSlider({
 }: BeforeAfterSliderProps) {
   const [position, setPosition] = useState(50);
   const imageFitClass = imageFit === "contain" ? "object-contain" : "object-cover";
+  const [beforeAspectState, setBeforeAspectState] = useState<{
+    imageId: string;
+    ratio?: number;
+  }>({ imageId: beforeImage.id });
+  const [afterAspectState, setAfterAspectState] = useState<{
+    imageId: string;
+    ratio?: number;
+  }>({ imageId: afterImage.id });
+  const beforeAspectRatio =
+    beforeAspectState.imageId === beforeImage.id
+      ? beforeAspectState.ratio
+      : undefined;
+  const afterAspectRatio =
+    afterAspectState.imageId === afterImage.id
+      ? afterAspectState.ratio
+      : undefined;
 
   function updateFromPointer(event: React.PointerEvent<HTMLDivElement>) {
     const bounds = event.currentTarget.getBoundingClientRect();
@@ -75,7 +91,19 @@ export function BeforeAfterSlider({
           fill
           sizes="(min-width: 1024px) 42vw, 100vw"
           className={`pointer-events-none select-none ${imageFitClass} object-center`}
-          style={getImageFrameStyle(afterAdjustment)}
+          style={getImageFrameStyle(afterAdjustment, {
+            imageAspectRatio: afterAspectRatio,
+            objectFit: imageFit,
+          })}
+          onLoad={(event) => {
+            const { naturalWidth, naturalHeight } = event.currentTarget;
+            if (naturalWidth > 0 && naturalHeight > 0) {
+              setAfterAspectState({
+                imageId: afterImage.id,
+                ratio: naturalWidth / naturalHeight,
+              });
+            }
+          }}
           draggable={false}
         />
         <div
@@ -92,7 +120,19 @@ export function BeforeAfterSlider({
             fill
             sizes="(min-width: 1024px) 42vw, 100vw"
             className={`pointer-events-none select-none ${imageFitClass} object-center`}
-            style={getImageFrameStyle(beforeAdjustment)}
+            style={getImageFrameStyle(beforeAdjustment, {
+              imageAspectRatio: beforeAspectRatio,
+              objectFit: imageFit,
+            })}
+            onLoad={(event) => {
+              const { naturalWidth, naturalHeight } = event.currentTarget;
+              if (naturalWidth > 0 && naturalHeight > 0) {
+                setBeforeAspectState({
+                  imageId: beforeImage.id,
+                  ratio: naturalWidth / naturalHeight,
+                });
+              }
+            }}
             draggable={false}
           />
         </div>

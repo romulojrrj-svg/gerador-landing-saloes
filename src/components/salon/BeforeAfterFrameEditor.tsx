@@ -572,6 +572,8 @@ function EditorImage({
   adjustment?: SalonImageFrameAdjustment;
   alt: string;
 }) {
+  const [imageAspectRatio, setImageAspectRatio] = useState<number>();
+
   if (!image) {
     return (
       <div className="absolute inset-0 flex items-center justify-center bg-zinc-200 px-6 text-center text-sm font-medium text-zinc-500">
@@ -588,7 +590,16 @@ function EditorImage({
       unoptimized
       sizes="(max-width: 1024px) 100vw, 60vw"
       className="pointer-events-none select-none object-cover object-center"
-      style={getImageFrameStyle(adjustment)}
+      style={getImageFrameStyle(adjustment, {
+        imageAspectRatio,
+        objectFit: "cover",
+      })}
+      onLoad={(event) => {
+        const { naturalWidth, naturalHeight } = event.currentTarget;
+        if (naturalWidth > 0 && naturalHeight > 0) {
+          setImageAspectRatio(naturalWidth / naturalHeight);
+        }
+      }}
       draggable={false}
     />
   );
