@@ -16,6 +16,7 @@ type BeforeAfterSliderProps = {
   adjustLabel: string;
   beforeAdjustment?: SalonImageFrameAdjustment;
   afterAdjustment?: SalonImageFrameAdjustment;
+  imageFit?: "cover" | "contain";
 };
 
 export function BeforeAfterSlider({
@@ -28,8 +29,10 @@ export function BeforeAfterSlider({
   adjustLabel,
   beforeAdjustment,
   afterAdjustment,
+  imageFit = "cover",
 }: BeforeAfterSliderProps) {
   const [position, setPosition] = useState(50);
+  const imageFitClass = imageFit === "contain" ? "object-contain" : "object-cover";
 
   function updateFromPointer(event: React.PointerEvent<HTMLDivElement>) {
     const bounds = event.currentTarget.getBoundingClientRect();
@@ -71,7 +74,7 @@ export function BeforeAfterSlider({
           alt={`${title} after`}
           fill
           sizes="(min-width: 1024px) 42vw, 100vw"
-          className="pointer-events-none select-none object-cover object-center"
+          className={`pointer-events-none select-none ${imageFitClass} object-center`}
           style={getImageFrameStyle(afterAdjustment)}
           draggable={false}
         />
@@ -88,7 +91,7 @@ export function BeforeAfterSlider({
             alt={`${title} before`}
             fill
             sizes="(min-width: 1024px) 42vw, 100vw"
-            className="pointer-events-none select-none object-cover object-center"
+            className={`pointer-events-none select-none ${imageFitClass} object-center`}
             style={getImageFrameStyle(beforeAdjustment)}
             draggable={false}
           />

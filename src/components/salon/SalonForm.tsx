@@ -2441,6 +2441,7 @@ function PremiumEditorialSection({
                                 adjustLabel="Ajustar divisor"
                                 beforeAdjustment={item.beforeAdjustment}
                                 afterAdjustment={item.afterAdjustment}
+                                imageFit="contain"
                               />
                             </div>
                             <p className="mt-3 text-xs leading-5 text-zinc-500">
