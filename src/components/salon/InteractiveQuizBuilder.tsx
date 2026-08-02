@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+
 import {
   ArrowDown,
   ArrowUp,
@@ -14,6 +16,7 @@ import {
   createInteractiveQuizQuestion,
   normalizeInteractiveQuizConfig,
 } from "@/lib/interactive-quiz";
+import { isValidEmail } from "@/lib/quiz-email-format";
 import type {
   SalonInteractiveQuizConfig,
   SalonInteractiveQuizOption,
@@ -44,6 +47,10 @@ export function InteractiveQuizBuilder({
   salonSlug?: string;
 }) {
   const normalized = config ? normalizeInteractiveQuizConfig(config) : undefined;
+  const [isSendingTestEmail, setIsSendingTestEmail] = useState(false);
+  const [testEmailMessage, setTestEmailMessage] = useState("");
+  const [testEmailError, setTestEmailError] = useState(false);
+  const [notificationConfigError, setNotificationConfigError] = useState("");
 
   function enable() {
     onChange({ ...(normalized ?? createInteractiveQuizConfig()), enabled: true });
@@ -52,6 +59,45 @@ export function InteractiveQuizBuilder({
   function patchConfig(patch: Partial<SalonInteractiveQuizConfig>) {
     if (!normalized) return;
     onChange({ ...normalized, ...patch });
+  }
+
+  async function sendTestEmail() {
+    if (!salonSlug || !normalized || !isValidEmail(normalized.notificationRecipientEmail ?? "")) return;
+    setIsSendingTestEmail(true);
+    setTestEmailMessage("");
+    setTestEmailError(false);
+    try {
+      const response = await fetch(`/api/admin/quiz/${encodeURIComponent(salonSlug)}/test-email`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      const body = await response.json().catch(() => ({})) as { ok?: boolean; error?: string };
+      if (!response.ok || !body.ok) {
+        setTestEmailError(true);
+        setTestEmailMessage(body.error ?? "Nao foi possivel enviar o e-mail de teste.");
+        return;
+      }
+      setTestEmailMessage("E-mail de teste enviado com sucesso. Verifique também a pasta de spam.");
+    } catch {
+      setTestEmailError(true);
+      setTestEmailMessage("Nao foi possivel conectar ao envio de e-mail.");
+    } finally {
+      setIsSendingTestEmail(false);
+    }
+  }
+
+  function toggleNotifications(enabled: boolean) {
+    if (enabled && !isValidEmail(normalized?.notificationRecipientEmail ?? "")) {
+      setNotificationConfigError("Informe um e-mail valido para ativar as notificacoes.");
+      return;
+    }
+    setNotificationConfigError("");
+    patchConfig({ notificationEnabled: enabled });
+  }
+
+  function updateNotificationRecipient(value: string) {
+    patchConfig({ notificationRecipientEmail: value });
+    if (isValidEmail(value)) setNotificationConfigError("");
   }
 
   function addQuestion() {
@@ -195,8 +241,22 @@ export function InteractiveQuizBuilder({
             <label className="flex items-center gap-2 self-end pb-3 text-sm font-semibold text-zinc-800"><input type="checkbox" checked={normalized.contactNameRequired} onChange={(event) => patchConfig({ contactNameRequired: event.target.checked })} /> Nome obrigatorio</label>
             <label className="flex items-center gap-2 self-end pb-3 text-sm font-semibold text-zinc-800"><input type="checkbox" checked={normalized.contactCityEnabled === true} onChange={(event) => patchConfig({ contactCityEnabled: event.target.checked })} /> Capturar cidade</label>
             <label className="flex items-center gap-2 self-end pb-3 text-sm font-semibold text-zinc-800"><input type="checkbox" checked={normalized.contactConsentRequired === true} onChange={(event) => patchConfig({ contactConsentRequired: event.target.checked })} /> Exigir consentimento</label>
-            <label className="flex items-center gap-2 self-end pb-3 text-sm font-semibold text-zinc-800"><input type="checkbox" checked={normalized.notificationEnabled === true} onChange={(event) => patchConfig({ notificationEnabled: event.target.checked })} /> Notificacoes por e-mail</label>
-            <Field label="E-mail de notificacao" value={normalized.notificationRecipientEmail} onChange={(value) => patchConfig({ notificationRecipientEmail: value })} />
+            <label className="flex items-center gap-2 self-end pb-3 text-sm font-semibold text-zinc-800"><input type="checkbox" checked={normalized.notificationEnabled === true} onChange={(event) => toggleNotifications(event.target.checked)} /> Notificacoes por e-mail</label>
+            <Field label="E-mail de notificacao" value={normalized.notificationRecipientEmail} onChange={updateNotificationRecipient} />
+            {notificationConfigError ? <p role="alert" className="text-sm font-normal text-rose-700 md:col-span-2">{notificationConfigError}</p> : null}
+          </div>
+
+          <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-dashed border-zinc-300 bg-white p-4">
+            <div>
+              <h4 className="font-semibold text-zinc-950">Teste de notificacao</h4>
+              <p className="mt-1 text-xs leading-5 text-zinc-500">Envia uma mensagem de teste para o e-mail configurado, sem criar um lead.</p>
+            </div>
+            <button type="button" onClick={sendTestEmail} disabled={isSendingTestEmail || !salonSlug?.trim() || !isValidEmail(normalized.notificationRecipientEmail ?? "")} className="rounded-full border border-zinc-300 bg-white px-4 py-2 text-sm font-semibold text-zinc-900 disabled:cursor-not-allowed disabled:opacity-50">
+              {isSendingTestEmail ? "Enviando teste…" : "Enviar e-mail de teste"}
+            </button>
+            {!salonSlug?.trim() ? <p className="w-full text-sm text-zinc-500">Salve a landing antes de enviar um teste.</p> : null}
+            {salonSlug?.trim() && !isValidEmail(normalized.notificationRecipientEmail ?? "") ? <p className="w-full text-sm text-zinc-500">Informe um e-mail válido para realizar o teste.</p> : null}
+            {testEmailMessage ? <p aria-live="polite" className={`w-full text-sm ${testEmailError ? "text-rose-700" : "text-emerald-700"}`}>{testEmailMessage}</p> : null}
           </div>
 
           <div className="rounded-2xl border border-zinc-200 bg-white p-4">

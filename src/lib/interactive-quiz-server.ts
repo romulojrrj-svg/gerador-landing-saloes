@@ -8,10 +8,19 @@ import { getSupabaseAdminClient, isSupabaseAdminConfigured } from "@/lib/supabas
 import { isServerLocalStorageEnabled } from "@/lib/storage-mode";
 import { getDevSharedSalonBySlug } from "@/lib/dev-shared-salon-storage";
 import { normalizeInteractiveQuizConfig } from "@/lib/interactive-quiz";
+import {
+  isValidEmail,
+  type QuizEmailAnswer,
+} from "@/lib/quiz-email-format";
+import {
+  sendQuizSubmissionNotification,
+  type MailErrorCode,
+} from "@/lib/quiz-email";
 import type { Salon, SalonInteractiveQuizConfig, SalonInteractiveQuizQuestion } from "@/types/salon";
 import type { InteractiveQuizAnswerValue, InteractiveQuizSubmissionPayload } from "@/lib/interactive-quiz-client";
 
 export type QuizLeadStatus = "new" | "contacted" | "finished";
+export type QuizNotificationStatus = "pending" | "sent" | "skipped" | "failed";
 
 export type QuizLead = {
   id: string;
@@ -20,12 +29,16 @@ export type QuizLead = {
   visitorName: string;
   visitorWhatsapp: string;
   visitorCity?: string;
-  answers: Array<{ questionId: string; prompt: string; type: string; value: InteractiveQuizAnswerValue; selectedOptions?: Array<{ id: string; label: string }> }>;
+  answers: QuizEmailAnswer[];
   consentAccepted: boolean;
   consentText: string;
   sourceUrl?: string;
   status: QuizLeadStatus;
   createdAt: string;
+  emailNotificationStatus?: QuizNotificationStatus;
+  emailNotificationSentAt?: string;
+  emailNotificationMessageId?: string;
+  emailNotificationErrorCode?: string;
 };
 
 type SubmissionResult =
@@ -35,6 +48,7 @@ type SubmissionResult =
 const LOCAL_FILE = path.join(process.cwd(), ".local-data", "quiz-submissions.json");
 const ipAttempts = new Map<string, number[]>();
 const recentSubmissions = new Map<string, number>();
+const notificationInFlight = new Set<string>();
 
 export async function getActiveInteractiveQuiz(slug: string) {
   let salon: Salon | null;
@@ -71,8 +85,8 @@ export async function createQuizSubmission(
     visitorWhatsapp: validated.visitorWhatsapp,
     visitorCity: validated.visitorCity,
     answers: validated.answers,
-    consentAccepted: false,
-    consentText: "",
+    consentAccepted: validated.consentAccepted,
+    consentText: validated.consentText,
     sourceUrl: cleanSourceUrl(payload.sourceUrl),
     status: "new",
     createdAt: new Date().toISOString(),
@@ -82,27 +96,28 @@ export async function createQuizSubmission(
     if (isServerLocalStorageEnabled()) {
       const leads = await readLocalLeads();
       await writeLocalLeads([lead, ...leads]);
-      return { ok: true, id: lead.id };
+    } else {
+      if (!isSupabaseAdminConfigured()) return { ok: false, status: 503, error: "Servico de envio indisponivel." };
+      const client = getSupabaseAdminClient();
+      if (!client) return { ok: false, status: 503, error: "Servico de envio indisponivel." };
+      const { error } = await client.from("salon_quiz_submissions").insert({
+        id: lead.id,
+        salon_id: lead.salonId,
+        quiz_version: lead.quizVersion,
+        visitor_name: lead.visitorName,
+        visitor_whatsapp: lead.visitorWhatsapp,
+        ...(lead.visitorCity ? { visitor_city: lead.visitorCity } : {}),
+        answers: lead.answers,
+        consent_accepted: lead.consentAccepted,
+        consent_text: lead.consentText,
+        source_url: lead.sourceUrl ?? null,
+        status: lead.status,
+        created_at: lead.createdAt,
+      });
+      if (error) return { ok: false, status: 500, error: "Nao foi possivel salvar suas respostas." };
     }
 
-    if (!isSupabaseAdminConfigured()) return { ok: false, status: 503, error: "Servico de envio indisponivel." };
-    const client = getSupabaseAdminClient();
-    if (!client) return { ok: false, status: 503, error: "Servico de envio indisponivel." };
-    const { error } = await client.from("salon_quiz_submissions").insert({
-      id: lead.id,
-      salon_id: lead.salonId,
-      quiz_version: lead.quizVersion,
-      visitor_name: lead.visitorName,
-      visitor_whatsapp: lead.visitorWhatsapp,
-      ...(lead.visitorCity ? { visitor_city: lead.visitorCity } : {}),
-      answers: lead.answers,
-      consent_accepted: lead.consentAccepted,
-      consent_text: lead.consentText,
-      source_url: lead.sourceUrl ?? null,
-      status: lead.status,
-      created_at: lead.createdAt,
-    });
-    if (error) return { ok: false, status: 500, error: "Nao foi possivel salvar suas respostas." };
+    await maybeSendQuizNotification(active.salon, active.config, lead);
     return { ok: true, id: lead.id };
   } catch {
     return { ok: false, status: 500, error: "Nao foi possivel salvar suas respostas." };
@@ -166,14 +181,36 @@ function validateSubmission(salon: Salon, config: SalonInteractiveQuizConfig, pa
     const valid = validateAnswer(question, value);
     if (!valid.ok) return valid;
     const selectedOptions = Array.isArray(value) || typeof value === "string" ? question.options.filter((option) => Array.isArray(value) ? value.includes(option.id) : value === option.id).map((option) => ({ id: option.id, label: option.label })) : undefined;
-    answers.push({ questionId: question.id, prompt: question.prompt.slice(0, 1000), type: question.type, value: value as InteractiveQuizAnswerValue, ...(selectedOptions?.length ? { selectedOptions } : {}) });
+    answers.push({
+      questionId: question.id,
+      category: question.category?.trim().slice(0, 200) || undefined,
+      prompt: question.prompt.slice(0, 1000),
+      type: question.type,
+      value: value as InteractiveQuizAnswerValue,
+      ...(selectedOptions?.length ? { selectedOptions } : {}),
+      ...(question.type === "scale" ? {
+        scaleMin: question.scaleMin,
+        scaleMax: question.scaleMax,
+        scaleMinLabel: question.scaleMinLabel,
+        scaleMaxLabel: question.scaleMaxLabel,
+      } : {}),
+    });
   }
   const visitorCity = config.contactCityEnabled
     ? payload.visitorCity?.trim().slice(0, 100) ?? ""
     : undefined;
   if (config.contactCityRequired && !visitorCity) return { ok: false as const, status: 400, error: "Informe sua cidade." };
   if (config.contactConsentRequired && payload.consentAccepted !== true) return { ok: false as const, status: 400, error: "Consentimento obrigatorio." };
-  return { ok: true as const, visitorName, visitorWhatsapp, visitorCity, answers, salonId: salon.id };
+  return {
+    ok: true as const,
+    visitorName,
+    visitorWhatsapp,
+    visitorCity,
+    answers,
+    consentAccepted: config.contactConsentRequired === true && payload.consentAccepted === true,
+    consentText: config.contactConsentRequired === true ? config.consentText.trim().slice(0, 2000) : "",
+    salonId: salon.id,
+  };
 }
 
 function validateAnswer(question: SalonInteractiveQuizQuestion, value: InteractiveQuizAnswerValue | undefined) {
@@ -215,11 +252,160 @@ function allowRequest(ip: string, slug: string, phone: string) {
   return true;
 }
 
+async function maybeSendQuizNotification(
+  salon: Salon,
+  config: SalonInteractiveQuizConfig,
+  lead: QuizLead,
+) {
+  const startedAt = Date.now();
+  const recipientEmail = config.notificationRecipientEmail?.trim() ?? "";
+
+  if (config.notificationEnabled !== true) {
+    await safelySetNotificationStatus(lead.id, "skipped");
+    logQuizNotification("quiz_notification_skipped", lead, "notification_disabled", startedAt, "skipped");
+    return;
+  }
+
+  if (!isValidEmail(recipientEmail)) {
+    await safelySetNotificationStatus(lead.id, "skipped");
+    logQuizNotification("quiz_notification_config_missing", lead, "recipient_invalid", startedAt, "skipped");
+    return;
+  }
+
+  const storedStatus = await getNotificationStatus(lead.id);
+  if (storedStatus === "sent" || notificationInFlight.has(lead.id)) {
+    logQuizNotification("quiz_notification_duplicate_prevented", lead, "already_sent_or_in_flight", startedAt);
+    return;
+  }
+
+  notificationInFlight.add(lead.id);
+  try {
+    const result = await sendQuizSubmissionNotification({
+      submission: lead,
+      salon,
+      recipientEmail,
+    });
+
+    if (result.success) {
+      await safelySetNotificationStatus(lead.id, "sent", result.messageId);
+      logQuizNotification("quiz_notification_sent", lead, undefined, startedAt);
+    } else {
+      await safelySetNotificationStatus(lead.id, "failed", undefined, result.errorCode);
+      logQuizNotification("quiz_notification_failed", lead, result.errorCode, startedAt);
+    }
+  } catch {
+    await safelySetNotificationStatus(lead.id, "failed", undefined, "mail_unknown");
+    logQuizNotification("quiz_notification_failed", lead, "mail_unknown", startedAt);
+  } finally {
+    notificationInFlight.delete(lead.id);
+  }
+}
+
+async function safelySetNotificationStatus(
+  id: string,
+  status: QuizNotificationStatus,
+  messageId?: string,
+  errorCode?: MailErrorCode,
+) {
+  try {
+    await setNotificationStatus(id, status, messageId, errorCode);
+  } catch {
+    // Notification bookkeeping must never turn a persisted lead into a failed submission.
+  }
+}
+
+async function getNotificationStatus(id: string) {
+  if (isServerLocalStorageEnabled()) {
+    const leads = await readLocalLeads();
+    return leads.find((lead) => lead.id === id)?.emailNotificationStatus;
+  }
+
+  const client = getSupabaseAdminClient();
+  if (!client) return undefined;
+  const { data, error } = await client
+    .from("salon_quiz_submissions")
+    .select("email_notification_status")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (error || !data) return undefined;
+  const status = data.email_notification_status;
+  return status === "pending" || status === "sent" || status === "skipped" || status === "failed"
+    ? status
+    : undefined;
+}
+
+async function setNotificationStatus(
+  id: string,
+  status: QuizNotificationStatus,
+  messageId?: string,
+  errorCode?: MailErrorCode,
+) {
+  if (isServerLocalStorageEnabled()) {
+    const leads = await readLocalLeads();
+    const next = leads.map((lead) => lead.id === id ? {
+      ...lead,
+      emailNotificationStatus: status,
+      ...(status === "sent" ? { emailNotificationSentAt: new Date().toISOString() } : {}),
+      ...(messageId ? { emailNotificationMessageId: messageId } : {}),
+      ...(errorCode ? { emailNotificationErrorCode: errorCode } : {}),
+    } : lead);
+    await writeLocalLeads(next);
+    return;
+  }
+
+  const client = getSupabaseAdminClient();
+  if (!client) return;
+  await client.from("salon_quiz_submissions").update({
+    email_notification_status: status,
+    email_notification_sent_at: status === "sent" ? new Date().toISOString() : null,
+    email_notification_message_id: messageId ?? null,
+    email_notification_error_code: errorCode ?? null,
+  }).eq("id", id);
+}
+
+function logQuizNotification(
+  event: string,
+  lead: QuizLead,
+  errorCode: string | undefined,
+  startedAt: number,
+  status: "ok" | "skipped" | "failed" = errorCode ? "failed" : "ok",
+) {
+  console.info("[quiz-notification]", {
+    event,
+    submissionId: lead.id,
+    salonId: lead.salonId,
+    status,
+    ...(errorCode ? { errorCode } : {}),
+    durationMs: Date.now() - startedAt,
+  });
+}
+
 async function readLocalLeads(): Promise<QuizLead[]> {
   try { return JSON.parse(await readFile(LOCAL_FILE, "utf8")) as QuizLead[]; } catch (error) { if (typeof error === "object" && error && "code" in error && error.code === "ENOENT") return []; throw error; }
 }
 async function writeLocalLeads(leads: QuizLead[]) { await mkdir(path.dirname(LOCAL_FILE), { recursive: true }); await writeFile(LOCAL_FILE, JSON.stringify(leads, null, 2), "utf8"); }
-function mapSupabaseLead(row: Record<string, unknown>): QuizLead { return { id: String(row.id), salonId: String(row.salon_id), quizVersion: String(row.quiz_version ?? ""), visitorName: String(row.visitor_name ?? ""), visitorWhatsapp: String(row.visitor_whatsapp ?? ""), answers: Array.isArray(row.answers) ? row.answers as QuizLead["answers"] : [], consentAccepted: row.consent_accepted === true, consentText: String(row.consent_text ?? ""), sourceUrl: typeof row.source_url === "string" ? row.source_url : undefined, status: row.status === "contacted" || row.status === "finished" ? row.status : "new", createdAt: String(row.created_at ?? "") }; }
+function mapSupabaseLead(row: Record<string, unknown>): QuizLead {
+  const emailNotificationStatus = row.email_notification_status;
+  return {
+    id: String(row.id),
+    salonId: String(row.salon_id),
+    quizVersion: String(row.quiz_version ?? ""),
+    visitorName: String(row.visitor_name ?? ""),
+    visitorWhatsapp: String(row.visitor_whatsapp ?? ""),
+    visitorCity: typeof row.visitor_city === "string" ? row.visitor_city : undefined,
+    answers: Array.isArray(row.answers) ? row.answers as QuizLead["answers"] : [],
+    consentAccepted: row.consent_accepted === true,
+    consentText: String(row.consent_text ?? ""),
+    sourceUrl: typeof row.source_url === "string" ? row.source_url : undefined,
+    status: row.status === "contacted" || row.status === "finished" ? row.status : "new",
+    createdAt: String(row.created_at ?? ""),
+    ...(emailNotificationStatus === "pending" || emailNotificationStatus === "sent" || emailNotificationStatus === "skipped" || emailNotificationStatus === "failed" ? { emailNotificationStatus } : {}),
+    ...(typeof row.email_notification_sent_at === "string" ? { emailNotificationSentAt: row.email_notification_sent_at } : {}),
+    ...(typeof row.email_notification_message_id === "string" ? { emailNotificationMessageId: row.email_notification_message_id } : {}),
+    ...(typeof row.email_notification_error_code === "string" ? { emailNotificationErrorCode: row.email_notification_error_code } : {}),
+  };
+}
 
 async function getQuizAdminSalon(slug: string) {
   if (isServerLocalStorageEnabled()) {

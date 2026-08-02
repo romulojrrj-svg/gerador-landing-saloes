@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
+    "test:quiz-email": "node --experimental-strip-types scripts/test-quiz-email.mjs",
     "export:salon": "node scripts/export-salon-static.mjs",
     "preview:salon-export": "node scripts/preview-salon-export.mjs"
   },
@@ -15,6 +16,7 @@
     "@supabase/supabase-js": "^2.110.0",
     "lucide-react": "^1.21.0",
     "next": "^16.2.9",
+    "nodemailer": "^9.0.3",
     "playwright-core": "^1.61.1",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
@@ -23,6 +25,7 @@
   "devDependencies": {
     "@tailwindcss/postcss": "^4.3.1",
     "@types/node": "^26.0.1",
+    "@types/nodemailer": "^8.0.1",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "eslint": "^9.39.4",

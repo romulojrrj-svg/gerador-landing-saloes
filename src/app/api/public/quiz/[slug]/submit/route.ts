@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { createQuizSubmission } from "@/lib/interactive-quiz-server";
 import type { InteractiveQuizSubmissionPayload } from "@/lib/interactive-quiz-client";
 
+export const runtime = "nodejs";
+
 type Context = { params: Promise<{ slug: string }> };
 
 export async function POST(request: NextRequest, context: Context) {
