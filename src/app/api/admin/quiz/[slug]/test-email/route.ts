@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAdminAuthCookieName, isAdminSessionCookieValid } from "@/lib/admin-auth";
 import { getAdminSalonBySlug } from "@/lib/admin-salons";
 import { normalizeInteractiveQuizConfig } from "@/lib/interactive-quiz";
-import { isValidEmail } from "@/lib/quiz-email-format";
+import { isValidEmail, type QuizTestEmailPayload } from "@/lib/quiz-email-format";
 import { sendQuizTestEmail } from "@/lib/quiz-email";
 
 export const runtime = "nodejs";
@@ -21,7 +21,11 @@ export async function POST(request: NextRequest, context: Context) {
   }
 
   const config = normalizeInteractiveQuizConfig(result.salon.premiumEditorial.interactiveQuiz);
-  const recipientEmail = config?.notificationRecipientEmail?.trim() ?? "";
+  const savedRecipientEmail = config?.notificationRecipientEmail?.trim() ?? "";
+  const body = await readTestEmailBody(request);
+  const recipientEmail = body
+    ? String(body.recipientEmail ?? "").trim()
+    : savedRecipientEmail;
   if (!config || !isValidEmail(recipientEmail)) {
     return NextResponse.json({ ok: false, error: "Informe um e-mail válido para realizar o teste." }, { status: 400 });
   }
@@ -32,6 +36,18 @@ export async function POST(request: NextRequest, context: Context) {
   }
 
   return NextResponse.json({ ok: true });
+}
+
+async function readTestEmailBody(request: NextRequest): Promise<Partial<QuizTestEmailPayload> | undefined> {
+  try {
+    const body = await request.json() as Partial<QuizTestEmailPayload>;
+    if (!body || typeof body !== "object" || Array.isArray(body) || !Object.prototype.hasOwnProperty.call(body, "recipientEmail")) {
+      return undefined;
+    }
+    return body;
+  } catch {
+    return undefined;
+  }
 }
 
 async function ensureAdminRequest(request: NextRequest) {

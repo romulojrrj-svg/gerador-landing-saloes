@@ -28,6 +28,10 @@ export type QuizEmailSalon = {
   slug: string;
 };
 
+export type QuizTestEmailPayload = {
+  recipientEmail: string;
+};
+
 export function isValidEmail(value: string) {
   const trimmed = value.trim();
   return trimmed.length <= 320 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed);

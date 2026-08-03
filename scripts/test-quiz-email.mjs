@@ -6,6 +6,14 @@ import {
 } from "../src/lib/quiz-email-format.ts";
 
 assert.equal(isValidEmail("lead@example.com"), true);
+assert.equal(isValidEmail(" romulojrj2@gmail.com ".trim()), true);
+assert.equal(isValidEmail("nome.sobrenome@gmail.com"), true);
+assert.equal(isValidEmail("nome+teste@gmail.com"), true);
+assert.equal(isValidEmail("contato@empresa.com.br"), true);
+assert.equal(isValidEmail("email"), false);
+assert.equal(isValidEmail("@email.com"), false);
+assert.equal(isValidEmail("nome@"), false);
+assert.equal(isValidEmail("nome com espaco@gmail.com"), false);
 assert.equal(isValidEmail("invalid"), false);
 assert.match(buildWhatsappLink("+5521999999999", "Ana"), /^https:\/\/wa\.me\/5521999999999\?text=/);
 
