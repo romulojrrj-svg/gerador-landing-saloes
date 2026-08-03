@@ -43,5 +43,11 @@ assert.match(email.html, /Naturalidade/);
 assert.match(email.html, /4 de 5/);
 assert.match(email.text, /Rio de Janeiro/);
 assert.match(email.html, /wa\.me/);
+assert.match(email.html, /02\/08\/2026, 09:00/);
+assert.doesNotMatch(email.html, /\/p\/dra-exemplo/);
+assert.doesNotMatch(email.text, /\/p\/dra-exemplo/);
+assert.doesNotMatch(email.html, /NÃ£o exigido|Não exigido/);
+assert.match(email.html, /Esta notificação foi enviada automaticamente através do seu site/);
+assert.doesNotMatch(email.html, /Esta notificação foi enviada automaticamente pela Minha Página Pronta/);
 
 console.log("quiz email formatter: ok");

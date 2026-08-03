@@ -78,11 +78,9 @@ export function buildWhatsappLink(phone: string, visitorName: string) {
 export function buildQuizNotificationEmail({
   submission,
   salon,
-  publicUrl,
 }: {
   submission: QuizEmailSubmission;
   salon: QuizEmailSalon;
-  publicUrl: string;
 }) {
   const visitorName = submission.visitorName.trim();
   const subject = visitorName
@@ -95,6 +93,7 @@ export function buildQuizNotificationEmail({
   const createdAt = new Date(submission.createdAt).toLocaleString("pt-BR", {
     dateStyle: "short",
     timeStyle: "short",
+    timeZone: "America/Sao_Paulo",
   });
 
   const htmlAnswers = answerBlocks.length
@@ -119,18 +118,18 @@ export function buildQuizNotificationEmail({
       </div>
       <div style="padding-top:22px;">
         <div style="color:#645c56;font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;">Página</div>
-        <p style="font-size:15px;line-height:1.7;margin:8px 0 0;"><strong>${escapeHtml(salon.name)}</strong><br /><a href="${escapeHtml(publicUrl)}" style="color:#7a5b44;">${escapeHtml(publicUrl)}</a><br />${escapeHtml(createdAt)}</p>
+        <p style="font-size:15px;line-height:1.7;margin:8px 0 0;"><strong>${escapeHtml(salon.name)}</strong><br />${escapeHtml(createdAt)}</p>
       </div>
       <div style="border-top:1px solid #eee8e2;margin-top:22px;padding-top:22px;">
         <div style="color:#645c56;font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;">Dados da visitante</div>
-        <p style="font-size:15px;line-height:1.7;margin:8px 0 0;">Nome: ${escapeHtml(visitorName || "Não informado")}<br />WhatsApp: ${escapeHtml(submission.visitorWhatsapp)}${submission.visitorCity ? `<br />Cidade: ${escapeHtml(submission.visitorCity)}` : ""}<br />Consentimento: ${submission.consentAccepted ? "Aceito" : "Não exigido"}</p>
+        <p style="font-size:15px;line-height:1.7;margin:8px 0 0;">Nome: ${escapeHtml(visitorName || "Não informado")}<br />WhatsApp: ${escapeHtml(submission.visitorWhatsapp)}${submission.visitorCity ? `<br />Cidade: ${escapeHtml(submission.visitorCity)}` : ""}${submission.consentAccepted ? "<br />Consentimento: Aceito" : ""}</p>
       </div>
       <div style="border-top:1px solid #eee8e2;margin-top:22px;padding-top:22px;">
         <div style="color:#645c56;font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;">Respostas do teste</div>
         ${htmlAnswers}
       </div>
       ${whatsappUrl ? `<div style="margin-top:26px;"><a href="${escapeHtml(whatsappUrl)}" style="background:#18804c;border-radius:999px;color:#fff;display:inline-block;font-size:14px;font-weight:700;padding:12px 18px;text-decoration:none;">Conversar pelo WhatsApp</a></div>` : ""}
-      <p style="border-top:1px solid #eee8e2;color:#8a817a;font-size:12px;line-height:1.6;margin:28px 0 0;padding-top:18px;">Esta notificação foi enviada automaticamente pela Minha Página Pronta.</p>
+      <p style="border-top:1px solid #eee8e2;color:#8a817a;font-size:12px;line-height:1.6;margin:28px 0 0;padding-top:18px;">Esta notificação foi enviada automaticamente através do seu site</p>
     </div>
   </body>
 </html>`;
@@ -140,7 +139,6 @@ export function buildQuizNotificationEmail({
     "",
     "Página:",
     salon.name,
-    publicUrl,
     createdAt,
     "",
     "Nome:",

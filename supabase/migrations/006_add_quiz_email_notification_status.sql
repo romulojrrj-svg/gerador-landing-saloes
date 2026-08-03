@@ -26,3 +26,9 @@ begin
       check (email_notification_status is null or email_notification_status in ('pending', 'sent', 'skipped', 'failed'));
   end if;
 end $$;
+
+-- The public endpoint uses the server-only service_role client. RLS remains enabled;
+-- no anon/authenticated policies are created.
+grant usage on schema public to service_role;
+grant select, insert, update, delete
+  on table public.salon_quiz_submissions to service_role;

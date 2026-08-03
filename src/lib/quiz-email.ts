@@ -102,7 +102,6 @@ export async function sendQuizSubmissionNotification({
     const content = buildQuizNotificationEmail({
       submission,
       salon,
-      publicUrl: getPublicQuizUrl(salon),
     });
     const info = await transport.sendMail({
       from: { name: checked.config.fromName, address: checked.config.fromEmail },
