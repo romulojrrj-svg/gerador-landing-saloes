@@ -107,7 +107,7 @@ export function BeforeAfterSlider({
           draggable={false}
         />
         <div
-          className="absolute inset-0 overflow-hidden"
+          className="absolute inset-0 overflow-hidden bg-zinc-200"
           style={{ clipPath: `inset(0 ${100 - position}% 0 0)` }}
           aria-hidden="true"
         >
