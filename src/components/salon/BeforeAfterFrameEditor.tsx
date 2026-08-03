@@ -80,7 +80,7 @@ export function BeforeAfterFrameEditor({
   const [dividerPosition, setDividerPosition] = useState(50);
   const [previewMode, setPreviewMode] = useState<PreviewMode>("compare");
   const [previewSize, setPreviewSize] = useState<PreviewSize>("desktop");
-  const [imageFit, setImageFit] = useState<ImageFit>("contain");
+  const imageFit: ImageFit = "cover";
   const [overlayOpacity, setOverlayOpacity] = useState(50);
   const [showGuides, setShowGuides] = useState(false);
   const [showGrid, setShowGrid] = useState(false);
@@ -145,7 +145,6 @@ export function BeforeAfterFrameEditor({
     setActiveSide(side);
     setDividerPosition(50);
     setPreviewMode("compare");
-    setImageFit("contain");
     setShowGuides(false);
     setShowGrid(false);
     setIsOpen(true);
@@ -369,26 +368,6 @@ export function BeforeAfterFrameEditor({
                       <Smartphone className="h-3.5 w-3.5" /> Mobile
                     </button>
                   </div>
-                </div>
-
-                <div className="mb-4 flex flex-wrap items-center gap-2 text-xs font-semibold text-zinc-700">
-                  <span>Visualização:</span>
-                  <button
-                    type="button"
-                    onClick={() => setImageFit("contain")}
-                    aria-pressed={imageFit === "contain"}
-                    className={`rounded-full border px-3 py-1.5 ${imageFit === "contain" ? "border-teal-500 bg-teal-50 text-teal-900" : "border-zinc-200 bg-white text-zinc-600"}`}
-                  >
-                    Foto inteira
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setImageFit("cover")}
-                    aria-pressed={imageFit === "cover"}
-                    className={`rounded-full border px-3 py-1.5 ${imageFit === "cover" ? "border-teal-500 bg-teal-50 text-teal-900" : "border-zinc-200 bg-white text-zinc-600"}`}
-                  >
-                    Moldura final
-                  </button>
                 </div>
 
                 <div
