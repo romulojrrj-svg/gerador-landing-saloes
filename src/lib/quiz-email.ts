@@ -35,6 +35,8 @@ type MailConfiguration = {
   fromEmail: string;
 };
 
+const DEFAULT_MAIL_FROM_NAME = "Novo contato - Seu Site";
+
 export function validateMailConfiguration() {
   const config = readMailConfiguration();
   const rawPort = process.env.SMTP_PORT?.trim() ?? "";
@@ -152,13 +154,17 @@ export async function sendQuizTestEmail({
 
 function readMailConfiguration(): MailConfiguration {
   const port = Number(process.env.SMTP_PORT ?? "465");
+  const configuredFromName = process.env.MAIL_FROM_NAME?.trim() ?? "";
   return {
     host: process.env.SMTP_HOST?.trim() ?? "",
     port,
     secure: process.env.SMTP_SECURE === "true",
     user: process.env.SMTP_USER?.trim() ?? "",
     pass: process.env.SMTP_PASS?.trim() ?? "",
-    fromName: process.env.MAIL_FROM_NAME?.trim() ?? "",
+    fromName:
+      configuredFromName === "Minha Página Pronta — Novo contato" || !configuredFromName
+        ? DEFAULT_MAIL_FROM_NAME
+        : configuredFromName,
     fromEmail: process.env.MAIL_FROM_EMAIL?.trim() ?? "",
   };
 }
