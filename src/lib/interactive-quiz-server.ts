@@ -68,15 +68,28 @@ export async function createQuizSubmission(
   slug: string,
   payload: InteractiveQuizSubmissionPayload,
   requestIp: string,
+  requestId = crypto.randomUUID(),
 ): Promise<SubmissionResult> {
-  if (JSON.stringify(payload).length > 50_000) return { ok: false, status: 413, error: "Envio muito grande." };
-  if (payload.honeypot?.trim()) return { ok: false, status: 400, error: "Nao foi possivel validar o envio." };
+  if (JSON.stringify(payload).length > 50_000) {
+    logQuizSubmission("quiz_submission_validation_failed", { slug, requestId });
+    return { ok: false, status: 413, error: "Envio muito grande." };
+  }
+  if (payload.honeypot?.trim()) {
+    logQuizSubmission("quiz_submission_validation_failed", { slug, requestId });
+    return { ok: false, status: 400, error: "Nao foi possivel validar o envio." };
+  }
   const active = await getActiveInteractiveQuiz(slug);
-  if (!active) return { ok: false, status: 404, error: "Teste indisponivel." };
+  if (!active) {
+    logQuizSubmission("quiz_submission_salon_not_found", { slug, requestId });
+    return { ok: false, status: 404, error: "Teste indisponivel." };
+  }
   if (!allowRequest(requestIp, slug, payload.visitorWhatsapp)) return { ok: false, status: 429, error: "Aguarde um momento antes de enviar novamente." };
 
   const validated = validateSubmission(active.salon, active.config, payload);
-  if (!validated.ok) return validated;
+  if (!validated.ok) {
+    logQuizSubmission("quiz_submission_validation_failed", { slug, salonId: active.salon.id, requestId });
+    return validated;
+  }
   const lead: QuizLead = {
     id: crypto.randomUUID(),
     salonId: active.salon.id,
@@ -114,12 +127,21 @@ export async function createQuizSubmission(
         status: lead.status,
         created_at: lead.createdAt,
       });
-      if (error) return { ok: false, status: 500, error: "Nao foi possivel salvar suas respostas." };
+      if (error) {
+        logQuizSubmission("quiz_submission_insert_failed", {
+          slug,
+          salonId: active.salon.id,
+          requestId,
+          supabaseCode: sanitizeSupabaseErrorCode(error.code),
+        });
+        return { ok: false, status: 500, error: "Nao foi possivel salvar suas respostas." };
+      }
     }
 
     await maybeSendQuizNotification(active.salon, active.config, lead);
     return { ok: true, id: lead.id };
   } catch {
+    logQuizSubmission("quiz_submission_insert_failed", { slug, salonId: active.salon.id, requestId });
     return { ok: false, status: 500, error: "Nao foi possivel salvar suas respostas." };
   }
 }
@@ -379,6 +401,24 @@ function logQuizNotification(
     ...(errorCode ? { errorCode } : {}),
     durationMs: Date.now() - startedAt,
   });
+}
+
+function logQuizSubmission(
+  event: "quiz_submission_validation_failed" | "quiz_submission_salon_not_found" | "quiz_submission_insert_failed",
+  details: { slug: string; salonId?: string; requestId: string; supabaseCode?: string },
+) {
+  console.info("[quiz-submission]", {
+    event,
+    slug: details.slug,
+    ...(details.salonId ? { salonId: details.salonId } : {}),
+    ...(details.supabaseCode ? { supabaseCode: details.supabaseCode } : {}),
+    requestId: details.requestId,
+  });
+}
+
+function sanitizeSupabaseErrorCode(value: unknown) {
+  const code = typeof value === "string" ? value : "unknown";
+  return /^[A-Za-z0-9_-]{1,80}$/.test(code) ? code : "unknown";
 }
 
 async function readLocalLeads(): Promise<QuizLead[]> {
