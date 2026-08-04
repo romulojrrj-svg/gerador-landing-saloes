@@ -13,7 +13,12 @@ export async function POST(request: NextRequest, context: Context) {
     const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || request.headers.get("x-real-ip") || "unknown";
     const requestId = getRequestId(request);
     const result = await createQuizSubmission(slug, body, ip, requestId);
-    return NextResponse.json(result.ok ? { ok: true } : { ok: false, error: result.error }, { status: result.ok ? 201 : result.status });
+    return NextResponse.json(
+      result.ok
+        ? { ok: true, saved: true, id: result.id, duplicate: result.duplicate === true }
+        : { ok: false, error: result.error },
+      { status: result.ok ? (result.duplicate ? 200 : 201) : result.status },
+    );
   } catch {
     return NextResponse.json({ ok: false, error: "Nao foi possivel processar o envio." }, { status: 400 });
   }

@@ -42,7 +42,7 @@ export type QuizLead = {
 };
 
 type SubmissionResult =
-  | { ok: true; id: string }
+  | { ok: true; id: string; duplicate?: boolean }
   | { ok: false; status: number; error: string };
 
 const LOCAL_FILE = path.join(process.cwd(), ".local-data", "quiz-submissions.json");
@@ -91,7 +91,7 @@ export async function createQuizSubmission(
     return validated;
   }
   const lead: QuizLead = {
-    id: crypto.randomUUID(),
+    id: isUuid(payload.submissionId) ? payload.submissionId : crypto.randomUUID(),
     salonId: active.salon.id,
     quizVersion: active.salon.updatedAt,
     visitorName: validated.visitorName,
@@ -128,6 +128,14 @@ export async function createQuizSubmission(
         created_at: lead.createdAt,
       });
       if (error) {
+        if (error.code === "23505") {
+          logQuizSubmission("quiz_submission_duplicate", {
+            slug,
+            salonId: active.salon.id,
+            requestId,
+          });
+          return { ok: true, id: lead.id, duplicate: true };
+        }
         logQuizSubmission("quiz_submission_insert_failed", {
           slug,
           salonId: active.salon.id,
@@ -404,7 +412,7 @@ function logQuizNotification(
 }
 
 function logQuizSubmission(
-  event: "quiz_submission_validation_failed" | "quiz_submission_salon_not_found" | "quiz_submission_insert_failed",
+  event: "quiz_submission_validation_failed" | "quiz_submission_salon_not_found" | "quiz_submission_insert_failed" | "quiz_submission_duplicate",
   details: { slug: string; salonId?: string; requestId: string; supabaseCode?: string },
 ) {
   console.info("[quiz-submission]", {
@@ -419,6 +427,10 @@ function logQuizSubmission(
 function sanitizeSupabaseErrorCode(value: unknown) {
   const code = typeof value === "string" ? value : "unknown";
   return /^[A-Za-z0-9_-]{1,80}$/.test(code) ? code : "unknown";
+}
+
+function isUuid(value: unknown) {
+  return typeof value === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{12}$/i.test(value);
 }
 
 async function readLocalLeads(): Promise<QuizLead[]> {

@@ -22,6 +22,20 @@ export type StaticTestimonial = {
   rating?: number;
 };
 
+/**
+ * Public-only Meta configuration embedded in an exported landing.
+ *
+ * Access tokens are intentionally not modeled here: they stay exclusively in
+ * the Cloudflare Worker secret store.
+ */
+export type StaticMetaIntegration = {
+  enabled: true;
+  pixelId: string;
+  capiEndpoint: string;
+  pageViewEventName: "PageView";
+  contactEventName: "Contact" | "Lead";
+};
+
 export type StaticPremiumEditorial = {
   accentColor: string;
   backgroundColor: string;
@@ -42,6 +56,8 @@ export type StaticPremiumEditorial = {
     description?: string;
     beforeImageId: string;
     afterImageId: string;
+    beforeAdjustment?: { version: 1; zoom: number; offsetX: number; offsetY: number };
+    afterAdjustment?: { version: 1; zoom: number; offsetX: number; offsetY: number };
     order: number;
     enabled: boolean;
   }>;
@@ -63,6 +79,90 @@ export type StaticPremiumEditorial = {
     imageAlt: string;
     order: number;
   }>;
+  gallerySection?: {
+    enabled: boolean;
+    eyebrow?: string;
+    title?: string;
+    description?: string;
+    position: "after_about" | "after_services" | "after_method" | "before_reviews" | "before_quiz" | "before_cta";
+    items: Array<{
+      id: string;
+      imageId?: string;
+      imageUrl?: string;
+      alt?: string;
+      caption?: string;
+      order: number;
+    }>;
+  };
+  editorialTestimonials?: Array<{
+    id: string;
+    quote?: string;
+    authorName?: string;
+    authorRole?: string;
+    originalImageId?: string;
+    originalImageUrl?: string;
+    originalImageAlt?: string;
+    showOriginalImage: boolean;
+    featured: boolean;
+    order: number;
+  }>;
+  interactiveQuiz?: {
+    enabled: boolean;
+    introEyebrow?: string;
+    introNotice?: string;
+    title: string;
+    subtitle: string;
+    introText: string;
+    estimatedTime: string;
+    startButtonLabel: string;
+    flowTitle: string;
+    contactIntro: string;
+    contactSubmitLabel?: string;
+    confirmationTitle: string;
+    confirmationText: string;
+    consentText: string;
+    contactCityEnabled: boolean;
+    contactCityRequired: boolean;
+    contactConsentRequired: boolean;
+    hideProgressMeta: boolean;
+    privacyUrl?: string;
+    position: "after_services" | "after_results" | "before_faq" | "before_cta";
+    contactNameRequired: boolean;
+    defaultCountryCode: string;
+    quizTheme?: {
+      mode: "inherit" | "custom";
+      primary?: string;
+      accent?: string;
+      background?: string;
+      surface?: string;
+      text?: string;
+    };
+    questions: Array<{
+      id: string;
+      category?: string;
+      type: "short_text" | "long_text" | "single_choice" | "multiple_choice" | "scale" | "yes_no";
+      prompt: string;
+      helperText?: string;
+      placeholder?: string;
+      required: boolean;
+      options: Array<{ id: string; label: string }>;
+      minSelections?: number;
+      maxSelections?: number;
+      scaleMin?: number;
+      scaleMax?: number;
+      scaleStep?: number;
+      scaleInitial?: number;
+      scaleMinLabel?: string;
+      scaleMaxLabel?: string;
+      scaleShowValue: boolean;
+      requireInteraction: boolean;
+      maxLength?: number;
+      showCharacterCount: boolean;
+      autoGrow: boolean;
+      autoAdvance: boolean;
+      autoAdvanceDelay?: number;
+    }>;
+  };
   finalCtaTitle: string;
   finalCtaText: string;
   finalCtaBackgroundColor?: string;
@@ -102,5 +202,8 @@ export type StaticSalon = {
   services: StaticService[];
   testimonials: StaticTestimonial[];
   googleRating: number | null;
+  integrations?: {
+    meta?: StaticMetaIntegration;
+  };
   premiumEditorial: StaticPremiumEditorial;
 };

@@ -1,0 +1,6 @@
+# Copy this file to .dev.vars only for local Worker development. Do not commit .dev.vars.
+META_ACCESS_TOKEN=replace-with-meta-access-token
+META_PIXEL_ID=replace-with-numeric-pixel-id
+META_TEST_EVENT_CODE=replace-with-optional-test-event-code
+META_GRAPH_API_VERSION=replace-with-graph-api-version
+ALLOWED_ORIGINS=http://localhost:4173

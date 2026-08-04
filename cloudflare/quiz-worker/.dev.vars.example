@@ -1,0 +1,9 @@
+# Never commit .dev.vars. These values are read only by `wrangler dev`.
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=replace-locally
+BREVO_API_KEY=replace-locally
+BREVO_SENDER_EMAIL=notifications@example.com
+BREVO_SENDER_NAME=Novo contato - Seu Site
+# Development origins only. Production must contain only the Pages/custom domains.
+# Example: https://dominiodacliente.com.br,https://www.dominiodacliente.com.br
+ALLOWED_ORIGINS=http://localhost:3000,http://127.0.0.1:3000

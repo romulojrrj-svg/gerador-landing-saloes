@@ -1,6 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
-import type { CSSProperties } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { ArrowUpRight, Menu, MapPin, ExternalLink, Star } from "lucide-react";
 import { LandingImage } from "./LandingImage";
 import { SalonHeaderBrand } from "./SalonHeaderBrand";
@@ -27,7 +27,13 @@ import type {
   SalonService,
 } from "@/types/salon";
 
-export function PremiumEditorialLanding({ salon }: { salon: Salon }) {
+export function PremiumEditorialLanding({
+  salon,
+  footerAccessory,
+}: {
+  salon: Salon;
+  footerAccessory?: ReactNode;
+}) {
   const content = salon.premiumEditorial;
   const imageMap = getPremiumEditorialV2Images(salon);
   const services = getPremiumServices(salon);
@@ -598,6 +604,7 @@ export function PremiumEditorialLanding({ salon }: { salon: Salon }) {
               </Link>
             ) : null}
           </div>
+          {footerAccessory ? <div className="mt-7">{footerAccessory}</div> : null}
         </Reveal>
       </section>
     </main>

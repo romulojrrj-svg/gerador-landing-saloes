@@ -4,6 +4,8 @@ import { globalIgnores } from "eslint/config";
 
 const eslintConfig = [
   globalIgnores([
+    "cloudflare/quiz-worker/.wrangler/**",
+    "cloudflare/quiz-worker/node_modules/**",
     "exports/**",
     "static-export-app/out/**",
     "static-export-app/.next/**",

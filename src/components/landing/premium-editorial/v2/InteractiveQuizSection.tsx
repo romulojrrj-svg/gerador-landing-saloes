@@ -4,7 +4,11 @@ import { createPortal } from "react-dom";
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { ArrowLeft, ArrowRight, Check, LoaderCircle, X } from "lucide-react";
 import { buildWhatsappHref } from "@/lib/public-landing";
-import { submitInteractiveQuiz, type InteractiveQuizAnswerValue } from "@/lib/interactive-quiz-client";
+import {
+  submitInteractiveQuiz,
+  type InteractiveQuizAnswerValue,
+  type InteractiveQuizSubmissionPayload,
+} from "@/lib/interactive-quiz-client";
 import type { Salon, SalonInteractiveQuizConfig, SalonInteractiveQuizQuestion, SalonInteractiveQuizTheme } from "@/types/salon";
 
 type Phase = "intro" | "question" | "contact" | "success";
@@ -23,8 +27,69 @@ type QuizTheme = {
   selectedBackground: string;
 };
 
+type StoredQuizSubmission = Pick<
+  InteractiveQuizSubmissionPayload,
+  "submissionId" | "visitorName" | "visitorWhatsapp" | "visitorCity" | "answers" | "consentAccepted" | "consentText"
+>;
+
 const QUIZ_EASING = "cubic-bezier(0.22, 1, 0.36, 1)";
 const QUIZ_TRANSITION_MS = 760;
+
+function pendingSubmissionStorageKey(slug: string) {
+  return `salon-interactive-quiz:${slug}:pending`;
+}
+
+function readPendingSubmission(slug: string): StoredQuizSubmission | null {
+  try {
+    const raw = window.localStorage.getItem(pendingSubmissionStorageKey(slug));
+    if (!raw) return null;
+    const value = JSON.parse(raw) as Partial<StoredQuizSubmission>;
+    if (
+      typeof value.submissionId !== "string" ||
+      !value.answers ||
+      typeof value.answers !== "object" ||
+      Array.isArray(value.answers)
+    ) {
+      return null;
+    }
+    return {
+      submissionId: value.submissionId,
+      visitorName: typeof value.visitorName === "string" ? value.visitorName : "",
+      visitorWhatsapp: typeof value.visitorWhatsapp === "string" ? value.visitorWhatsapp : "",
+      visitorCity: typeof value.visitorCity === "string" ? value.visitorCity : "",
+      answers: value.answers,
+      consentAccepted: value.consentAccepted === true,
+      consentText: typeof value.consentText === "string" ? value.consentText : "",
+    };
+  } catch {
+    return null;
+  }
+}
+
+function persistPendingSubmission(slug: string, payload: InteractiveQuizSubmissionPayload) {
+  try {
+    const value: StoredQuizSubmission = {
+      submissionId: payload.submissionId,
+      visitorName: payload.visitorName,
+      visitorWhatsapp: payload.visitorWhatsapp,
+      visitorCity: payload.visitorCity,
+      answers: payload.answers,
+      consentAccepted: payload.consentAccepted,
+      consentText: payload.consentText,
+    };
+    window.localStorage.setItem(pendingSubmissionStorageKey(slug), JSON.stringify(value));
+  } catch {
+    // Storage can be disabled by the visitor. Submission still proceeds normally.
+  }
+}
+
+function removePendingSubmission(slug: string) {
+  try {
+    window.localStorage.removeItem(pendingSubmissionStorageKey(slug));
+  } catch {
+    // Nothing else is required when storage is unavailable.
+  }
+}
 
 function cssColor(value: unknown, fallback: string) {
   return typeof value === "string" && value.trim() ? value.trim() : fallback;
@@ -106,6 +171,8 @@ function InteractiveQuizFlow({ salon, config }: { salon: Salon; config: SalonInt
   const transitionLockRef = useRef(false);
   const requestCloseRef = useRef<() => void>(() => undefined);
   const closeQuizRef = useRef<(fromHistory?: boolean) => void>(() => undefined);
+  const submissionIdRef = useRef("");
+  const hasRestoredPendingRef = useRef(false);
   const question = config.questions[questionIndex];
   const hasUnsubmittedAnswers = phase !== "success" && (
     Object.keys(answers).length > 0 ||
@@ -127,6 +194,22 @@ function InteractiveQuizFlow({ salon, config }: { salon: Salon; config: SalonInt
     "--quiz-border": quizTheme.border,
     "--quiz-selected-background": quizTheme.selectedBackground,
   } as CSSProperties;
+
+  useEffect(() => {
+    if (hasRestoredPendingRef.current || typeof window === "undefined") return;
+    hasRestoredPendingRef.current = true;
+    const pending = readPendingSubmission(salon.slug);
+    if (!pending) return;
+    const frame = window.requestAnimationFrame(() => {
+      submissionIdRef.current = pending.submissionId;
+      setAnswers(pending.answers);
+      setVisitorName(pending.visitorName);
+      setVisitorWhatsapp(pending.visitorWhatsapp);
+      setVisitorCity(pending.visitorCity ?? "");
+      setConsentAccepted(pending.consentAccepted);
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [salon.slug]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -387,24 +470,34 @@ function InteractiveQuizFlow({ salon, config }: { salon: Salon; config: SalonInt
       return;
     }
     setIsSubmitting(true);
+    const submissionId = submissionIdRef.current || crypto.randomUUID();
+    submissionIdRef.current = submissionId;
+    const payload: InteractiveQuizSubmissionPayload = {
+      submissionId,
+      visitorName: visitorName.trim(),
+      visitorWhatsapp: visitorWhatsapp.trim(),
+      visitorCity: visitorCity.trim(),
+      answers,
+      consentAccepted,
+      consentText: config.contactConsentRequired ? config.consentText : "",
+      sourceUrl: window.location.href,
+      honeypot,
+    };
+    persistPendingSubmission(salon.slug, payload);
     try {
-      await submitInteractiveQuiz(salon.slug, {
-        visitorName: visitorName.trim(),
-        visitorWhatsapp: visitorWhatsapp.trim(),
-        visitorCity: visitorCity.trim(),
-        answers,
-        consentAccepted,
-        consentText: config.contactConsentRequired ? config.consentText : "",
-        sourceUrl: window.location.href,
-        honeypot,
-      }, config);
+      const result = await submitInteractiveQuiz(salon.slug, payload, config);
+      if (result.saved === false) {
+        throw new Error("Nao foi possivel salvar suas respostas.");
+      }
+      removePendingSubmission(salon.slug);
+      submissionIdRef.current = "";
       setPhase("success");
-    } catch {
-      // Keep the visitor experience complete while the lead endpoint is still
-      // being finalized. Validation errors are handled before this request;
-      // technical failures should not leave the visitor on a raw error state.
-      setError("");
-      setPhase("success");
+    } catch (submissionError) {
+      const message = submissionError instanceof Error ? submissionError.message : "";
+      setError(
+        message ||
+          "Nao foi possivel enviar agora. Suas respostas foram mantidas neste dispositivo para tentar novamente.",
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -430,7 +523,7 @@ function InteractiveQuizFlow({ salon, config }: { salon: Salon; config: SalonInt
         <div className="sr-only" aria-live="polite">{step.phase === "question" ? `Etapa ${step.questionIndex + 1} de ${config.questions.length}` : step.phase === "contact" ? "Ultima etapa: seus dados de contato" : step.phase === "success" ? "Respostas enviadas" : "Introducao do teste"}</div>
         {step.phase === "intro" ? <Intro config={config} onStart={startFromDialog} headingRef={focusRef} dialog /> : null}
         {step.phase === "question" && stepQuestion ? <QuestionStep question={stepQuestion} flowTitle={stepQuestion.category || config.flowTitle} questionIndex={step.questionIndex} total={config.questions.length} value={answers[stepQuestion.id]} error={active ? error : ""} progress={stepProgress} headingRef={focusRef} onAnswer={active ? setAnswer : noop} onBack={active ? goBack : noop} onNext={active ? advance : noop} /> : null}
-        {step.phase === "contact" ? <ContactStepV2 config={config} visitorName={visitorName} visitorWhatsapp={visitorWhatsapp} visitorCity={visitorCity} consentAccepted={consentAccepted} error={active ? error : ""} isSubmitting={isSubmitting} progress={stepProgress} headingRef={focusRef} onName={active ? setVisitorName : noop} onWhatsapp={active ? setVisitorWhatsapp : noop} onCity={active ? setVisitorCity : noop} onConsent={active ? setConsentAccepted : noop} onBack={active ? goBack : noop} onSubmit={active ? submit : noop} onHoneypot={active ? setHoneypot : noop} /> : null}
+        {step.phase === "contact" ? <ContactStepV2 config={config} visitorName={visitorName} visitorWhatsapp={visitorWhatsapp} visitorCity={visitorCity} consentAccepted={consentAccepted} error={active ? error : ""} isSubmitting={isSubmitting} progress={stepProgress} headingRef={focusRef} onName={active ? setVisitorName : noop} onWhatsapp={active ? setVisitorWhatsapp : noop} onCity={active ? setVisitorCity : noop} onConsent={active ? setConsentAccepted : noop} onBack={active ? goBack : noop} onSubmit={active ? submit : noop} onHoneypot={active ? setHoneypot : noop} fallbackWhatsappHref={buildWhatsappHref(salon.whatsapp, salon.whatsappMessage)} /> : null}
         {step.phase === "success" ? <SuccessStep salon={salon} config={config} headingRef={focusRef} onClose={() => closeQuiz()} /> : null}
       </>
     );
@@ -548,9 +641,9 @@ function formatWhatsappInput(value: string) {
   return `(${areaCode})${firstPart}${secondPart ? `-${secondPart}` : ""}`;
 }
 
-function ContactStepV2({ config, visitorName, visitorWhatsapp, visitorCity, consentAccepted, error, isSubmitting, progress, headingRef, onName, onWhatsapp, onCity, onConsent, onBack, onSubmit, onHoneypot }: { config: SalonInteractiveQuizConfig; visitorName: string; visitorWhatsapp: string; visitorCity: string; consentAccepted: boolean; error: string; isSubmitting: boolean; progress: number; headingRef: React.RefObject<HTMLHeadingElement | null>; onName: (value: string) => void; onWhatsapp: (value: string) => void; onCity: (value: string) => void; onConsent: (value: boolean) => void; onBack: () => void; onSubmit: () => void; onHoneypot: (value: string) => void }) {
+function ContactStepV2({ config, visitorName, visitorWhatsapp, visitorCity, consentAccepted, error, isSubmitting, progress, headingRef, onName, onWhatsapp, onCity, onConsent, onBack, onSubmit, onHoneypot, fallbackWhatsappHref }: { config: SalonInteractiveQuizConfig; visitorName: string; visitorWhatsapp: string; visitorCity: string; consentAccepted: boolean; error: string; isSubmitting: boolean; progress: number; headingRef: React.RefObject<HTMLHeadingElement | null>; onName: (value: string) => void; onWhatsapp: (value: string) => void; onCity: (value: string) => void; onConsent: (value: boolean) => void; onBack: () => void; onSubmit: () => void; onHoneypot: (value: string) => void; fallbackWhatsappHref?: string }) {
   if (!config.contactCityEnabled && !config.contactConsentRequired && !config.contactSubmitLabel) return <ContactStep config={config} visitorName={visitorName} visitorWhatsapp={visitorWhatsapp} error={error} isSubmitting={isSubmitting} progress={progress} headingRef={headingRef} onName={onName} onWhatsapp={onWhatsapp} onBack={onBack} onSubmit={onSubmit} onHoneypot={onHoneypot} />
-  return <div><div className="flex items-center justify-between gap-4"><span className="text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500">Última etapa</span></div><div className="mt-3 h-1.5 overflow-hidden rounded-full bg-zinc-200"><div className="h-full w-full rounded-full bg-[#9b7353] transition-[width] duration-500 motion-reduce:transition-none" /></div><h2 id="interactive-quiz-dialog-title" ref={headingRef} tabIndex={-1} className="mt-8 font-serif text-3xl leading-tight text-zinc-950 outline-none sm:text-4xl">{config.contactIntro}</h2><div className="mt-7 grid gap-4"><label className="grid gap-2 text-sm font-semibold text-zinc-800">Nome{config.contactNameRequired ? " *" : ""}<input className="rounded-2xl border border-zinc-200 bg-white px-4 py-4 text-base outline-none focus:border-[#9b7353]" value={visitorName} onChange={(event) => onName(event.target.value)} autoComplete="name" /></label><label className="grid gap-2 text-sm font-semibold text-zinc-800">WhatsApp *<input className="rounded-2xl border border-zinc-200 bg-white px-4 py-4 text-base outline-none focus:border-[#9b7353]" value={visitorWhatsapp} onChange={(event) => onWhatsapp(formatWhatsappInput(event.target.value))} autoComplete="tel" inputMode="tel" placeholder="(21)99..." /></label>{config.contactCityEnabled ? <label className="grid gap-2 text-sm font-semibold text-zinc-800">Cidade{config.contactCityRequired ? " *" : ""}<input className="rounded-2xl border border-zinc-200 bg-white px-4 py-4 text-base outline-none focus:border-[#9b7353]" value={visitorCity} onChange={(event) => onCity(event.target.value)} autoComplete="address-level2" /></label> : null}{config.contactConsentRequired ? <label className="flex items-start gap-3 text-sm leading-6 text-zinc-600"><input type="checkbox" checked={consentAccepted} onChange={(event) => onConsent(event.target.checked)} className="mt-1 h-4 w-4 shrink-0" /><span>{config.consentText}</span></label> : null}<label className="absolute -left-[9999px] h-px w-px overflow-hidden" aria-hidden="true">Nao preencher<input tabIndex={-1} autoComplete="off" value="" onChange={(event) => onHoneypot(event.target.value)} /></label></div>{error ? <p role="alert" className="mt-4 text-sm font-semibold text-rose-700">{error}</p> : null}<div className="mt-8 flex flex-wrap justify-between gap-3"><button type="button" onClick={onBack} disabled={isSubmitting} className="inline-flex min-h-11 items-center gap-2 rounded-full border border-zinc-300 bg-white px-5 py-2.5 text-sm font-semibold text-zinc-800"><ArrowLeft className="h-4 w-4" aria-hidden="true" />Voltar</button><button type="button" onClick={onSubmit} disabled={isSubmitting} className="inline-flex min-h-11 items-center gap-2 rounded-full bg-zinc-950 px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-60">{isSubmitting ? <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Check className="h-4 w-4" aria-hidden="true" />}Enviar para análise</button></div></div>;
+  return <div><div className="flex items-center justify-between gap-4"><span className="text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500">Última etapa</span></div><div className="mt-3 h-1.5 overflow-hidden rounded-full bg-zinc-200"><div className="h-full w-full rounded-full bg-[#9b7353] transition-[width] duration-500 motion-reduce:transition-none" /></div><h2 id="interactive-quiz-dialog-title" ref={headingRef} tabIndex={-1} className="mt-8 font-serif text-3xl leading-tight text-zinc-950 outline-none sm:text-4xl">{config.contactIntro}</h2><div className="mt-7 grid gap-4"><label className="grid gap-2 text-sm font-semibold text-zinc-800">Nome{config.contactNameRequired ? " *" : ""}<input className="rounded-2xl border border-zinc-200 bg-white px-4 py-4 text-base outline-none focus:border-[#9b7353]" value={visitorName} onChange={(event) => onName(event.target.value)} autoComplete="name" /></label><label className="grid gap-2 text-sm font-semibold text-zinc-800">WhatsApp *<input className="rounded-2xl border border-zinc-200 bg-white px-4 py-4 text-base outline-none focus:border-[#9b7353]" value={visitorWhatsapp} onChange={(event) => onWhatsapp(formatWhatsappInput(event.target.value))} autoComplete="tel" inputMode="tel" placeholder="(21)99..." /></label>{config.contactCityEnabled ? <label className="grid gap-2 text-sm font-semibold text-zinc-800">Cidade{config.contactCityRequired ? " *" : ""}<input className="rounded-2xl border border-zinc-200 bg-white px-4 py-4 text-base outline-none focus:border-[#9b7353]" value={visitorCity} onChange={(event) => onCity(event.target.value)} autoComplete="address-level2" /></label> : null}{config.contactConsentRequired ? <label className="flex items-start gap-3 text-sm leading-6 text-zinc-600"><input type="checkbox" checked={consentAccepted} onChange={(event) => onConsent(event.target.checked)} className="mt-1 h-4 w-4 shrink-0" /><span>{config.consentText}</span></label> : null}<label className="absolute -left-[9999px] h-px w-px overflow-hidden" aria-hidden="true">Nao preencher<input tabIndex={-1} autoComplete="off" value="" onChange={(event) => onHoneypot(event.target.value)} /></label></div>{error ? <div className="mt-4 grid gap-3"><p role="alert" className="text-sm font-semibold text-rose-700">{error}</p><div className="flex flex-wrap gap-3"><button type="button" onClick={onSubmit} disabled={isSubmitting} className="inline-flex min-h-10 items-center rounded-full border border-zinc-300 bg-white px-4 py-2 text-sm font-semibold text-zinc-800 disabled:opacity-60">Tentar novamente</button>{fallbackWhatsappHref ? <a href={fallbackWhatsappHref} className="inline-flex min-h-10 items-center rounded-full border border-zinc-300 bg-white px-4 py-2 text-sm font-semibold text-zinc-800">Falar pelo WhatsApp</a> : null}</div></div> : null}<div className="mt-8 flex flex-wrap justify-between gap-3"><button type="button" onClick={onBack} disabled={isSubmitting} className="inline-flex min-h-11 items-center gap-2 rounded-full border border-zinc-300 bg-white px-5 py-2.5 text-sm font-semibold text-zinc-800"><ArrowLeft className="h-4 w-4" aria-hidden="true" />Voltar</button><button type="button" onClick={onSubmit} disabled={isSubmitting} className="inline-flex min-h-11 items-center gap-2 rounded-full bg-zinc-950 px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-60">{isSubmitting ? <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Check className="h-4 w-4" aria-hidden="true" />}{error ? "Tentar novamente" : "Enviar para análise"}</button></div></div>;
 }
 
 function ContactStep({ config, visitorName, visitorWhatsapp, error, isSubmitting, progress, headingRef, onName, onWhatsapp, onBack, onSubmit, onHoneypot }: { config: SalonInteractiveQuizConfig; visitorName: string; visitorWhatsapp: string; visitorCity?: string; consentAccepted?: boolean; error: string; isSubmitting: boolean; progress: number; headingRef: React.RefObject<HTMLHeadingElement | null>; onName: (value: string) => void; onWhatsapp: (value: string) => void; onCity?: (value: string) => void; onConsent?: (value: boolean) => void; onBack: () => void; onSubmit: () => void; onHoneypot: (value: string) => void }) {

@@ -8,6 +8,12 @@
     "start": "next start",
     "lint": "eslint .",
     "test:quiz-email": "node --experimental-strip-types scripts/test-quiz-email.mjs",
+    "check:quiz-worker": "npm --prefix cloudflare/quiz-worker run check",
+    "test:quiz-worker": "npm --prefix cloudflare/quiz-worker run test",
+    "smoke:quiz-worker": "npm --prefix cloudflare/quiz-worker run smoke",
+    "check:meta-capi-worker": "npm --prefix cloudflare/meta-capi-worker run check",
+    "test:meta-capi-worker": "npm --prefix cloudflare/meta-capi-worker run test",
+    "dry-run:meta-capi-worker": "npm --prefix cloudflare/meta-capi-worker run dry-run",
     "export:salon": "node scripts/export-salon-static.mjs",
     "preview:salon-export": "node scripts/preview-salon-export.mjs"
   },

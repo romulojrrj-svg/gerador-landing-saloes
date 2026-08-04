@@ -20,6 +20,8 @@ const prohibitedReferences = [
   "anon_key",
   "gemini",
   "admin_password",
+  "access_token",
+  "meta_access_token",
   "c:\\users\\",
   "blob:",
   "data:image",
@@ -42,9 +44,13 @@ async function main() {
   }
 
   const env = await loadLocalEnv();
+  const quizApiUrl = normalizeQuizApiUrl(args["quiz-api-url"] ?? env.NEXT_PUBLIC_QUIZ_API_URL);
+  if ((args["quiz-api-url"] || env.NEXT_PUBLIC_QUIZ_API_URL) && !quizApiUrl) {
+    throw new Error("Use --quiz-api-url com uma URL http(s) valida da Worker.");
+  }
   const salonRow = await loadSalonFromSupabase(env, slug);
-  const prepared = await prepareExport(salonRow, slug, version, domainOverride);
-  const output = await buildStaticSite(prepared, slug, version);
+  const prepared = await prepareExport(salonRow, slug, version, domainOverride, quizApiUrl);
+  const output = await buildStaticSite(prepared, slug, version, quizApiUrl);
   await validateExport(output.siteDir);
   const zipPath = await createZip(output.siteDir, output.versionDir, slug, version);
   const packageHash = await hashFile(zipPath);
@@ -132,10 +138,12 @@ async function loadSalonFromSupabase(env, slug) {
   return data;
 }
 
-async function prepareExport(row, slug, version, domainOverride = "") {
+async function prepareExport(row, slug, version, domainOverride = "", quizApiUrl = "") {
   const metadata = record(row.metadata);
   const legacySalon = record(metadata.salon);
   const fields = { ...legacySalon, ...metadata };
+  const rawMetaIntegration = record(record(fields.integrations).meta);
+  const metaIntegration = sanitizePublicMetaIntegration(rawMetaIntegration);
   const sourceTemplate = fields.template;
   const sourceTemplateVersion = fields.templateVersion ?? legacySalon.templateVersion ?? null;
   const sourceDesignLocked = fields.designLocked ?? legacySalon.designLocked ?? null;
@@ -154,7 +162,13 @@ async function prepareExport(row, slug, version, domainOverride = "") {
 
   const customDomain = domainOverride || normalizeDomain(fields.customDomain);
   if (!customDomain) throw new Error("O salao precisa ter um dominio proprio valido para gerar canonical e sitemap.");
+  if (rawMetaIntegration.enabled === true && !metaIntegration) {
+    throw new Error("A configuracao integrations.meta esta habilitada, mas nao possui pixelId, capiEndpoint ou eventos validos.");
+  }
   const premium = sanitizePremiumEditorial(record(fields.premiumEditorial));
+  if (premium.interactiveQuiz?.enabled && !quizApiUrl) {
+    throw new Error("A exportacao de uma landing com Teste Interativo exige --quiz-api-url ou NEXT_PUBLIC_QUIZ_API_URL.");
+  }
   const exportTemplateVersion = sourceTemplateVersion === "premium_editorial_v2"
     ? "premium_editorial_v2"
     : "premium_v1";
@@ -169,6 +183,8 @@ async function prepareExport(row, slug, version, domainOverride = "") {
     premium.aboutImageId,
     ...premium.beforeAfterItems.flatMap((item) => [item.beforeImageId, item.afterImageId]),
     ...premium.reviewScreenshotImages.map((item) => item.imageId),
+    ...(premium.gallerySection?.items ?? []).map((item) => item.imageId),
+    ...(premium.editorialTestimonials ?? []).map((item) => item.originalImageId),
   ].filter(Boolean));
 
   if (!requiredImageIds.size) {
@@ -186,6 +202,16 @@ async function prepareExport(row, slug, version, domainOverride = "") {
   for (const screenshot of premium.reviewScreenshotImages) {
     if (screenshot.imageId || !screenshot.imageUrl) continue;
     assetSources.push({ id: `review-${screenshot.id}`, url: requiredUrl(screenshot.imageUrl, `feedback ${screenshot.id}`), alt: screenshot.imageAlt || "Feedback de paciente", type: "review", source: "manual", kind: "photo" });
+  }
+
+  for (const item of premium.gallerySection?.items ?? []) {
+    if (item.imageId || !item.imageUrl) continue;
+    assetSources.push({ id: `gallery-${item.id}`, url: requiredUrl(item.imageUrl, `galeria ${item.id}`), alt: item.alt || `${row.name} galeria`, type: "gallery", source: "manual", kind: "photo" });
+  }
+
+  for (const item of premium.editorialTestimonials ?? []) {
+    if (item.originalImageId || !item.originalImageUrl) continue;
+    assetSources.push({ id: `testimonial-${item.id}`, url: requiredUrl(item.originalImageUrl, `depoimento ${item.id}`), alt: item.originalImageAlt || "Depoimento", type: "review", source: "manual", kind: "photo" });
   }
 
   const horizontalLogoUrl = string(fields.horizontalLogoUrl);
@@ -226,10 +252,8 @@ async function prepareExport(row, slug, version, domainOverride = "") {
     services: array(row.services).map((service, index) => ({ id: string(service.id) || `service-${index + 1}`, title: string(service.title), description: string(service.description) || undefined })).filter((service) => service.title),
     testimonials: array(row.real_reviews).map((review, index) => ({ id: string(review.id) || `review-${index + 1}`, authorName: string(review.authorName) || string(review.author) || "", text: string(review.text), rating: numberOrUndefined(review.rating) })).filter((review) => review.text),
     googleRating: numberOrNull(fields.googleRating),
-    premiumEditorial: {
-      ...premium,
-      reviewScreenshotImages: premium.reviewScreenshotImages.map((item) => ({ ...item, src: item.imageId ? undefined : publicAsset(assetResults.get(`review-${item.id}`))?.src })),
-    },
+    ...(metaIntegration ? { integrations: { meta: metaIntegration } } : {}),
+    premiumEditorial: rewritePremiumAssetReferences(premium, assetResults),
     seo: sanitizeSeo(record(row.seo), row.name),
   };
 
@@ -265,13 +289,151 @@ function sanitizePremiumEditorial(value) {
     backgroundColor: string(value.backgroundColor) || "#f8f5f0",
     heroEyebrow: string(value.heroEyebrow), heroTitle: string(value.heroTitle), heroDescription: string(value.heroDescription), heroImageId: string(value.heroImageId) || undefined, aboutImageId: string(value.aboutImageId) || undefined,
     aboutTitle: string(value.aboutTitle), aboutRole: string(value.aboutRole), aboutText: string(value.aboutText), methodEyebrow: string(value.methodEyebrow), methodTitle: string(value.methodTitle), methodText: string(value.methodText),
-    beforeAfterItems: array(value.beforeAfterItems).map((item, index) => ({ id: string(item.id) || `before-after-${index + 1}`, title: string(item.title), description: string(item.description) || undefined, beforeImageId: string(item.beforeImageId), afterImageId: string(item.afterImageId), order: numberOrUndefined(item.order) ?? index, enabled: item.enabled !== false })).filter((item) => item.beforeImageId && item.afterImageId),
+    beforeAfterItems: array(value.beforeAfterItems).map((item, index) => ({ id: string(item.id) || `before-after-${index + 1}`, title: string(item.title), description: string(item.description) || undefined, beforeImageId: string(item.beforeImageId), afterImageId: string(item.afterImageId), beforeAdjustment: sanitizeImageAdjustment(record(item.beforeAdjustment)), afterAdjustment: sanitizeImageAdjustment(record(item.afterAdjustment)), order: numberOrUndefined(item.order) ?? index, enabled: item.enabled !== false })).filter((item) => item.beforeImageId && item.afterImageId),
     faqItems: array(value.faqItems).map((item, index) => ({ id: string(item.id) || `faq-${index + 1}`, question: string(item.question), answer: string(item.answer), order: numberOrUndefined(item.order) ?? index, enabled: item.enabled !== false })).filter((item) => item.question && item.answer),
     reviewDisplayType: value.reviewDisplayType === "screenshots" ? "screenshots" : "google",
     reviewEyebrow: string(value.reviewEyebrow), reviewTitle: string(value.reviewTitle), reviewDescription: string(value.reviewDescription),
     reviewScreenshotImages: array(value.reviewScreenshotImages).map((item, index) => ({ id: string(item.id) || `review-screenshot-${index + 1}`, imageId: string(item.imageId) || undefined, imageUrl: string(item.imageUrl) || undefined, imageAlt: string(item.imageAlt) || "Feedback de paciente", order: numberOrUndefined(item.order) ?? index })).filter((item) => item.imageId || item.imageUrl),
+    gallerySection: sanitizeGallerySection(optionalRecord(value.gallerySection)),
+    editorialTestimonials: array(value.editorialTestimonials).map((item, index) => ({ id: string(item.id) || `editorial-testimonial-${index + 1}`, quote: string(item.quote) || undefined, authorName: string(item.authorName) || undefined, authorRole: string(item.authorRole) || undefined, originalImageId: string(item.originalImageId) || undefined, originalImageUrl: string(item.originalImageUrl) || undefined, originalImageAlt: string(item.originalImageAlt) || undefined, showOriginalImage: item.showOriginalImage === true, featured: item.featured === true, order: numberOrUndefined(item.order) ?? index })).filter((item) => item.quote || item.originalImageId || item.originalImageUrl),
+    interactiveQuiz: sanitizePublicInteractiveQuiz(optionalRecord(value.interactiveQuiz)),
     finalCtaTitle: string(value.finalCtaTitle), finalCtaText: string(value.finalCtaText), finalCtaBackgroundColor: string(value.finalCtaBackgroundColor) || undefined, finalWhatsappButtonColor: string(value.finalWhatsappButtonColor) || undefined, finalWhatsappButtonTextColor: string(value.finalWhatsappButtonTextColor) || undefined, bookingButtonTextColor: string(value.bookingButtonTextColor) || undefined, instagramButtonTextColor: string(value.instagramButtonTextColor) || undefined, finalSecondaryButtonTextColor: string(value.finalSecondaryButtonTextColor) || undefined,
     aboutLabel: string(value.aboutLabel) || undefined, servicesLabel: string(value.servicesLabel) || undefined, servicesTitle: string(value.servicesTitle) || undefined, resultsLabel: string(value.resultsLabel) || undefined, contactLabel: string(value.contactLabel) || undefined, bookAppointmentLabel: string(value.bookAppointmentLabel) || undefined, bookViaWhatsappLabel: string(value.bookViaWhatsappLabel) || undefined, reservationsLabel: string(value.reservationsLabel) || undefined, chatOnWhatsappLabel: string(value.chatOnWhatsappLabel) || undefined, bookOnFreshaLabel: string(value.bookOnFreshaLabel) || undefined,
+  };
+}
+
+function sanitizeImageAdjustment(value) {
+  if (!value || value.version !== 1) return undefined;
+  const zoom = numberOrUndefined(value.zoom);
+  const offsetX = numberOrUndefined(value.offsetX);
+  const offsetY = numberOrUndefined(value.offsetY);
+  if (zoom == null || offsetX == null || offsetY == null) return undefined;
+  return {
+    version: 1,
+    zoom: Math.min(Math.max(zoom, 1), 4),
+    offsetX: Math.min(Math.max(offsetX, -1), 1),
+    offsetY: Math.min(Math.max(offsetY, -1), 1),
+  };
+}
+
+function sanitizeGallerySection(value) {
+  if (!value) return undefined;
+  const positions = new Set(["after_about", "after_services", "after_method", "before_reviews", "before_quiz", "before_cta"]);
+  return {
+    enabled: value.enabled === true,
+    eyebrow: string(value.eyebrow) || undefined,
+    title: string(value.title) || undefined,
+    description: string(value.description) || undefined,
+    position: positions.has(value.position) ? value.position : "before_reviews",
+    items: array(value.items).map((item, index) => ({
+      id: string(item.id) || `gallery-${index + 1}`,
+      imageId: string(item.imageId) || undefined,
+      imageUrl: string(item.imageUrl) || undefined,
+      alt: string(item.alt) || undefined,
+      caption: string(item.caption) || undefined,
+      order: numberOrUndefined(item.order) ?? index,
+    })).filter((item) => item.imageId || item.imageUrl),
+  };
+}
+
+function sanitizePublicInteractiveQuiz(value) {
+  if (!value) return undefined;
+  const positions = new Set(["after_services", "after_results", "before_faq", "before_cta"]);
+  const questionTypes = new Set(["short_text", "long_text", "single_choice", "multiple_choice", "scale", "yes_no"]);
+  const questions = array(value.questions).map((question, index) => {
+    const type = string(question.type);
+    if (!questionTypes.has(type)) return null;
+    return {
+      id: string(question.id) || `question-${index + 1}`,
+      category: string(question.category) || undefined,
+      type,
+      prompt: string(question.prompt),
+      helperText: string(question.helperText) || undefined,
+      placeholder: string(question.placeholder) || undefined,
+      required: question.required !== false,
+      options: array(question.options).map((option, optionIndex) => ({
+        id: string(option.id) || `option-${optionIndex + 1}`,
+        label: string(option.label),
+      })).filter((option) => option.label),
+      minSelections: numberOrUndefined(question.minSelections),
+      maxSelections: numberOrUndefined(question.maxSelections),
+      scaleMin: numberOrUndefined(question.scaleMin),
+      scaleMax: numberOrUndefined(question.scaleMax),
+      scaleStep: numberOrUndefined(question.scaleStep),
+      scaleInitial: numberOrUndefined(question.scaleInitial),
+      scaleMinLabel: string(question.scaleMinLabel) || undefined,
+      scaleMaxLabel: string(question.scaleMaxLabel) || undefined,
+      scaleShowValue: question.scaleShowValue !== false,
+      requireInteraction: question.requireInteraction === true,
+      maxLength: numberOrUndefined(question.maxLength),
+      showCharacterCount: question.showCharacterCount === true,
+      autoGrow: question.autoGrow === true,
+      autoAdvance: question.autoAdvance === true,
+      autoAdvanceDelay: numberOrUndefined(question.autoAdvanceDelay),
+    };
+  }).filter(Boolean);
+  return {
+    enabled: value.enabled === true,
+    introEyebrow: string(value.introEyebrow) || undefined,
+    introNotice: string(value.introNotice) || undefined,
+    title: string(value.title),
+    subtitle: string(value.subtitle),
+    introText: string(value.introText),
+    estimatedTime: string(value.estimatedTime),
+    startButtonLabel: string(value.startButtonLabel),
+    flowTitle: string(value.flowTitle),
+    contactIntro: string(value.contactIntro),
+    contactSubmitLabel: string(value.contactSubmitLabel) || undefined,
+    confirmationTitle: string(value.confirmationTitle),
+    confirmationText: string(value.confirmationText),
+    consentText: string(value.consentText),
+    contactCityEnabled: value.contactCityEnabled === true,
+    contactCityRequired: value.contactCityRequired === true,
+    contactConsentRequired: value.contactConsentRequired === true,
+    hideProgressMeta: value.hideProgressMeta === true,
+    privacyUrl: string(value.privacyUrl) || undefined,
+    position: positions.has(value.position) ? value.position : "before_cta",
+    contactNameRequired: value.contactNameRequired !== false,
+    defaultCountryCode: string(value.defaultCountryCode) || "+55",
+    quizTheme: sanitizeQuizTheme(optionalRecord(value.quizTheme)),
+    questions,
+  };
+}
+
+function sanitizeQuizTheme(value) {
+  if (!value) return undefined;
+  return {
+    mode: value.mode === "custom" ? "custom" : "inherit",
+    primary: string(value.primary) || undefined,
+    accent: string(value.accent) || undefined,
+    background: string(value.background) || undefined,
+    surface: string(value.surface) || undefined,
+    text: string(value.text) || undefined,
+  };
+}
+
+function rewritePremiumAssetReferences(premium, assetResults) {
+  const localImageUrl = (id) => publicAsset(assetResults.get(id))?.src;
+  return {
+    ...premium,
+    reviewScreenshotImages: premium.reviewScreenshotImages.map((item) => ({
+      ...item,
+      imageId: item.imageId || (localImageUrl(`review-${item.id}`) ? `review-${item.id}` : undefined),
+      imageUrl: item.imageId ? undefined : localImageUrl(`review-${item.id}`),
+    })),
+    gallerySection: premium.gallerySection ? {
+      ...premium.gallerySection,
+      items: premium.gallerySection.items.map((item) => ({
+        ...item,
+        imageId: item.imageId || (localImageUrl(`gallery-${item.id}`) ? `gallery-${item.id}` : undefined),
+        imageUrl: item.imageId ? undefined : localImageUrl(`gallery-${item.id}`),
+      })),
+    } : undefined,
+    editorialTestimonials: premium.editorialTestimonials.map((item) => ({
+      ...item,
+      originalImageId: item.originalImageId || (localImageUrl(`testimonial-${item.id}`) ? `testimonial-${item.id}` : undefined),
+      originalImageUrl: item.originalImageId ? undefined : localImageUrl(`testimonial-${item.id}`),
+    })),
   };
 }
 
@@ -323,8 +485,40 @@ function looksLikeHtml(buffer) { return /^\s*(?:<!doctype html|<html|<head|<body
 function requiredUrl(value, label) { if (!/^https:\/\//i.test(value) || /^(?:blob:|data:|file:|https?:\/\/(?:localhost|127\.0\.0\.1))/i.test(value)) throw new Error(`URL invalida para ${label}.`); return value; }
 function imageUrl(image) { return string(image.src) || string(image.url); }
 function normalizeDomain(value) { const domain = string(value).toLowerCase().replace(/^https?:\/\//, "").replace(/^www\./, "").replace(/\/$/, ""); return /^[a-z0-9.-]+\.[a-z]{2,}$/i.test(domain) ? domain : ""; }
+function normalizeQuizApiUrl(value) {
+  const candidate = string(value).replace(/\/$/, "");
+  try {
+    const url = new URL(candidate);
+    return url.protocol === "https:" || url.protocol === "http:" ? url.toString().replace(/\/$/, "") : "";
+  } catch {
+    return "";
+  }
+}
+function sanitizePublicMetaIntegration(value) {
+  if (value.enabled !== true) return undefined;
+  const pixelId = string(value.pixelId);
+  const capiEndpoint = normalizeMetaCapiEndpoint(value.capiEndpoint);
+  const pageViewEventName = string(value.pageViewEventName) || "PageView";
+  const contactEventName = string(value.contactEventName) || "Contact";
+  if (!/^\d{5,20}$/.test(pixelId) || !capiEndpoint || pageViewEventName !== "PageView" || !["Contact", "Lead"].includes(contactEventName)) {
+    return undefined;
+  }
+  // Deliberately enumerate fields. Any token-like fields in metadata are never
+  // copied into the static DTO or its generated JavaScript.
+  return { enabled: true, pixelId, capiEndpoint, pageViewEventName, contactEventName };
+}
+function normalizeMetaCapiEndpoint(value) {
+  try {
+    const url = new URL(string(value));
+    if (url.protocol !== "https:" || url.username || url.password || url.search || url.hash || url.pathname !== "/meta-event") return "";
+    return url.toString();
+  } catch {
+    return "";
+  }
+}
 function array(value) { return Array.isArray(value) ? value.filter((item) => item && typeof item === "object") : []; }
 function record(value) { return value && typeof value === "object" && !Array.isArray(value) ? value : {}; }
+function optionalRecord(value) { return value && typeof value === "object" && !Array.isArray(value) ? value : undefined; }
 function string(value) { return typeof value === "string" ? value.normalize("NFC").trim() : ""; }
 function numberOrUndefined(value) { const number = typeof value === "number" ? value : Number(value); return Number.isFinite(number) ? number : undefined; }
 function numberOrNull(value) { return numberOrUndefined(value) ?? null; }
@@ -341,11 +535,11 @@ async function writeStaticPublicFiles(dto) {
   await fs.writeFile(path.join(publicDir, "_headers"), `/_next/static/*\n  Cache-Control: public, max-age=31536000, immutable\n  X-Content-Type-Options: nosniff\n\n/assets/*\n  Cache-Control: public, max-age=31536000, immutable\n  X-Content-Type-Options: nosniff\n\n/*\n  Cache-Control: public, max-age=0, must-revalidate\n  X-Content-Type-Options: nosniff\n  Referrer-Policy: strict-origin-when-cross-origin\n  Permissions-Policy: camera=(), microphone=(), geolocation=()\n`);
 }
 
-async function buildStaticSite(prepared, slug, version) {
+async function buildStaticSite(prepared, slug, version, quizApiUrl = "") {
   const versionDir = path.join(root, "exports", slug, `${timestamp()}_${version}`);
   const siteDir = path.join(versionDir, "site");
   await fs.mkdir(versionDir, { recursive: true });
-  execFileSync(process.execPath, [path.join(root, "node_modules", "next", "dist", "bin", "next"), "build", "--webpack"], { cwd: staticApp, stdio: "inherit", env: { ...process.env, NODE_ENV: "production" } });
+  execFileSync(process.execPath, [path.join(root, "node_modules", "next", "dist", "bin", "next"), "build", "--webpack"], { cwd: staticApp, stdio: "inherit", env: { ...process.env, NODE_ENV: "production", NEXT_PUBLIC_STATIC_EXPORT: "true", NEXT_PUBLIC_QUIZ_API_URL: quizApiUrl } });
   await fs.cp(path.join(staticApp, "out"), siteDir, { recursive: true, errorOnExist: true });
   await fs.mkdir(path.join(root, "exports", slug, "latest"), { recursive: true });
   await fs.rm(path.join(root, "exports", slug, "latest"), { recursive: true, force: true });

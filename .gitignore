@@ -50,3 +50,10 @@ static-export-app/public/sitemap.xml
 static-export-app/public/site.webmanifest
 static-export-app/public/favicon.ico
 static-export-app/public/brand/
+
+# Local Cloudflare Worker configuration
+cloudflare/quiz-worker/.dev.vars
+cloudflare/quiz-worker/.wrangler/
+cloudflare/meta-capi-worker/.dev.vars
+cloudflare/meta-capi-worker/.wrangler/
+supabase/.temp/
