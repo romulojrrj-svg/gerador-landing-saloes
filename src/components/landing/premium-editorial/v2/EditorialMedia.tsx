@@ -4,7 +4,6 @@ import { createPortal } from "react-dom";
 import Image from "next/image";
 import { Check, X } from "lucide-react";
 import { useEffect, useRef, useState, type MouseEvent } from "react";
-import { LandingImage } from "./LandingImage";
 import type {
   SalonGalleryImage,
   SalonPremiumEditorialGalleryItem,
@@ -92,14 +91,14 @@ export function EditorialGallerySection({
             ) : null}
           </div>
 
-          <div className="mt-8 grid min-w-0 grid-cols-1 gap-4 md:auto-rows-[12rem] md:grid-cols-12">
+          <div className="mt-8 grid min-w-0 grid-cols-1 gap-4 md:grid-cols-12">
             {items.map((resolved, index) => {
               const isFeatured = items.length > 1 && index === 0;
               const itemClassName =
                 items.length === 1
-                  ? "min-w-0 md:col-span-12 md:row-span-2"
+                  ? "min-w-0 md:col-span-12"
                   : isFeatured
-                    ? "min-w-0 md:col-span-7 md:row-span-2"
+                    ? "min-w-0 md:col-span-7"
                     : "min-w-0 md:col-span-5";
               const alt =
                 resolved.item.alt?.trim() ||
@@ -114,36 +113,28 @@ export function EditorialGallerySection({
                   <button
                     type="button"
                     onClick={(event) => openImage(event, resolved)}
-                    className="group relative block aspect-[4/3] w-full min-w-0 overflow-hidden rounded-[1.75rem] bg-zinc-100 text-left focus:outline-none focus:ring-2 focus:ring-offset-4 md:aspect-auto md:h-full md:min-h-0"
+                    className="group relative block w-full min-w-0 overflow-hidden rounded-[1.75rem] bg-zinc-100 text-left focus:outline-none focus:ring-2 focus:ring-offset-4"
                     style={{ outlineColor: accent }}
                     aria-label={
                       resolved.item.caption?.trim() ||
                       (alt ? `Ampliar imagem: ${alt}` : "Ampliar imagem")
                     }
                   >
-                    {resolved.image ? (
-                      <LandingImage
-                        image={resolved.image}
-                        salonSlug={salonSlug}
-                        section="premium-editorial-gallery"
-                        imageId={resolved.image.id}
-                        alt={alt}
-                        fill
-                        sizes={
-                          isFeatured
-                            ? "(min-width: 768px) 58vw, 100vw"
-                            : "(min-width: 768px) 42vw, 100vw"
-                        }
-                        className="object-cover transition duration-500 ease-out group-hover:scale-[1.02] motion-reduce:transition-none"
-                      />
-                    ) : resolved.src ? (
-                      <Image
+                    {resolved.src ? (
+                      <img
                         src={resolved.src}
                         alt={alt}
-                        fill
-                        unoptimized
-                        sizes="(min-width: 768px) 42vw, 100vw"
-                        className="object-cover transition duration-500 ease-out group-hover:scale-[1.02] motion-reduce:transition-none"
+                        loading={index === 0 ? "eager" : "lazy"}
+                        decoding="async"
+                        className="block h-auto w-full max-w-full object-contain"
+                        onError={() => {
+                          console.warn("[landing-images] falha ao carregar imagem", {
+                            slug: salonSlug,
+                            section: "premium-editorial-gallery",
+                            imageId: resolved.image?.id ?? resolved.item.id,
+                            url: resolved.src,
+                          });
+                        }}
                       />
                     ) : null}
                     <span
@@ -277,13 +268,12 @@ export function EditorialTestimonialsSection({
                     style={{ outlineColor: accent }}
                     aria-label="Ampliar depoimento original"
                   >
-                    <Image
+                    <img
                       src={src}
                       alt={testimonial.originalImageAlt?.trim() || ""}
-                      width={1200}
-                      height={900}
-                      unoptimized
-                      className="max-h-80 w-full object-contain"
+                      loading="lazy"
+                      decoding="async"
+                      className="block h-auto w-full max-w-full object-contain"
                     />
                   </button>
                 ) : null}
