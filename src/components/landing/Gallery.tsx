@@ -4,7 +4,6 @@ import { useState } from "react";
 import { getPublicText } from "@/lib/public-landing";
 import { filterValidLandingImages } from "@/lib/salon-images";
 import type { SalonGalleryImage, SalonLanguage } from "@/types/salon";
-import { LandingImage } from "./LandingImage";
 import { SectionHeader } from "./SectionHeader";
 
 type GalleryProps = {
@@ -81,20 +80,23 @@ export function Gallery({
               key={image.id}
               className={getGalleryCardClass(index, loadableImages.length)}
             >
-              <LandingImage
-                image={image}
-                salonSlug={salonSlug ?? salonName ?? "unknown-salon"}
-                section="gallery"
+              <img
+                src={image.src || image.url}
                 alt={image.alt}
-                fill
                 loading={index > 1 ? "lazy" : "eager"}
-                sizes="(min-width: 1280px) 30vw, (min-width: 768px) 50vw, 100vw"
-                className="object-cover transition duration-700 group-hover:scale-[1.03]"
-                onLoadError={(imageId) =>
+                decoding="async"
+                className="block h-auto w-full max-w-full object-contain"
+                onError={() => {
+                  console.warn("[landing-images] falha ao carregar imagem", {
+                    slug: salonSlug ?? salonName ?? "unknown-salon",
+                    section: "gallery",
+                    imageId: image.id,
+                    url: image.src || image.url,
+                  });
                   setFailedImageIds((current) =>
-                    current.includes(imageId) ? current : [...current, imageId],
-                  )
-                }
+                    current.includes(image.id) ? current : [...current, image.id],
+                  );
+                }}
               />
               <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/18 via-transparent to-transparent opacity-70" />
             </figure>
@@ -107,27 +109,27 @@ export function Gallery({
 
 function getGalleryCardClass(index: number, total: number) {
   const base =
-    "group relative overflow-hidden rounded-[1.15rem] border border-[#eadfce] bg-zinc-200 shadow-[0_16px_36px_rgba(83,57,33,0.08)] sm:rounded-[1.55rem]";
+    "group relative min-w-0 self-start overflow-hidden rounded-[1.15rem] border border-[#eadfce] bg-zinc-200 shadow-[0_16px_36px_rgba(83,57,33,0.08)] sm:rounded-[1.55rem]";
 
   if (total === 1) {
-    return `${base} col-span-2 aspect-[4/3] max-h-[21rem] xl:col-span-8 xl:col-start-3`;
+    return `${base} col-span-2 xl:col-span-8 xl:col-start-3`;
   }
 
   if (total === 2) {
-    return `${base} col-span-2 aspect-[4/3] max-h-[18rem] sm:col-span-1 sm:aspect-[4/4.5] xl:max-h-none ${
+    return `${base} col-span-2 sm:col-span-1 ${
       index === 0 ? "xl:col-span-7" : "xl:col-span-5"
     }`;
   }
 
   const variants = [
-    "col-span-2 aspect-[4/3] max-h-[18rem] xl:col-span-5 xl:max-h-none",
-    "aspect-[4/4.6] max-h-[13rem] xl:col-span-4 xl:max-h-none",
-    "aspect-[4/4.6] max-h-[13rem] xl:col-span-3 xl:max-h-none",
-    "aspect-[4/4.6] max-h-[13rem] xl:col-span-3 xl:max-h-none",
-    "aspect-[4/4.6] max-h-[13rem] xl:col-span-3 xl:max-h-none",
-    "col-span-2 aspect-[4/3] max-h-[18rem] xl:col-span-6 xl:max-h-none",
-    "aspect-[4/4.6] max-h-[13rem] xl:col-span-3 xl:max-h-none",
-    "aspect-[4/4.6] max-h-[13rem] xl:col-span-3 xl:max-h-none",
+    "col-span-2 xl:col-span-5",
+    "col-span-1 xl:col-span-4",
+    "col-span-1 xl:col-span-3",
+    "col-span-1 xl:col-span-3",
+    "col-span-1 xl:col-span-3",
+    "col-span-2 xl:col-span-6",
+    "col-span-1 xl:col-span-3",
+    "col-span-1 xl:col-span-3",
   ];
 
   return `${base} ${variants[index % variants.length]}`;

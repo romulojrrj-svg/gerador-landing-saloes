@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -216,20 +215,19 @@ export function FeedbackScreenshotCarousel({
               }`}
             >
               <div
-                className={`relative aspect-[9/16] overflow-hidden rounded-[1.5rem] border bg-white p-2 transition-[border-color,box-shadow,transform] duration-500 ease-out sm:rounded-[2rem] motion-reduce:transition-none ${
+                className={`overflow-hidden rounded-[1.5rem] border bg-white p-2 transition-[border-color,box-shadow,transform] duration-500 ease-out sm:rounded-[2rem] motion-reduce:transition-none ${
                   active
                     ? "border-zinc-300 shadow-[0_24px_55px_rgba(70,42,31,0.12)]"
                     : "border-zinc-200/80 shadow-[0_14px_36px_rgba(70,42,31,0.06)]"
                 }`}
               >
-                <div className="relative h-full w-full overflow-hidden rounded-[1.15rem] bg-[#f8f5f0]">
-                  <Image
+                <div className="w-full overflow-hidden rounded-[1.15rem] bg-[#f8f5f0]">
+                  <img
                     src={item.src}
                     alt={item.alt}
-                    fill
-                    unoptimized
-                    sizes="(min-width: 1024px) 30vw, 82vw"
-                    className="object-contain"
+                    loading={index === 0 ? "eager" : "lazy"}
+                    decoding="async"
+                    className="block h-auto w-full max-w-full object-contain"
                   />
                 </div>
               </div>

@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@source "../../src/components/landing/premium-editorial/v2/InteractiveQuizSection.tsx";
 
 :root {
   color-scheme: light;
